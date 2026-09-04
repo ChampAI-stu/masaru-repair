@@ -298,6 +298,7 @@ form[hidden]{display:none}
       <button data-p="cust"><span class="e">👥</span>ลูกค้า</button>
       <button data-p="parts"><span class="e">📦</span>คลังอะไหล่</button>
       <button data-p="report"><span class="e">📈</span>รายงาน</button>
+      <button data-p="setting"><span class="e">⚙️</span>ตั้งค่า</button>
     </nav>
     <div class="sidefoot">
       <div class="k" id="roleLbl">ผู้ใช้งาน</div>
@@ -513,6 +514,42 @@ form[hidden]{display:none}
         </div>
       </div>
 
+      <!-- ============ ตั้งค่า ============ -->
+      <div class="page" id="p-setting">
+        <div class="card">
+          <h3>🔧 ช่างซ่อม <span class="sp"></span>
+            <button class="btn sm g" onclick="addTech()">+ เพิ่มช่าง</button></h3>
+          <div class="cb"><div class="tw"><table id="tblTech">
+            <thead><tr><th>รหัส</th><th>ชื่อ-สกุล</th><th>ชื่อที่แสดง</th><th>เบอร์โทร</th><th>ความถนัด</th><th class="num">งานค้าง</th><th>สถานะ</th><th class="num"></th></tr></thead>
+            <tbody></tbody></table></div></div>
+        </div>
+
+        <div class="card">
+          <h3>👤 ผู้ใช้งานและสิทธิ์ <span class="sp"></span>
+            <span class="muted" style="font-weight:400;font-size:13px">เปลี่ยนสิทธิ์แล้ว เขาต้องออกจากระบบและเข้าใหม่ 1 ครั้ง</span></h3>
+          <div class="cb"><div class="tw"><table id="tblUsers">
+            <thead><tr><th>ชื่อ</th><th>อีเมล</th><th>สิทธิ์</th><th>ผูกกับช่าง</th><th>เข้าล่าสุด</th><th class="num"></th></tr></thead>
+            <tbody></tbody></table></div></div>
+        </div>
+
+        <div class="card">
+          <h3>🎫 โค้ดเชิญ <span class="sp"></span>
+            <button class="btn sm g" onclick="addInvite()">+ สร้างโค้ด</button></h3>
+          <div class="cb"><div class="tw"><table id="tblInv">
+            <thead><tr><th>โค้ด</th><th>สิทธิ์ที่ได้</th><th>คำอธิบาย</th><th class="num">ใช้ไป</th><th class="num">จำกัด</th><th>สถานะ</th><th class="num"></th></tr></thead>
+            <tbody></tbody></table></div></div>
+        </div>
+
+        <div class="card">
+          <h3>🩺 หมวดอาการเสีย <span class="sp"></span>
+            <button class="btn sm g" onclick="addSym()">+ เพิ่มหมวด</button>
+            <span class="muted" style="font-weight:400;font-size:13px">ใช้ทำกราฟ Top 5</span></h3>
+          <div class="cb"><div class="tw"><table id="tblSym">
+            <thead><tr><th>รหัส</th><th>ชื่อหมวด</th><th class="num">ลำดับ</th><th class="num">ใช้ไปแล้ว</th><th>สถานะ</th><th class="num"></th></tr></thead>
+            <tbody></tbody></table></div></div>
+        </div>
+      </div>
+
     </div>
   </div>
 </div>
@@ -572,8 +609,8 @@ const ROLE_LABEL = { staff:'พนักงานรับเครื่อง'
 const ROLE_PAGES = {
   staff: ['dash','jobs','intake','cust'],
   tech:  ['dash','jobs','parts'],
-  head:  ['dash','jobs','intake','cust','parts','report'],
-  admin: ['dash','jobs','intake','cust','parts','report']
+  head:  ['dash','jobs','intake','cust','parts','report','setting'],
+  admin: ['dash','jobs','intake','cust','parts','report','setting']
 };
 
 function toast(m, err){
@@ -795,7 +832,8 @@ const PGT = {
   intake: ['รับเครื่อง / บันทึกงาน','ขั้นตอนที่ 1/6 — สร้างใบงานซ่อมและ QR Code'],
   cust:   ['ลูกค้า','ประวัติลูกค้าและการซ่อม'],
   parts:  ['คลังอะไหล่','สต็อกและการเบิกใช้'],
-  report: ['รายงาน','วิเคราะห์ข้อมูลเชิงลึก']
+  report: ['รายงาน','วิเคราะห์ข้อมูลเชิงลึก'],
+  setting:['ตั้งค่าระบบ','ช่างซ่อม · ผู้ใช้งาน · โค้ดเชิญ · หมวดอาการ']
 };
 document.querySelectorAll('aside nav button').forEach(b => b.onclick = () => goPage(b.dataset.p));
 function goPage(p){
@@ -809,6 +847,7 @@ function goPage(p){
   if (p === 'cust')   renderCust();
   if (p === 'parts')  loadParts();
   if (p === 'report') loadReport();
+  if (p === 'setting') loadSettings();
 }
 
 /* =====================================================================
@@ -1633,6 +1672,218 @@ async function loadReport(){
       <td>${esc(r.symptom_name)}</td>
       <td class="num"><span class="pill ${r.job_count>=4?'tag-crit':'tag-warn'}">${r.job_count} ครั้ง</span></td></tr>`).join('');
   } catch(e){ console.warn(e); }
+}
+
+
+/* =====================================================================
+   ตั้งค่าระบบ — เฉพาะหัวหน้าช่าง / แอดมิน
+   ===================================================================== */
+const SET = { users:[], invites:[], syms:[] };
+
+async function loadSettings(){
+  try {
+    const [techs, users, inv, syms] = await Promise.all([
+      sb.from('technicians').select('*').order('code'),
+      sb.from('v_app_users').select('*').order('role'),
+      sb.from('invite_codes').select('*').order('created_at'),
+      sb.from('symptom_categories').select('*').order('sort_order')
+    ]);
+    if (techs.error) throw techs.error;
+    S.techs  = (techs.data || []).filter(t => t.is_active);
+    SET.techsAll = techs.data || [];
+    SET.users = users.data || [];
+    SET.invites = inv.data || [];
+    SET.syms = syms.data || [];
+    renderSettings();
+  } catch(e){ fail(e); }
+}
+
+function renderSettings(){
+  /* ---- ช่าง ---- */
+  $('tblTech').querySelector('tbody').innerHTML = (SET.techsAll || []).map(t => {
+    const load = S.jobs.filter(j => j.technician_id === t.id && !CLOSED.includes(j.status)).length;
+    return `<tr>
+      <td class="mono"><b>${esc(t.code)}</b></td>
+      <td>${esc(t.full_name)}</td><td>${esc(t.nickname || '—')}</td>
+      <td>${esc(t.phone || '—')}</td><td class="sub2">${esc(t.skill_note || '—')}</td>
+      <td class="num">${load}</td>
+      <td><span class="pill ${t.is_active ? 'tag-good' : 'st0'}">${t.is_active ? 'ใช้งาน' : 'ปิดใช้'}</span></td>
+      <td class="num">
+        <button class="btn ic" onclick="editTech('${t.id}')" title="แก้ไข">✏️</button>
+        <button class="btn ic ${t.is_active ? 'dn' : ''}" onclick="toggleTech('${t.id}',${!t.is_active})"
+          title="${t.is_active ? 'ปิดใช้งาน' : 'เปิดใช้งาน'}">${t.is_active ? '🚫' : '✓'}</button></td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="8" class="empty">ยังไม่มีช่าง</td></tr>';
+
+  /* ---- ผู้ใช้ ---- */
+  const RL = { staff:'พนักงานรับเครื่อง', tech:'ช่างซ่อม', head:'หัวหน้าช่าง', admin:'ผู้ดูแลระบบ' };
+  $('tblUsers').querySelector('tbody').innerHTML = SET.users.map(u => `<tr>
+    <td><b>${esc(u.full_name)}</b>${u.id === ME.id ? ' <span class="pill st1">คุณ</span>' : ''}</td>
+    <td class="sub2">${esc(u.email)}</td>
+    <td><select class="mini" onchange="changeRole('${esc(u.email)}', this.value)">
+      ${Object.entries(RL).map(([k,v]) => `<option value="${k}" ${k===u.role?'selected':''}>${v}</option>`).join('')}
+    </select></td>
+    <td>${u.tech_code ? `<span class="pill st2">${esc(u.tech_code)} · ${esc(u.tech_name||'')}</span>` : '<span class="muted">—</span>'}</td>
+    <td class="sub2">${u.last_sign_in_at ? dtth(u.last_sign_in_at) : 'ยังไม่เคยเข้า'}</td>
+    <td class="num">${u.id === ME.id ? '' :
+      `<button class="btn ic dn" onclick="revokeUser('${esc(u.email)}')" title="ตัดสิทธิ์">✕</button>`}</td>
+  </tr>`).join('') || '<tr><td colspan="6" class="empty">ยังไม่มีผู้ใช้</td></tr>';
+
+  /* ---- โค้ดเชิญ ---- */
+  $('tblInv').querySelector('tbody').innerHTML = SET.invites.map(c => {
+    const full = c.max_uses !== null && c.used_count >= c.max_uses;
+    return `<tr>
+      <td class="mono"><b>${esc(c.code)}</b></td>
+      <td><span class="pill st2">${RL[c.role] || c.role}</span></td>
+      <td class="sub2">${esc(c.label || '—')}</td>
+      <td class="num">${c.used_count}</td>
+      <td class="num">${c.max_uses ?? '∞'}</td>
+      <td><span class="pill ${!c.is_active ? 'st0' : full ? 'tag-warn' : 'tag-good'}">
+        ${!c.is_active ? 'ปิดแล้ว' : full ? 'ใช้ครบแล้ว' : 'เปิดอยู่'}</span></td>
+      <td class="num">
+        <button class="btn ic" onclick="copyCode('${esc(c.code)}')" title="คัดลอก">📋</button>
+        <button class="btn ic ${c.is_active ? 'dn' : ''}" onclick="toggleInvite('${esc(c.code)}',${!c.is_active})"
+          title="${c.is_active ? 'ปิดโค้ด' : 'เปิดโค้ด'}">${c.is_active ? '🚫' : '✓'}</button></td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="7" class="empty">ยังไม่มีโค้ดเชิญ</td></tr>';
+
+  /* ---- หมวดอาการ ---- */
+  $('tblSym').querySelector('tbody').innerHTML = SET.syms.map(s => {
+    const used = S.jobs.filter(j => j.symptom_category === s.code).length;
+    return `<tr>
+      <td class="mono"><b>${esc(s.code)}</b></td><td>${esc(s.name_th)}</td>
+      <td class="num muted">${s.sort_order}</td><td class="num">${used}</td>
+      <td><span class="pill ${s.is_active ? 'tag-good' : 'st0'}">${s.is_active ? 'ใช้งาน' : 'ปิดใช้'}</span></td>
+      <td class="num"><button class="btn ic ${s.is_active ? 'dn' : ''}"
+        onclick="toggleSym('${esc(s.code)}',${!s.is_active})">${s.is_active ? '🚫' : '✓'}</button></td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="6" class="empty">ยังไม่มีหมวดอาการ</td></tr>';
+}
+
+/* ---------- ช่าง ---------- */
+async function addTech(){
+  const code = prompt('รหัสช่าง เช่น TECH-04');            if (!code) return;
+  const name = prompt('ชื่อ-สกุล เช่น วิทยา ใจงาม');        if (!name) return;
+  const nick = prompt('ชื่อที่แสดงบนแดชบอร์ด', name.split(' ')[0]) || name;
+  const phone = prompt('เบอร์โทร (ข้ามได้)', '') || null;
+  const skill = prompt('ความถนัด เช่น มอเตอร์, แบตเตอรี่ (ข้ามได้)', '') || null;
+  try {
+    const { error } = await sb.from('technicians').insert({
+      code: code.trim().toUpperCase(), full_name: name.trim(),
+      nickname: nick.trim(), phone, skill_note: skill });
+    if (error) throw error;
+    toast('✅ เพิ่มช่างแล้ว');
+    await loadSettings(); refreshTechSelects();
+  } catch(e){ fail(e); }
+}
+
+async function editTech(id){
+  const t = (SET.techsAll || []).find(x => x.id === id); if (!t) return;
+  const nick  = prompt('ชื่อที่แสดง', t.nickname || t.full_name); if (nick === null) return;
+  const phone = prompt('เบอร์โทร', t.phone || '');
+  const skill = prompt('ความถนัด', t.skill_note || '');
+  try {
+    const { error } = await sb.from('technicians').update({
+      nickname: nick.trim() || null, phone: phone || null, skill_note: skill || null }).eq('id', id);
+    if (error) throw error;
+    toast('✅ บันทึกแล้ว');
+    await loadSettings(); refreshTechSelects();
+  } catch(e){ fail(e); }
+}
+
+async function toggleTech(id, on){
+  if (!on && !confirm('ปิดใช้งานช่างคนนี้? งานเดิมยังอยู่ครบ แต่จะไม่ขึ้นในช่องเลือกช่าง')) return;
+  try {
+    const { error } = await sb.from('technicians').update({ is_active: on }).eq('id', id);
+    if (error) throw error;
+    await loadSettings(); refreshTechSelects();
+  } catch(e){ fail(e); }
+}
+
+function refreshTechSelects(){
+  const to = S.techs.map(t => `<option value="${t.id}">${esc(t.nickname || t.full_name)}</option>`).join('');
+  const f = $('fTech'), cur = f.value;
+  f.innerHTML = '<option value="">ช่างทั้งหมด</option>' + to;
+  f.value = cur;
+  renderJobs();
+}
+
+/* ---------- ผู้ใช้ ---------- */
+async function changeRole(email, role){
+  if (!confirm(`เปลี่ยนสิทธิ์ของ ${email} เป็น "${role}"?`)) { loadSettings(); return; }
+  try {
+    const { data, error } = await sb.rpc('set_user_role', { p_email: email, p_role: role });
+    if (error) throw error;
+    toast('✅ ' + data);
+    await loadSettings();
+  } catch(e){ fail(e); loadSettings(); }
+}
+
+async function revokeUser(email){
+  if (!confirm(`ตัดสิทธิ์ ${email} ออกจากระบบ?\n\nบัญชียังอยู่ แต่จะเข้ามาแล้วไม่เห็นข้อมูลใด ๆ`)) return;
+  try {
+    const { data, error } = await sb.rpc('revoke_member', { p_email: email });
+    if (error) throw error;
+    toast('✅ ' + data);
+    await loadSettings();
+  } catch(e){ fail(e); }
+}
+
+/* ---------- โค้ดเชิญ ---------- */
+async function addInvite(){
+  const code = prompt('โค้ดเชิญ เช่น MASARU-TECH-2026'); if (!code) return;
+  const role = prompt('สิทธิ์ที่จะได้ — staff / tech / head / admin', 'tech');
+  if (!role || !['staff','tech','head','admin'].includes(role)) return toast('สิทธิ์ไม่ถูกต้อง', true);
+  const label = prompt('คำอธิบายให้คนอ่านเข้าใจ', role === 'tech' ? 'ช่างซ่อม' : '') || null;
+  const mx = prompt('จำกัดกี่คน? (เว้นว่าง = ไม่จำกัด)', '10');
+  try {
+    const { error } = await sb.from('invite_codes').insert({
+      code: code.trim().toUpperCase(), role, label,
+      max_uses: mx && mx.trim() ? Number(mx) : null });
+    if (error) throw error;
+    toast('✅ สร้างโค้ดแล้ว');
+    await loadSettings();
+  } catch(e){ fail(e); }
+}
+
+async function toggleInvite(code, on){
+  try {
+    const { error } = await sb.from('invite_codes').update({ is_active: on }).eq('code', code);
+    if (error) throw error;
+    toast(on ? 'เปิดโค้ดแล้ว' : 'ปิดโค้ดแล้ว');
+    await loadSettings();
+  } catch(e){ fail(e); }
+}
+
+function copyCode(c){
+  navigator.clipboard?.writeText(c).then(() => toast('📋 คัดลอกโค้ด ' + c + ' แล้ว'))
+    .catch(() => prompt('คัดลอกโค้ดนี้', c));
+}
+
+/* ---------- หมวดอาการ ---------- */
+async function addSym(){
+  const code = prompt('รหัสหมวด (อังกฤษพิมพ์ใหญ่) เช่น CABLE'); if (!code) return;
+  const name = prompt('ชื่อหมวดภาษาไทย เช่น สายไฟขาด');       if (!name) return;
+  const ord  = Number(prompt('ลำดับการแสดง (เลขน้อยขึ้นก่อน)', '100')) || 100;
+  try {
+    const { error } = await sb.from('symptom_categories')
+      .insert({ code: code.trim().toUpperCase(), name_th: name.trim(), sort_order: ord });
+    if (error) throw error;
+    toast('✅ เพิ่มหมวดแล้ว');
+    const { data } = await sb.from('symptom_categories').select('*').eq('is_active', true).order('sort_order');
+    S.cats = data || [];
+    $('nSymCat').innerHTML = '<option value="">— ยังไม่ระบุ —</option>'
+      + S.cats.map(c => `<option value="${c.code}">${esc(c.name_th)}</option>`).join('');
+    await loadSettings();
+  } catch(e){ fail(e); }
+}
+
+async function toggleSym(code, on){
+  try {
+    const { error } = await sb.from('symptom_categories').update({ is_active: on }).eq('code', code);
+    if (error) throw error;
+    await loadSettings();
+  } catch(e){ fail(e); }
 }
 
 /* เปิดใบงานจาก QR */
