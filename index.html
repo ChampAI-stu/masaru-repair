@@ -163,6 +163,19 @@ svg .ax{fill:var(--ink3);font-size:11px;font-family:"Sarabun",sans-serif}
 svg .vl{fill:var(--ink2);font-size:11px;font-weight:700;font-family:"Sarabun",sans-serif;font-variant-numeric:tabular-nums}
 svg .nm{fill:var(--ink);font-size:12.5px;font-family:"Sarabun",sans-serif}
 
+/* รูปภาพ */
+.phs{display:flex;gap:9px;flex-wrap:wrap}
+.ph{position:relative;width:92px;height:92px;border-radius:9px;overflow:hidden;border:1px solid var(--line);background:#f4f7fb;flex:0 0 auto}
+.ph img{width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in}
+.ph .x{position:absolute;top:3px;right:3px;width:20px;height:20px;border:0;border-radius:50%;
+  background:rgba(20,28,44,.72);color:#fff;font-size:11px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.ph.add{display:flex;align-items:center;justify-content:center;border:1.5px dashed var(--line);
+  color:var(--ink3);font-size:24px;cursor:pointer;background:#fbfcfe}
+.ph.add:hover{border-color:var(--blue);color:var(--blue);background:var(--blue-l)}
+.phgrp{margin-bottom:15px}
+.phgrp .t{font-size:12.5px;font-weight:700;color:var(--ink2);margin-bottom:7px;display:flex;gap:7px;align-items:center}
+.phgrp .t .c{background:var(--line2);border-radius:999px;padding:0 7px;font-size:11.5px;color:var(--ink3)}
+
 .box-ok{background:var(--good-l);border:1px solid #b6ddca;border-radius:9px;padding:11px 14px;font-size:14px}
 .box-warn{background:var(--warn-l);border:1px solid #ecd6a4;border-radius:9px;padding:11px 14px;font-size:14px}
 .box-crit{background:var(--crit-l);border:1px solid #f0cbc8;border-radius:9px;padding:11px 14px;font-size:14px}
@@ -358,6 +371,10 @@ svg .nm{fill:var(--ink);font-size:12.5px;font-family:"Sarabun",sans-serif}
                   <div><label>ของที่นำมาด้วย</label><input type="text" id="nAcc" placeholder="เช่น กล่อง, ดอกสว่าน, สายชาร์จ"></div>
                 </div>
               </div>
+              <div style="margin-top:13px">
+                <label>รูปภาพก่อนรับซ่อม <span class="muted" style="font-weight:400">(สูงสุด 6 รูป · ระบบย่อขนาดให้อัตโนมัติ)</span></label>
+                <div class="phs" id="stagedBox"></div>
+              </div>
               <input type="hidden" id="nCustId">
               <div class="row" style="justify-content:flex-end;margin-top:16px">
                 <button class="btn" onclick="clearIntake()">ยกเลิก</button>
@@ -436,6 +453,11 @@ svg .nm{fill:var(--ink);font-size:12.5px;font-family:"Sarabun",sans-serif}
    ===================================================================== */
 const SUPABASE_URL = 'https://rmunaewdmlnsiwogmozq.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_m10p5I53UNKTZbUAEiUaCw_OCSR63mq';
+
+/* รูปภาพ — เอา URL ที่ลงท้ายด้วย /exec จาก Apps Script มาใส่
+   ปล่อยว่างไว้ = ปิดฟีเจอร์รูป ระบบส่วนอื่นยังใช้ได้ปกติ */
+const UPLOAD_URL   = '';
+const UPLOAD_TOKEN = 'masaru-repair-2026';   // ต้องตรงกับ TOKEN ใน upload.gs
 /* ===================================================================== */
 
 /* ---------- ขั้นตอน 6 ขั้น + สี ramp เดียวไล่อ่อน→เข้ม ---------- */
@@ -458,7 +480,7 @@ const CLOSED = ['delivered','cancelled'];
 const stepOf = st => STEP_OF[st] || 0;
 
 let sb = null;
-const S = { jobs:[], techs:[], cats:[], parts:[], custs:[], stock:[], job:null, lines:[], filter:'open' };
+const S = { jobs:[], techs:[], cats:[], parts:[], custs:[], stock:[], job:null, lines:[], photos:[], filter:'open' };
 
 /* ---------- helpers ---------- */
 const $ = id => document.getElementById(id);
@@ -488,6 +510,109 @@ window.__pageAll = async function(build, size = 1000){
     from += size;
   }
 };
+
+/* =====================================================================
+   รูปภาพ — บีบอัดในเบราว์เซอร์ แล้วส่งตรงเข้า Google Drive
+   ไฟล์ไม่ผ่าน Supabase เลย ฐานข้อมูลเก็บแค่ storage_key
+   ===================================================================== */
+const PHASES = [
+  { k:'before',   label:'ก่อนซ่อม',    max:6 },
+  { k:'during',   label:'ระหว่างซ่อม',  max:6 },
+  { k:'after',    label:'หลังซ่อม',     max:4 },
+  { k:'document', label:'เอกสาร',      max:4 }
+];
+const photoUrl  = key => 'https://drive.google.com/thumbnail?id=' + key + '&sz=w600';
+const photoOpen = key => 'https://drive.google.com/file/d/' + key + '/view';
+const uploadOn  = () => !!UPLOAD_URL;
+
+/** ย่อรูปเหลือด้านยาว 1280px คุณภาพ 0.72 — 3MB เหลือราว 80KB */
+function compressImage(file, maxDim = 1280, quality = 0.72){
+  return new Promise((res, rej) => {
+    const rd = new FileReader(), img = new Image();
+    rd.onerror = () => rej(new Error('อ่านไฟล์ไม่ได้'));
+    rd.onload  = () => { img.src = rd.result; };
+    img.onerror = () => rej(new Error('ไฟล์นี้ไม่ใช่รูปภาพ'));
+    img.onload = () => {
+      const sc = Math.min(1, maxDim / Math.max(img.width, img.height));
+      const w = Math.round(img.width * sc), h = Math.round(img.height * sc);
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#fff'; ctx.fillRect(0,0,w,h);
+      ctx.drawImage(img, 0, 0, w, h);
+      res(c.toDataURL('image/jpeg', quality));
+    };
+    rd.readAsDataURL(file);
+  });
+}
+
+/** ห้ามใส่ header Content-Type — จะโดน CORS preflight แล้ว Apps Script ตอบไม่ได้ */
+async function driveCall(payload){
+  const r = await fetch(UPLOAD_URL, {
+    method: 'POST',
+    body: JSON.stringify({ token: UPLOAD_TOKEN, ...payload })
+  });
+  const j = await r.json();
+  if (!j.ok) throw new Error(j.error || 'Google ตอบกลับผิดพลาด');
+  return j;
+}
+
+async function uploadPhotos(files, jobId, jobNo, phase){
+  if (!uploadOn()) { toast('ยังไม่ได้ตั้งค่า UPLOAD_URL', true); return 0; }
+  let n = 0;
+  for (const f of files){
+    try {
+      const data = await compressImage(f);
+      const up = await driveCall({ action:'upload', jobNo, phase, mime:'image/jpeg', data });
+      const { error } = await sb.from('repair_photos').insert({
+        job_id: jobId, phase, provider:'gdrive',
+        storage_key: up.fileId, bytes: up.bytes, created_by: who()
+      });
+      if (error) throw error;
+      n++;
+    } catch(e){ fail(e); }
+  }
+  return n;
+}
+
+async function deletePhoto(id, key){
+  if (!confirm('ลบรูปนี้?')) return;
+  try {
+    const { error } = await sb.from('repair_photos').delete().eq('id', id);
+    if (error) throw error;
+    if (uploadOn()) { try { await driveCall({ action:'delete', fileId:key }); } catch(e){ console.warn(e); } }
+    toast('ลบรูปแล้ว');
+    await openJob(S.job.id);
+  } catch(e){ fail(e); }
+}
+
+async function addPhotos(input, phase){
+  const files = [...input.files];
+  input.value = '';
+  if (!files.length) return;
+  toast(`⏳ กำลังอัปโหลด ${files.length} รูป…`);
+  const n = await uploadPhotos(files, S.job.id, S.job.job_no, phase);
+  if (n) toast(`✅ อัปโหลด ${n} รูปแล้ว`);
+  await openJob(S.job.id);
+}
+
+/* -- รูปตอนรับเครื่อง: พักไว้ในหน่วยความจำก่อน แล้วอัปหลังสร้างใบงานเสร็จ -- */
+let INTAKE_FILES = [];
+function stageIntake(input){
+  INTAKE_FILES = INTAKE_FILES.concat([...input.files]).slice(0,6);
+  input.value = '';
+  renderStaged();
+}
+function unstage(i){ INTAKE_FILES.splice(i,1); renderStaged(); }
+function renderStaged(){
+  const box = $('stagedBox');
+  if (!box) return;
+  box.innerHTML = INTAKE_FILES.map((f,i) =>
+    `<div class="ph"><img src="${URL.createObjectURL(f)}" alt="รูปก่อนรับซ่อม ${i+1}">
+     <button class="x" onclick="unstage(${i})" title="เอาออก">✕</button></div>`).join('')
+    + (INTAKE_FILES.length < 6
+      ? `<label class="ph add">＋<input type="file" accept="image/*" multiple hidden onchange="stageIntake(this)"></label>` : '');
+}
 
 /* =====================================================================
    กราฟ — วาดเป็น SVG เอง ไม่ต้องโหลดไลบรารี
@@ -894,6 +1019,7 @@ function clearIntake(){
     .forEach(id => $(id).value = '');
   $('nSymCat').value = ''; $('nTech').value = '';
   $('warrBox').innerHTML = ''; $('warrBox').dataset.status = ''; $('custHint').textContent = '';
+  INTAKE_FILES = []; renderStaged();
 }
 
 async function saveJob(){
@@ -924,6 +1050,12 @@ async function saveJob(){
     }).select('id, job_no').single();
     if (error) throw error;
     toast('✅ สร้างใบงาน ' + job.job_no + ' แล้ว');
+
+    if (INTAKE_FILES.length && uploadOn()){
+      toast(`⏳ กำลังอัปโหลดรูป ${INTAKE_FILES.length} รูป…`);
+      const n = await uploadPhotos(INTAKE_FILES, job.id, job.job_no, 'before');
+      if (n) toast(`✅ ใบงาน ${job.job_no} · อัปโหลดรูป ${n} รูปแล้ว`);
+    }
     clearIntake();
     await reloadAll();
     openJob(job.id);
@@ -937,12 +1069,13 @@ function closeJob(){ $('mask').classList.remove('on'); document.body.style.overf
 
 async function openJob(id){
   try {
-    const [j, lines] = await Promise.all([
+    const [j, lines, photos] = await Promise.all([
       sb.from('v_jobs').select('*').eq('id', id).single(),
-      sb.from('repair_parts_used').select('*, parts_master(part_no,name)').eq('job_id', id).order('created_at')
+      sb.from('repair_parts_used').select('*, parts_master(part_no,name)').eq('job_id', id).order('created_at'),
+      sb.from('repair_photos').select('*').eq('job_id', id).order('created_at')
     ]);
     if (j.error) throw j.error;
-    S.job = j.data; S.lines = lines.data || [];
+    S.job = j.data; S.lines = lines.data || []; S.photos = photos.data || [];
     renderJobModal();
     $('mask').classList.add('on'); document.body.style.overflow = 'hidden';
   } catch(e){ fail(e); }
@@ -990,6 +1123,25 @@ function renderJobModal(){
           ${esc(j.symptom||'—')} ${j.symptom_name ? `<span class="pill st1">${esc(j.symptom_name)}</span>` : ''}</div></div>
       <div class="noprint" style="margin-top:13px"><label>QR Code ใบงาน</label><div id="qrbox"></div></div>
     </div></div>
+
+    <div class="card"><h3>📸 รูปภาพ <span class="sp"></span>
+      <span class="muted" style="font-weight:400;font-size:13px">
+        ${uploadOn() ? 'ย่อขนาดในเครื่องก่อนอัปโหลด · เก็บที่ Google Drive' : '⚠️ ยังไม่ได้ตั้งค่า UPLOAD_URL'}</span></h3>
+      <div class="cb">${PHASES.map(p => {
+        const list = S.photos.filter(x => x.phase === p.k);
+        return `<div class="phgrp">
+          <div class="t">${p.label}<span class="c">${list.length}/${p.max}</span></div>
+          <div class="phs">
+            ${list.map(ph => `<div class="ph">
+              <img src="${photoUrl(ph.storage_key)}" alt="${p.label}" loading="lazy"
+                   onclick="window.open('${photoOpen(ph.storage_key)}','_blank')">
+              <button class="x noprint" onclick="deletePhoto('${ph.id}','${ph.storage_key}')" title="ลบรูป">✕</button>
+            </div>`).join('')}
+            ${uploadOn() && list.length < p.max ? `<label class="ph add noprint">＋
+              <input type="file" accept="image/*" multiple hidden onchange="addPhotos(this,'${p.k}')"></label>` : ''}
+          </div></div>`;
+      }).join('')}</div>
+    </div>
 
     <div class="card"><h3>🔧 ส่วนช่าง</h3><div class="cb">
       <div class="grid g2">
