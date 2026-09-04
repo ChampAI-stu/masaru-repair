@@ -61,6 +61,42 @@ aside nav button .e{font-size:16px;width:20px;text-align:center}
 .search{position:relative;min-width:210px}
 .phead .search input{width:100%;padding:9px 14px 9px 34px;border:1px solid var(--line);border-radius:999px;background:#f7f9fc}
 .search .mg{position:absolute;left:12px;top:8px;color:var(--ink3)}
+/* กระดิ่งแจ้งเตือน */
+.bell{position:relative;border:1px solid var(--line);background:#fff;border-radius:10px;
+  padding:7px 11px;font-size:17px;cursor:pointer;line-height:1}
+.bell:hover{background:#f6f9fd}
+.bell.act{border-color:var(--blue);background:var(--blue-l)}
+.bell .badge{position:absolute;top:-6px;right:-6px;min-width:20px;height:20px;padding:0 5px;
+  border-radius:999px;background:var(--crit);color:#fff;font-size:11.5px;font-weight:800;
+  display:flex;align-items:center;justify-content:center;border:2px solid #fff;font-variant-numeric:tabular-nums}
+.bell .badge[hidden]{display:none}
+
+.npanel{position:absolute;top:calc(100% + 6px);right:14px;width:min(400px,calc(100vw - 28px));
+  background:#fff;border:1px solid var(--line);border-radius:12px;z-index:60;
+  box-shadow:0 14px 40px rgba(20,30,50,.22);overflow:hidden;display:none}
+.npanel.on{display:block}
+.nphead{padding:14px 17px;border-bottom:1px solid var(--line2);display:flex;align-items:center;gap:9px}
+.nphead b{font-size:15px;color:var(--navy)}
+.nphead .sp{flex:1}
+.nplist{max-height:min(460px,60vh);overflow-y:auto}
+.ngrp{padding:9px 17px 5px;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--ink3);background:#fafbfd;border-bottom:1px solid var(--line2)}
+.nitem{display:flex;gap:11px;padding:11px 17px;border-bottom:1px solid var(--line2);
+  cursor:pointer;align-items:flex-start;text-align:left;width:100%;background:none;border-left:0;border-right:0;border-top:0}
+.nitem:hover{background:#f7fafd}
+.nitem .ic{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;
+  font-size:14px;flex:0 0 auto}
+.nitem .tx{flex:1;min-width:0}
+.nitem .t1{font-size:13.8px;font-weight:600;color:var(--ink);line-height:1.4}
+.nitem .t2{font-size:12px;color:var(--ink3);margin-top:2px}
+.nitem .rt{font-size:11.5px;font-weight:800;white-space:nowrap;padding-top:2px}
+.lv-crit .ic{background:var(--crit-l);color:var(--crit)} .lv-crit .rt{color:var(--crit)}
+.lv-warn .ic{background:var(--warn-l);color:var(--warn)} .lv-warn .rt{color:var(--warn)}
+.lv-ok   .ic{background:var(--good-l);color:var(--good)} .lv-ok   .rt{color:var(--good)}
+.lv-info .ic{background:var(--blue-l);color:var(--blue)} .lv-info .rt{color:var(--blue)}
+.npempty{padding:36px 18px;text-align:center;color:var(--ink3)}
+.npempty .e{font-size:34px;display:block;margin-bottom:8px}
+
 .avatar{width:36px;height:36px;border-radius:50%;background:var(--navy);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px}
 .content{padding:20px 22px 60px;max-width:1500px;width:100%}
 .page{display:none}.page.on{display:block}
@@ -345,7 +381,17 @@ form[hidden]{display:none}
         <span class="mg">🔍</span>
         <input type="text" id="gSearch" placeholder="ค้นหาเลขที่งาน / ลูกค้า / Serial…">
       </div>
+      <button class="bell" id="bellBtn" title="การแจ้งเตือน" aria-haspopup="true" aria-expanded="false">
+        🔔<span class="badge" id="bellCount" hidden>0</span></button>
       <div class="avatar" id="avatar">—</div>
+
+      <div class="npanel" id="npanel" role="dialog" aria-label="การแจ้งเตือน">
+        <div class="nphead"><b>การแจ้งเตือน</b>
+          <span class="pill tag-crit" id="npCount">0</span>
+          <span class="sp"></span>
+          <button class="btn sm" onclick="closeBell()">ปิด</button></div>
+        <div class="nplist" id="nplist"></div>
+      </div>
     </div>
 
     <div class="content">
@@ -1175,13 +1221,14 @@ async function startApp(session){
 
 async function reloadAll(){
   try {
-    const [jobs, custs] = await Promise.all([
+    const [jobs, custs, stock] = await Promise.all([
       window.__pageAll(() => sb.from('v_jobs').select('*').order('received_at', { ascending:false })),
-      window.__pageAll(() => sb.from('repair_customers').select('*').order('name'))
+      window.__pageAll(() => sb.from('repair_customers').select('*').order('name')),
+      window.__pageAll(() => sb.from('v_parts_stock').select('*'))
     ]);
-    S.jobs = jobs; S.custs = custs;
+    S.jobs = jobs; S.custs = custs; S.stock = stock;
     $('connSt').textContent = `● เชื่อมต่อแล้ว · ${jobs.length} ใบงาน`;
-    renderDash(); renderChips(); renderJobs(); renderCust();
+    renderDash(); renderChips(); renderJobs(); renderCust(); renderBell();
   } catch(e){ fail(e); }
 }
 
@@ -1686,7 +1733,7 @@ function renderCust(){
    คลังอะไหล่
    ===================================================================== */
 async function loadParts(){
-  try { S.stock = await window.__pageAll(() => sb.from('v_parts_stock').select('*')); renderParts(); }
+  try { S.stock = await window.__pageAll(() => sb.from('v_parts_stock').select('*')); renderParts(); renderBell(); }
   catch(e){ fail(e); }
 }
 function renderParts(){
@@ -2054,6 +2101,104 @@ async function toggleSym(code, on){
     await loadSettings();
   } catch(e){ fail(e); }
 }
+
+/* =====================================================================
+   การแจ้งเตือน — คำนวณสด ๆ จากข้อมูลจริง ไม่ต้องมีตารางเพิ่ม
+   ===================================================================== */
+function buildAlerts(){
+  const A = [];
+  const open = S.jobs.filter(j => !CLOSED.includes(j.status));
+  const today = new Date(); today.setHours(0,0,0,0);
+  const dayDiff = d => Math.round((new Date(d).setHours(0,0,0,0) - today) / 864e5);
+
+  // เกินกำหนด — เร่งด่วนสุด
+  open.filter(j => j.days_overdue > 0)
+      .sort((a,b) => b.days_overdue - a.days_overdue)
+      .forEach(j => A.push({ g:'เกินกำหนด', lv:'crit', ic:'🚨',
+        t1:`${j.job_no} · ${j.customer_name || '—'}`,
+        t2:`${[j.brand,j.model].filter(Boolean).join(' ') || j.tool_type || 'ไม่ระบุเครื่อง'} · ${j.tech_name || 'ยังไม่มอบหมาย'}`,
+        rt:`เกิน ${j.days_overdue} วัน`, go:() => openJob(j.id) }));
+
+  // ครบกำหนดวันนี้ / พรุ่งนี้
+  open.filter(j => j.due_date && !(j.days_overdue > 0) && dayDiff(j.due_date) <= 1)
+      .sort((a,b) => new Date(a.due_date) - new Date(b.due_date))
+      .forEach(j => { const d = dayDiff(j.due_date);
+        A.push({ g:'ใกล้ครบกำหนด', lv:'warn', ic:'⏰',
+          t1:`${j.job_no} · ${j.customer_name || '—'}`,
+          t2:`${j.tech_name || 'ยังไม่มอบหมาย'} · ${STATUS[j.status] || j.status}`,
+          rt: d <= 0 ? 'วันนี้' : 'พรุ่งนี้', go:() => openJob(j.id) }); });
+
+  // ยังไม่มอบหมายช่าง
+  open.filter(j => !j.technician_id)
+      .forEach(j => A.push({ g:'ยังไม่มอบหมายช่าง', lv:'warn', ic:'👤',
+        t1:`${j.job_no} · ${j.customer_name || '—'}`,
+        t2:`รับเข้ามา ${j.days_in_shop ?? 0} วันแล้ว`,
+        rt:'รอจ่ายงาน', go:() => openJob(j.id) }));
+
+  // รออะไหล่
+  open.filter(j => j.status === 'wait_parts')
+      .forEach(j => A.push({ g:'งานติดรออะไหล่', lv:'warn', ic:'📦',
+        t1:`${j.job_no} · ${[j.brand,j.model].filter(Boolean).join(' ') || '—'}`,
+        t2:`${j.tech_name || '—'} · ค้าง ${j.days_in_shop ?? 0} วัน`,
+        rt:'รออะไหล่', go:() => openJob(j.id) }));
+
+  // พร้อมส่งมอบ — ต้องโทรตามลูกค้า
+  S.jobs.filter(j => j.status === 'ready')
+        .forEach(j => A.push({ g:'พร้อมส่งมอบ — รอลูกค้ารับ', lv:'ok', ic:'✅',
+          t1:`${j.job_no} · ${j.customer_name || '—'}`,
+          t2:`${j.customer_phone || 'ไม่มีเบอร์ติดต่อ'} · รวม ฿${money(j.total_cost)}`,
+          rt:'นัดรับได้', go:() => openJob(j.id) }));
+
+  // อะไหล่หมด / ติดลบ / ถึงจุดสั่งซื้อ
+  (S.stock || []).filter(p => p.stock_state !== 'ปกติ')
+    .sort((a,b) => a.qty - b.qty)
+    .forEach(p => A.push({
+      g:'อะไหล่ต้องสั่งเพิ่ม', lv: p.qty <= 0 ? 'crit' : 'warn', ic:'🔩',
+      t1:`${p.part_no} · ${p.name}`,
+      t2:`เหลือ ${p.qty} ${p.unit || ''} · จุดสั่งซื้อ ${p.reorder_point} · ใช้ไป 90 วัน ${p.used_90d}`,
+      rt:p.stock_state, go:() => goPage('parts') }));
+
+  return A;
+}
+
+function renderBell(){
+  const A = buildAlerts();
+  const b = $('bellCount');
+  b.textContent = A.length > 99 ? '99+' : A.length;
+  b.hidden = A.length === 0;
+  $('npCount').textContent = A.length + ' รายการ';
+
+  if (!A.length){
+    $('nplist').innerHTML = `<div class="npempty"><span class="e">🎉</span>
+      ไม่มีอะไรต้องจัดการตอนนี้<br><span class="sub2">งานทั้งหมดอยู่ในกำหนด และอะไหล่พอใช้</span></div>`;
+    return;
+  }
+  let html = '', last = null;
+  A.forEach((a, i) => {
+    if (a.g !== last){ html += `<div class="ngrp">${esc(a.g)}</div>`; last = a.g; }
+    html += `<button class="nitem lv-${a.lv}" onclick="hitAlert(${i})">
+      <span class="ic">${a.ic}</span>
+      <span class="tx"><span class="t1">${esc(a.t1)}</span><span class="t2">${esc(a.t2)}</span></span>
+      <span class="rt">${esc(a.rt)}</span></button>`;
+  });
+  $('nplist').innerHTML = html;
+  window.__alerts = A;
+}
+
+function hitAlert(i){ closeBell(); window.__alerts?.[i]?.go?.(); }
+function closeBell(){ $('npanel').classList.remove('on'); $('bellBtn').classList.remove('act'); $('bellBtn').setAttribute('aria-expanded','false'); }
+
+$('bellBtn').addEventListener('click', e => {
+  e.stopPropagation();
+  const on = $('npanel').classList.toggle('on');
+  $('bellBtn').classList.toggle('act', on);
+  $('bellBtn').setAttribute('aria-expanded', on);
+  if (on) renderBell();
+});
+document.addEventListener('click', e => {
+  if ($('npanel').classList.contains('on') && !$('npanel').contains(e.target) && e.target !== $('bellBtn')) closeBell();
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeBell(); });
 
 /* เปิดใบงานจาก QR */
 window.addEventListener('load', () => {
