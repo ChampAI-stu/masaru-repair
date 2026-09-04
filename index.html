@@ -301,6 +301,8 @@ svg .nm{fill:var(--ink);font-size:12.5px;font-family:"Sarabun",sans-serif}
 .kv .k{color:var(--ink3);flex:0 0 auto}
 .kv .v{font-weight:700;text-align:right;word-break:break-word}
 .kv .v.mono{font-weight:600}
+.recap{background:#f7fafd;border:1px solid var(--line2);border-radius:9px;padding:11px 14px;
+  font-size:13.5px;color:var(--ink2);margin-top:16px;white-space:pre-line;line-height:1.7}
 .jhint{background:var(--blue-l);border:1px solid #cadff2;border-radius:9px;padding:10px 14px;
   font-size:13.5px;color:var(--navy);margin-bottom:16px}
 .chipset{display:flex;gap:6px;flex-wrap:wrap}
@@ -601,10 +603,9 @@ form[hidden]{display:none}
               <div class="grid">
                 <div><label>อาการเสียที่ลูกค้าแจ้ง <span class="req">*</span></label>
                   <textarea id="nSymptom" placeholder="อธิบายอาการเสีย…"></textarea></div>
-                <div class="grid g2" style="gap:13px">
-                  <div><label>หมวดอาการ (ใช้ทำสถิติ)</label><select id="nSymCat"><option value="">— ยังไม่ระบุ —</option></select></div>
-                  <div><label>ของที่นำมาด้วย</label><input type="text" id="nAcc" placeholder="เช่น กล่อง, ดอกสว่าน, สายชาร์จ"></div>
-                </div>
+                <div><label>ของที่นำมาด้วย</label>
+                  <input type="text" id="nAcc" placeholder="เช่น กล่อง, ดอกสว่าน, สายชาร์จ"></div>
+                <select id="nSymCat" hidden><option value="">—</option></select>
               </div>
               <div style="margin-top:13px">
                 <label>รูปภาพก่อนรับซ่อม <span class="muted" style="font-weight:400">(สูงสุด 6 รูป · ระบบย่อขนาดให้อัตโนมัติ)</span></label>
@@ -1694,7 +1695,7 @@ async function saveJob(){
 /* =====================================================================
    ใบงาน (modal)
    ===================================================================== */
-function closeJob(){ goPage('jobs'); renderJobs();
+function closeJob(){ S.peek = null; goPage('jobs'); renderJobs();
   const r = document.querySelector('#tblJobs tbody tr.seen');
   if (r) r.scrollIntoView({ block:'nearest' });
 }
@@ -1761,6 +1762,9 @@ function photoBox(phase, label, max){
    ===================================================================== */
 function renderJobPage(){
   const j = S.job, cur = stepOf(j.status) || 1, sd = STEPS[cur-1];
+  const view = S.peek || cur, vs = STEPS[view-1];
+  $('pgTitle').textContent = 'รายละเอียดงานซ่อม';
+  $('pgSub').textContent = `ขั้นตอน ${cur}/6 · ${sd.label}`;
   const late = j.days_overdue > 0;
   const pc = S.lines.reduce((s,l) => s + Number(l.line_total||0), 0);
   const hist = S.jobs.filter(x => x.customer_id === j.customer_id && x.id !== j.id).length;
@@ -1769,7 +1773,7 @@ function renderJobPage(){
   <div class="card noprint"><div class="cb">
     <div class="prog">${progBar(cur)}</div>
     <div class="sub2" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line2)">
-      ขั้นตอนปัจจุบัน: <b style="color:var(--navy)">${cur}/6 ${esc(sd.label)}</b> — ${esc(sd.hint)}</div>
+      ขั้นตอนปัจจุบัน: <b style="color:var(--navy)">${cur}/6 ${esc(sd.label)}</b> · ${esc(vs.hint)}</div>
   </div></div>
 
   <div class="card"><div class="cb" style="display:flex;align-items:center;gap:11px;flex-wrap:wrap;padding:13px 18px">
@@ -1820,10 +1824,8 @@ function renderJobPage(){
     </div>
 
     <div class="card">
-      <h3><span class="jnum" style="background:${(S.peek?STEPS[S.peek-1]:sd).c};color:${(S.peek?STEPS[S.peek-1]:sd).ink}">${S.peek||cur}</span>
-        ${esc((S.peek?STEPS[S.peek-1]:sd).label)}
-        ${S.peek ? '<span class="pill tag-warn">ย้อนดูประวัติ</span>' : ''}</h3>
-      <div class="cb" id="stepForm">${S.peek ? stepReadOnly(S.peek, j) : stepForm(cur, j, pc)}</div>
+      <h3><span class="jnum" style="background:${vs.c};color:${vs.ink}">${view}</span> ${esc(vs.label)}</h3>
+      <div class="cb" id="stepForm">${stepForm(view, j, pc)}</div>
     </div>
   </div>`;
 
@@ -1832,46 +1834,73 @@ function renderJobPage(){
     qb.innerHTML = '';
     new QRCode(qb, { text: location.origin + location.pathname + '?job=' + j.id, width:118, height:118, correctLevel: QRCode.CorrectLevel.M });
   }
-  if (!S.peek) bindStepForm(cur, pc);
+  bindStepForm(view, pc);
 }
 
-/* ---------- ฟอร์มของแต่ละขั้น ---------- */
-function stepForm(cur, j, pc){
-  const hint = t => `<div class="jhint">${esc(t)}</div>`;
-  const back = cur > 1 ? `<button class="btn" onclick="moveStep(${cur-1})">← ย้อนขั้น</button>` : '';
-  const save = `<button class="btn" onclick="saveStep()">💾 บันทึก</button>`;
+/* ---------- ฟอร์มของแต่ละขั้น ----------
+   ขั้นที่ผ่านมาแล้ว "แก้ไขได้" เหมือนต้นฉบับ ไม่ได้ล็อกอ่านอย่างเดียว
+   ------------------------------------------------------------------ */
+const tHM  = iso => iso ? new Date(iso).toTimeString().slice(0,5) : '';
+const hmTs = (t, base) => {
+  if (!t) return null;
+  const d = base ? new Date(base) : new Date();
+  const [H,M] = t.split(':'); d.setHours(+H, +M, 0, 0);
+  return d.toISOString();
+};
 
-  if (cur === 1) return hint('ข้อมูลรับเครื่องบันทึกครบแล้ว · ตรวจสอบทางซ้ายอีกครั้งก่อนไปขั้นถัดไป') + `
+function stepForm(nStep, j, pc){
+  const cur  = stepOf(j.status) || 1;
+  const past = nStep < cur;
+  const sd   = STEPS[nStep-1];
+
+  const hint = `<div class="jhint">${esc(sd.hint)} · <b>${past ? 'ผ่านแล้ว — แก้ไขได้' : 'กำลังดำเนินการ'}</b></div>`;
+  const recap = t => `<div class="recap">${t}</div>`;
+  const save  = `<button class="btn" onclick="saveStep()">บันทึก</button>`;
+  const back  = nStep > 1 ? `<button class="btn" onclick="moveStep(${nStep-1})">← ย้อนขั้น</button>` : '';
+  const toCur = `<button class="btn g" onclick="peekStep(${cur})">ไปขั้นปัจจุบัน (${cur}) →</button>`;
+  const deliver = `<button class="btn" style="background:#1c1c1c;border-color:#1c1c1c;color:#fff"
+     onclick="setStatus('delivered')">ยืนยันส่งมอบลูกค้า</button>`;
+  const foot = extras => `<div class="jfoot">${past ? save + toCur + (cur === 6 ? deliver : '')
+                                                   : back + save + extras}</div>`;
+
+  /* ---- 1 รับเครื่อง ---- */
+  if (nStep === 1) return hint + `
     <div class="grid g2">
-      <div><label>กำหนดเสร็จ</label><input type="date" id="sDue" value="${(j.due_date||'').slice(0,10)}"></div>
-      <div><label>หมวดอาการ (ใช้ทำสถิติ)</label><select id="sCat">
-        <option value="">— ยังไม่ระบุ —</option>
-        ${S.cats.map(c => `<option value="${c.code}" ${c.code===j.symptom_category?'selected':''}>${esc(c.name_th)}</option>`).join('')}
-      </select></div>
-    </div>
-    <div class="jfoot">${save}<button class="btn g" onclick="moveStep(2)">ไปตรวจเช็ค →</button></div>`;
-
-  if (cur === 2) return hint('บันทึกอาการที่พบจากการตรวจเช็คจริง และสาเหตุที่ทำให้เสีย') + `
-    <div class="grid">
-      <div><label>อาการที่พบจากการตรวจเช็ค <span class="req">*</span></label>
-        <textarea id="sInspect" placeholder="เช่น แรงกระแทกกลาง มีเสียงดังจากชุดเกียร์">${esc(j.inspect_result||'')}</textarea></div>
-      <div><label>สาเหตุ</label>
-        <textarea id="sCause" placeholder="เช่น ลูกปืนชุด Hammer เสื่อมสภาพ">${esc(j.cause||'')}</textarea></div>
-    </div>
-    <div class="jfoot">${back}${save}<button class="btn g" onclick="moveStep(3)">ไปมอบหมายงาน →</button></div>`;
-
-  if (cur === 3) return hint('เลือกช่างผู้รับผิดชอบและยืนยันกำหนดเสร็จ') + `
-    <div class="grid g2">
-      <div><label>ช่างผู้รับผิดชอบ <span class="req">*</span></label><select id="sTech">
-        <option value="">— เลือกช่าง —</option>
-        ${S.techs.map(t => `<option value="${t.id}" ${t.id===j.technician_id?'selected':''}>${esc(t.nickname||t.full_name)}
-          — งานค้าง ${S.jobs.filter(x => x.technician_id===t.id && !CLOSED.includes(x.status)).length}</option>`).join('')}
-      </select></div>
+      <div><label>วันที่รับ</label><input type="date" id="sRecv" value="${(j.received_at||'').slice(0,10)}"></div>
       <div><label>กำหนดเสร็จ</label><input type="date" id="sDue" value="${(j.due_date||'').slice(0,10)}"></div>
     </div>
-    <div class="jfoot">${back}${save}<button class="btn g" onclick="moveStep(4)">เริ่มซ่อม →</button></div>`;
+    <div style="margin-top:14px"><label>อาการเสียที่ลูกค้าแจ้ง <span class="req">*</span></label>
+      <textarea id="sSymptom">${esc(j.symptom||'')}</textarea></div>
+    <div style="margin-top:14px"><label>ของที่นำมาด้วย</label>
+      <input type="text" id="sAcc" value="${esc(j.accessories||'')}" placeholder="กล่อง, ดอกสว่าน"></div>
+    ` + foot(`<button class="btn g" onclick="moveStep(2)">ไปตรวจเช็ค →</button>`);
 
-  if (cur === 4) return hint('ซ่อม เปลี่ยนอะไหล่ หรือรออุปกรณ์ · กำลังดำเนินการ') + `
+  /* ---- 2 ตรวจเช็ค ---- */
+  if (nStep === 2) return hint + `
+    <div><label>หมวดอาการที่พบ</label><select id="sCat">
+      <option value="">— ยังไม่ระบุ —</option>
+      ${S.cats.map(c => `<option value="${c.code}" ${c.code===j.symptom_category?'selected':''}>${esc(c.name_th)}</option>`).join('')}
+    </select></div>
+    <div style="margin-top:14px"><label>อาการที่พบ (จากการตรวจเช็ค) <span class="req">*</span></label>
+      <textarea id="sInspect" placeholder="เช่น ทริกเกอร์ชำรุด">${esc(j.inspect_result||'')}</textarea></div>
+    ${recap('อาการที่ลูกค้าแจ้ง: ' + esc(j.symptom || '—'))}
+    ` + foot(`<button class="btn g" onclick="moveStep(3)">ไปมอบหมายงาน →</button>`);
+
+  /* ---- 3 มอบหมายงาน ---- */
+  if (nStep === 3) return hint + `
+    <div><label>มอบหมายช่าง <span class="req">*</span></label><select id="sTech">
+      <option value="">— เลือกช่าง —</option>
+      ${S.techs.map(t => `<option value="${t.id}" ${t.id===j.technician_id?'selected':''}>${esc(t.nickname||t.full_name)} — งานค้าง ${S.jobs.filter(x => x.technician_id===t.id && !CLOSED.includes(x.status)).length}</option>`).join('')}
+    </select></div>
+    <div class="grid g2" style="margin-top:14px">
+      <div><label>เวลาเริ่มงาน</label><input type="time" id="sStart" value="${tHM(j.started_at)}"></div>
+      <div><label>เวลาที่คาดว่าเสร็จ</label><input type="time" id="sExpect" value="${tHM(j.expect_at)}"></div>
+    </div>
+    ${recap('ผลตรวจเช็ค: ' + esc(j.inspect_result || '—'))}
+    ` + foot(`<button class="btn g" onclick="moveStep(4)">เริ่มซ่อม →</button>`);
+
+  /* ---- 4 ซ่อม / เปลี่ยนอะไหล่ ---- */
+  if (nStep === 4) return hint + `
     <div><label>วิธีการซ่อม <span class="req">*</span></label>
       <textarea id="sMethod" placeholder="เปลี่ยนลูกปืน, ทำความสะอาด Gear Housing, เติม Grease">${esc(j.repair_method||'')}</textarea></div>
 
@@ -1880,8 +1909,7 @@ function stepForm(cur, j, pc){
         <thead><tr><th>PART NO.</th><th>รายการ</th><th class="num">จำนวน</th><th class="num">ราคา</th><th class="num noprint"></th></tr></thead>
         <tbody>${S.lines.length ? S.lines.map(l => `<tr>
           <td class="mono"><b>${esc(l.parts_master?.part_no||'')}</b></td>
-          <td>${esc(l.parts_master?.name||'')}</td>
-          <td class="num">${l.qty}</td>
+          <td>${esc(l.parts_master?.name||'')}</td><td class="num">${l.qty}</td>
           <td class="num">฿${money2(l.line_total)}</td>
           <td class="num noprint"><button class="btn ic dn" onclick="removeLine('${l.id}')">✕</button></td></tr>`).join('')
           : '<tr><td colspan="5" class="muted" style="text-align:center;padding:16px">ยังไม่มีอะไหล่</td></tr>'}</tbody>
@@ -1893,127 +1921,51 @@ function stepForm(cur, j, pc){
         <input type="number" id="aPrice" placeholder="ราคา" min="0" title="ราคา/หน่วย">
         <button class="btn p" onclick="addLineInline()" title="เพิ่ม">＋</button>
       </div>
-      <datalist id="partList">${S.parts.map(p =>
-        `<option value="${esc(p.part_no)}">${esc(p.name)}</option>`).join('')}</datalist>
+      <datalist id="partList">${S.parts.map(p => `<option value="${esc(p.part_no)}">${esc(p.name)}</option>`).join('')}</datalist>
     </div>
 
     <div style="margin-top:16px">
       <div class="sumrow"><span>รวมค่าอะไหล่</span><b>฿${money2(pc)}</b></div>
-      <div class="sumrow"><span>ค่าแรง</span>
-        <input type="number" id="sLabor" value="${Number(j.labor_cost)||0}" min="0" step="10"></div>
-      <div class="sumrow"><span>ส่วนลด</span>
-        <input type="number" id="sDiscount" value="${Number(j.discount)||0}" min="0" step="10"></div>
+      <div class="sumrow"><span>ค่าแรง</span><input type="number" id="sLabor" value="${Number(j.labor_cost)||0}" min="0" step="10"></div>
+      <div class="sumrow"><span>ส่วนลด</span><input type="number" id="sDiscount" value="${Number(j.discount)||0}" min="0" step="10"></div>
       <div class="sumrow total"><span>รวมทั้งหมด</span><span id="sTotal">฿${money2(pc + (Number(j.labor_cost)||0) - (Number(j.discount)||0))}</span></div>
     </div>
-
     <div style="margin-top:16px">${photoBox('during','รูประหว่างซ่อม',6)}</div>
-
-    <div class="jfoot">${back}${save}
-      ${j.status !== 'wait_parts'
+    ${recap('ผลตรวจเช็ค: ' + esc(j.inspect_result || '—'))}
+    ` + foot(
+      (j.status !== 'wait_parts'
         ? `<button class="btn" onclick="setStatus('wait_parts')">📦 รออะไหล่</button>`
-        : `<button class="btn p" onclick="setStatus('repairing')">▶️ อะไหล่มาแล้ว</button>`}
-      <button class="btn g" onclick="moveStep(5)">ไปตรวจสอบ →</button></div>`;
+        : `<button class="btn p" onclick="setStatus('repairing')">▶️ อะไหล่มาแล้ว</button>`)
+      + `<button class="btn g" onclick="moveStep(5)">ไปตรวจสอบ →</button>`);
 
-  if (cur === 5) return hint('ทดสอบเครื่องให้แน่ใจก่อนแจ้งลูกค้ามารับ') + `
-    <div><label>ผลการทดสอบ / หมายเหตุ</label>
+  /* ---- 5 ตรวจสอบ ---- */
+  if (nStep === 5){
+    const partTxt = S.lines.length
+      ? S.lines.map(l => `${l.parts_master?.name || l.parts_master?.part_no} ×${l.qty}`).join(', ')
+      : 'ไม่ได้ใช้อะไหล่';
+    return hint + `
+    <div><label>สรุปผลการทดสอบ <span class="req">*</span></label>
       <textarea id="sNote" placeholder="ทดสอบเดินเครื่อง 10 นาที ทำงานปกติ ไม่มีเสียงผิดปกติ">${esc(j.note||'')}</textarea></div>
+    ${recap('วิธีซ่อม: ' + esc(j.repair_method || '—') + '\nอะไหล่: ' + esc(partTxt))}
     <div style="margin-top:16px">${photoBox('after','รูปหลังซ่อม',4)}</div>
-    <div class="sumrow total" style="margin-top:16px">
-      <span>ยอดที่ต้องเก็บลูกค้า</span><span>฿${money2(j.total_cost)}</span></div>
-    <div class="jfoot">${back}${save}<button class="btn g" onclick="moveStep(6)">พร้อมส่งมอบ →</button></div>`;
+    ` + foot(`<button class="btn g" onclick="moveStep(6)">พร้อมส่งมอบ →</button>`);
+  }
 
-  // ขั้น 6
+  /* ---- 6 ส่งมอบลูกค้า ---- */
   const done = j.status === 'delivered';
-  return hint(done ? 'ปิดงานเรียบร้อยแล้ว' : 'นัดลูกค้ามารับเครื่อง แล้วกดปิดงาน') + `
-    <div class="sumrow"><span>ค่าอะไหล่</span><b>฿${money2(j.parts_cost)}</b></div>
-    <div class="sumrow"><span>ค่าแรง</span><b>฿${money2(j.labor_cost)}</b></div>
-    <div class="sumrow"><span>ส่วนลด</span><b>−฿${money2(j.discount)}</b></div>
-    <div class="sumrow total"><span>รวมทั้งหมด</span><span>฿${money2(j.total_cost)}</span></div>
-    <div class="grid g2" style="margin-top:16px">
-      <div><label>ลูกค้า</label><input type="text" value="${esc(j.customer_name||'')}" disabled></div>
-      <div><label>เบอร์ติดต่อ</label><input type="text" value="${esc(j.customer_phone||'—')}" disabled></div>
+  return hint + `
+    <div class="grid g2" style="gap:0 26px">
+      <div class="kv"><span class="k">ช่าง</span><span class="v">${esc(j.tech_name || '—')}</span></div>
+      <div class="kv"><span class="k">รวมค่าซ่อม</span><span class="v">฿${money2(j.total_cost)}</span></div>
+      <div class="kv"><span class="k">ผลการทดสอบ</span><span class="v">${esc(j.note || '—')}</span></div>
+      <div class="kv"><span class="k">วันส่งมอบ</span>
+        <span class="v" ${done?'':'style="color:var(--ink3);font-weight:600"'}>${done ? dtth(j.delivered_at) : 'ยังไม่ส่งมอบ'}</span></div>
     </div>
-    ${done ? `<div class="box-ok" style="margin-top:16px">✅ ส่งมอบแล้วเมื่อ ${dtth(j.delivered_at)}</div>` : ''}
+    <p style="margin:16px 0 0;color:var(--ink2)">
+      ${done ? '✅ ปิดงานเรียบร้อยแล้ว' : 'เมื่อลูกค้ารับเครื่องแล้ว กดยืนยันส่งมอบเพื่อปิดงาน'}</p>
     <div style="margin-top:16px">${photoBox('document','เอกสาร / ใบเสร็จ',4)}</div>
-    <div class="jfoot">${back}
-      ${done ? `<button class="btn" onclick="setStatus('ready')">↩ เปิดงานใหม่</button>`
-             : `<button class="btn g" onclick="setStatus('delivered')">✅ ส่งมอบแล้ว ปิดงาน</button>`}</div>`;
-}
-
-/* ---------- ย้อนดูสิ่งที่บันทึกไว้ในขั้นก่อนหน้า (อ่านอย่างเดียว) ---------- */
-function stepReadOnly(nStep, j){
-  const cur = stepOf(j.status) || 1;
-  const logs = stepLog(nStep);
-  const ro = (v, empty) => `<div class="robox ${v ? '' : 'empty'}">${esc(v || empty || 'ยังไม่ได้บันทึก')}</div>`;
-  const kv = (k, v) => `<div class="kv"><span class="k">${k}</span><span class="v">${esc(v ?? '—')}</span></div>`;
-
-  const bar = `<div class="peekbar">
-    <span>🕘 กำลังดูย้อนหลัง <b>ขั้นที่ ${nStep} · ${esc(STEPS[nStep-1].label)}</b> — แก้ไขไม่ได้</span>
-    <span class="sp"></span>
-    <button class="btn sm g" onclick="peekStep(${cur})">กลับไปขั้นที่ทำอยู่ (${cur}) →</button></div>`;
-
-  const time = logs.length
-    ? `<div style="margin-top:16px"><label>บันทึกการเปลี่ยนสถานะ</label><div class="tl">
-        ${logs.map(l => `<div class="e"><b>${STATUS[l.to_status] || l.to_status}</b>
-          — ${dtth(l.created_at)}${l.changed_by ? ' · โดย ' + esc(l.changed_by) : ''}</div>`).join('')}
-      </div></div>`
-    : `<div class="sub2" style="margin-top:16px">ยังไม่มีบันทึกการเข้าสู่ขั้นนี้</div>`;
-
-  let body = '';
-  if (nStep === 1){
-    body = `${kv('ลูกค้า', j.customer_name)}${kv('เบอร์โทร', j.customer_phone)}
-      ${kv('ประเภทเครื่อง', j.tool_type)}${kv('แบรนด์ / รุ่น', [j.brand,j.model].filter(Boolean).join(' '))}
-      ${kv('Serial No.', j.serial_no)}${kv('วันที่รับ', dth(j.received_at))}
-      ${kv('กำหนดเสร็จ', dth(j.due_date))}${kv('หมวดอาการ', j.symptom_name)}
-      ${kv('ผู้รับเรื่อง', j.created_by)}
-      <div style="margin-top:14px"><label>อาการเสียที่ลูกค้าแจ้ง</label>${ro(j.symptom)}</div>
-      <div style="margin-top:14px"><label>ของที่นำมาด้วย</label>${ro(j.accessories, 'ไม่มี')}</div>`;
-  }
-  else if (nStep === 2){
-    body = `<div><label>อาการที่พบจากการตรวจเช็ค</label>${ro(j.inspect_result)}</div>
-      <div style="margin-top:14px"><label>สาเหตุ</label>${ro(j.cause)}</div>`;
-  }
-  else if (nStep === 3){
-    body = `${kv('ช่างผู้รับผิดชอบ', j.tech_name)}${kv('กำหนดเสร็จ', dth(j.due_date))}
-      ${kv('อยู่ในร้านมาแล้ว', (j.days_in_shop ?? 0) + ' วัน')}`;
-  }
-  else if (nStep === 4){
-    const pc = S.lines.reduce((s,l) => s + Number(l.line_total||0), 0);
-    body = `<div><label>วิธีการซ่อม</label>${ro(j.repair_method)}</div>
-      <div style="margin-top:16px"><label>อะไหล่ที่ใช้</label>
-        <div class="tw"><table>
-          <thead><tr><th>PART NO.</th><th>รายการ</th><th class="num">จำนวน</th><th class="num">ราคา</th></tr></thead>
-          <tbody>${S.lines.length ? S.lines.map(l => `<tr>
-            <td class="mono"><b>${esc(l.parts_master?.part_no||'')}</b></td>
-            <td>${esc(l.parts_master?.name||'')}</td>
-            <td class="num">${l.qty}</td><td class="num">฿${money2(l.line_total)}</td></tr>`).join('')
-            : '<tr><td colspan="4" class="muted" style="text-align:center;padding:14px">ไม่ได้ใช้อะไหล่</td></tr>'}</tbody>
-        </table></div></div>
-      <div style="margin-top:14px">
-        <div class="sumrow"><span>รวมค่าอะไหล่</span><b>฿${money2(pc)}</b></div>
-        <div class="sumrow"><span>ค่าแรง</span><b>฿${money2(j.labor_cost)}</b></div>
-      </div>
-      <div style="margin-top:14px">${photoBoxRO('during','รูประหว่างซ่อม')}</div>`;
-  }
-  else if (nStep === 5){
-    body = `<div><label>ผลการทดสอบ / หมายเหตุ</label>${ro(j.note)}</div>
-      <div style="margin-top:14px">${photoBoxRO('after','รูปหลังซ่อม')}</div>`;
-  }
-  else {
-    body = `${kv('ค่าอะไหล่', '฿' + money2(j.parts_cost))}${kv('ค่าแรง', '฿' + money2(j.labor_cost))}
-      ${kv('ส่วนลด', '฿' + money2(j.discount))}${kv('รวมทั้งหมด', '฿' + money2(j.total_cost))}
-      ${kv('ส่งมอบเมื่อ', j.delivered_at ? dtth(j.delivered_at) : 'ยังไม่ส่งมอบ')}
-      <div style="margin-top:14px">${photoBoxRO('document','เอกสาร / ใบเสร็จ')}</div>`;
-  }
-  return bar + body + time;
-}
-
-function photoBoxRO(phase, label){
-  const list = S.photos.filter(x => x.phase === phase);
-  return `<label>${label} (${list.length})</label><div class="phs">
-    ${list.length ? list.map(p => `<div class="ph"><img src="${photoUrl(p.storage_key)}" alt="${label}" loading="lazy"
-      onclick="window.open('${photoOpen(p.storage_key)}','_blank')"></div>`).join('')
-      : '<span class="muted" style="font-size:13px">ไม่มีรูปในขั้นนี้</span>'}</div>`;
+    <div class="jfoot">${back}${save}
+      ${done ? `<button class="btn" onclick="setStatus('ready')">↩ เปิดงานใหม่</button>` : deliver}</div>`;
 }
 
 function bindStepForm(cur, pc){
@@ -2032,39 +1984,51 @@ function bindStepForm(cur, pc){
 function collectStep(){
   const p = { created_by: who() };
   const g = id => $(id) ? val(id) : undefined;
+  const base = S.job.received_at;
+  if ($('sRecv'))     p.received_at     = g('sRecv') ? new Date(g('sRecv') + 'T09:00:00').toISOString() : undefined;
   if ($('sDue'))      p.due_date        = g('sDue') || null;
+  if ($('sSymptom'))  p.symptom         = g('sSymptom') || null;
+  if ($('sAcc'))      p.accessories     = g('sAcc') || null;
   if ($('sCat'))      p.symptom_category= g('sCat') || null;
   if ($('sInspect'))  p.inspect_result  = g('sInspect') || null;
-  if ($('sCause'))    p.cause           = g('sCause') || null;
   if ($('sTech'))     p.technician_id   = g('sTech') || null;
+  if ($('sStart'))    p.started_at      = hmTs(g('sStart'), base);
+  if ($('sExpect'))   p.expect_at       = hmTs(g('sExpect'), base);
   if ($('sMethod'))   p.repair_method   = g('sMethod') || null;
   if ($('sNote'))     p.note            = g('sNote') || null;
   if ($('sLabor'))    p.labor_cost      = Number(g('sLabor')) || 0;
   if ($('sDiscount')) p.discount        = Number(g('sDiscount')) || 0;
+  Object.keys(p).forEach(k => p[k] === undefined && delete p[k]);
   return p;
 }
 
 async function saveStep(extra){
+  const keep = S.peek;
   try {
     const { error } = await sb.from('repair_jobs').update({ ...collectStep(), ...(extra||{}) }).eq('id', S.job.id);
     if (error) throw error;
     toast('✅ บันทึกแล้ว');
-    await openJob(S.job.id); reloadAll();
+    await openJob(S.job.id);
+    if (keep && !extra?.status){ S.peek = keep; renderJobPage(); }
+    reloadAll();
   } catch(e){ fail(e); }
 }
 
 async function setStatus(st){
+  S.peek = null;
   await saveStep({ status: st });
 }
 
 async function moveStep(to){
-  const cur = stepOf(S.job.status) || 1;
-  // ตรวจข้อมูลจำเป็นก่อนเดินหน้า
-  if (to > cur){
-    if (cur === 2 && !val('sInspect')) return toast('กรอกอาการที่พบก่อน', true);
-    if (cur === 3 && !val('sTech'))    return toast('เลือกช่างผู้รับผิดชอบก่อน', true);
-    if (cur === 4 && !val('sMethod'))  return toast('กรอกวิธีการซ่อมก่อน', true);
+  const from = S.peek || stepOf(S.job.status) || 1;
+  if (to > from){
+    if (from === 1 && !val('sSymptom')) return toast('กรอกอาการเสียที่ลูกค้าแจ้งก่อน', true);
+    if (from === 2 && !val('sInspect')) return toast('กรอกอาการที่พบจากการตรวจเช็คก่อน', true);
+    if (from === 3 && !val('sTech'))    return toast('เลือกช่างผู้รับผิดชอบก่อน', true);
+    if (from === 4 && !val('sMethod'))  return toast('กรอกวิธีการซ่อมก่อน', true);
+    if (from === 5 && !val('sNote'))    return toast('กรอกสรุปผลการทดสอบก่อน', true);
   }
+  S.peek = null;
   await saveStep({ status: STEPS[to-1].main });
 }
 
