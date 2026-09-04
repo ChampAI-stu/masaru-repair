@@ -159,7 +159,23 @@ table{width:100%;border-collapse:collapse;font-size:14px}
 th{text-align:left;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);padding:11px 13px;border-bottom:1px solid var(--line);white-space:nowrap}
 td{padding:11px 13px;border-bottom:1px solid var(--line2);vertical-align:middle}
 tbody tr:last-child td{border-bottom:0}
-tbody tr.click{cursor:pointer}tbody tr.click:hover{background:#f7fafd}
+tbody tr:hover > td{background:#fafcfe}
+
+/* แถวที่กดได้ — ต้องเห็นชัดว่าชี้อยู่แถวไหน */
+tbody tr.click{cursor:pointer;transition:background .1s}
+tbody tr.click > td{transition:background .1s}
+tbody tr.click:hover > td{background:#eaf2fb}
+tbody tr.click:active > td{background:#dde9f7}
+tbody tr.click > td:first-child{box-shadow:inset 3px 0 0 transparent;transition:box-shadow .1s}
+tbody tr.click:hover > td:first-child{box-shadow:inset 3px 0 0 var(--blue)}
+tbody tr.click:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}
+/* แถวที่เพิ่งเปิดดู — กลับมาแล้วรู้ว่าค้างอยู่ตรงไหน */
+tbody tr.click.seen > td{background:var(--gold-l)}
+tbody tr.click.seen > td:first-child{box-shadow:inset 3px 0 0 var(--gold-line)}
+tbody tr.click.seen:hover > td{background:#f5ead0}
+td.nostop{cursor:default}
+.acts{display:flex;gap:6px;justify-content:flex-end;align-items:center}
+.btn.sm.p{padding:6px 13px}
 .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .tw{overflow-x:auto}
 .mono{font-family:ui-monospace,"SF Mono",Consolas,monospace;font-size:13px}
@@ -432,7 +448,7 @@ form[hidden]{display:none}
           <div class="card">
             <h3>งานที่เกินกำหนด <span class="sp"></span><span id="odCount" class="pill tag-crit"></span></h3>
             <div class="cb"><div class="tw"><table id="tblOverdue">
-              <thead><tr><th>เลขที่งาน</th><th>ลูกค้า</th><th>เครื่องมือ</th><th>กำหนดเสร็จ</th><th class="num">เกินกำหนด</th></tr></thead>
+              <thead><tr><th>เลขที่งาน</th><th>ลูกค้า</th><th>เครื่องมือ</th><th>กำหนดเสร็จ</th><th class="num">เกินกำหนด</th><th class="num noprint"></th></tr></thead>
               <tbody></tbody></table></div>
               <div id="odEmpty" class="empty" style="display:none">🎉 ไม่มีงานเกินกำหนด</div>
             </div>
@@ -462,7 +478,7 @@ form[hidden]{display:none}
           <h3>รายการใบงาน <span class="sp"></span><span class="muted" id="jobCount"></span></h3>
           <div class="cb">
             <div class="tw"><table id="tblJobs">
-              <thead><tr><th>เลขที่งาน</th><th>ลูกค้า</th><th>เครื่องมือ</th><th>อาการ</th><th>ช่าง</th><th>สถานะ</th><th>กำหนดเสร็จ</th><th class="num">รวม</th></tr></thead>
+              <thead><tr><th>เลขที่งาน</th><th>ลูกค้า</th><th>เครื่องมือ</th><th>อาการ</th><th>ช่าง</th><th>สถานะ</th><th>กำหนดเสร็จ</th><th class="num">รวม</th><th class="num noprint">จัดการ</th></tr></thead>
               <tbody></tbody></table></div>
             <div id="jobsEmpty" class="empty" style="display:none">ไม่มีใบงานที่ตรงเงื่อนไข</div>
           </div>
@@ -679,7 +695,7 @@ const CLOSED = ['delivered','cancelled'];
 const stepOf = st => STEP_OF[st] || 0;
 
 let sb = null;
-const S = { jobs:[], techs:[], cats:[], parts:[], custs:[], stock:[], job:null, lines:[], photos:[], filter:'open', range:'all' };
+const S = { jobs:[], techs:[], cats:[], parts:[], custs:[], stock:[], job:null, lines:[], photos:[], filter:'open', range:'all', seen:null };
 
 /* ---------- helpers ---------- */
 const $ = id => document.getElementById(id);
@@ -1347,11 +1363,12 @@ function renderDash(){
   $('odCount').textContent = od.length + ' ใบ';
   $('odEmpty').style.display = od.length ? 'none' : 'block';
   $('tblOverdue').querySelector('tbody').innerHTML = od.slice(0,12).map(j =>
-    `<tr class="click" onclick="openJob('${j.id}')">
+    `<tr>
       <td class="mono"><b>${esc(j.job_no)}</b></td><td>${esc(j.customer_name || '—')}</td>
       <td>${esc([j.brand,j.model].filter(Boolean).join(' ') || '—')}</td>
       <td>${dth(j.due_date)}</td>
-      <td class="num"><span class="pill tag-crit">${j.days_overdue} วัน</span></td></tr>`).join('');
+      <td class="num"><span class="pill tag-crit">${j.days_overdue} วัน</span></td>
+      <td class="num noprint"><button class="btn sm p" onclick="openJob('${j.id}')">✏️ แก้ไข</button></td></tr>`).join('');
 
   // อาการเสียบ่อย 90 วัน
   const since = Date.now() - 90*864e5, cnt = {};
@@ -1419,24 +1436,24 @@ function renderJobs(){
   $('tblJobs').querySelector('tbody').innerHTML = rows.map(j => {
     const s = stepOf(j.status), sd = STEPS[s-1];
     const late = j.days_overdue > 0;
-    return `<tr>
-      <td class="click mono" onclick="openJob('${j.id}')"><b>${esc(j.job_no)}</b>
-        <div class="sub2">${dth(j.received_at)}</div></td>
-      <td class="click" onclick="openJob('${j.id}')">${esc(j.customer_name || '—')}
-        <div class="sub2">${esc(j.customer_phone || '')}</div></td>
-      <td class="click" onclick="openJob('${j.id}')">${esc([j.brand,j.model].filter(Boolean).join(' ') || j.tool_type || '—')}
+    return `<tr class="click ${S.seen === j.id ? 'seen' : ''}" tabindex="0"
+      onclick="openJob('${j.id}')"
+      onkeydown="if(event.key==='Enter'){event.preventDefault();openJob('${j.id}')}">
+      <td class="mono"><b>${esc(j.job_no)}</b><div class="sub2">${dth(j.received_at)}</div></td>
+      <td>${esc(j.customer_name || '—')}<div class="sub2">${esc(j.customer_phone || '')}</div></td>
+      <td>${esc([j.brand,j.model].filter(Boolean).join(' ') || j.tool_type || '—')}
         <div class="sub2">${esc(j.serial_no || '')}</div></td>
-      <td class="click" onclick="openJob('${j.id}')">${esc((j.symptom||'').slice(0,34))}${(j.symptom||'').length>34?'…':''}</td>
-      <td><select class="mini" onchange="assignTech('${j.id}', this.value)">
-        <option value="">— ไม่ระบุ —</option>
-        ${S.techs.map(t => `<option value="${t.id}" ${t.id===j.technician_id?'selected':''}>${esc(t.nickname||t.full_name)}</option>`).join('')}
-      </select></td>
-      <td class="click" onclick="openJob('${j.id}')">
-        <span class="pill st${s||0}"><span class="d"></span>${STATUS[j.status]||j.status}</span>
+      <td>${esc((j.symptom||'').slice(0,34))}${(j.symptom||'').length>34?'…':''}</td>
+      <td class="nostop" onclick="event.stopPropagation()">
+        <select class="mini" onchange="assignTech('${j.id}', this.value)">
+          <option value="">— ไม่ระบุ —</option>
+          ${S.techs.map(t => `<option value="${t.id}" ${t.id===j.technician_id?'selected':''}>${esc(t.nickname||t.full_name)}</option>`).join('')}
+        </select></td>
+      <td><span class="pill st${s||0}"><span class="d"></span>${STATUS[j.status]||j.status}</span>
         ${sd ? `<div class="sub2">ขั้น ${s}/6 · ${esc(sd.label)}</div>` : ''}</td>
-      <td class="click" onclick="openJob('${j.id}')" ${late?'style="color:var(--crit);font-weight:700"':''}>
-        ${dth(j.due_date)}${late ? `<div><span class="pill tag-crit">เกิน ${j.days_overdue} วัน</span></div>` : ''}</td>
-      <td class="num click" onclick="openJob('${j.id}')"><b>฿${money(j.total_cost)}</b></td>
+      <td ${late?'style="color:var(--crit);font-weight:700"':''}>${dth(j.due_date)}
+        ${late ? `<div><span class="pill tag-crit">เกิน ${j.days_overdue} วัน</span></div>` : ''}</td>
+      <td class="num"><b>฿${money(j.total_cost)}</b></td>
     </tr>`;
   }).join('');
 }
@@ -1532,7 +1549,12 @@ async function saveJob(){
 /* =====================================================================
    ใบงาน (modal)
    ===================================================================== */
-function closeJob(){ $('mask').classList.remove('on'); document.body.style.overflow = ''; }
+function closeJob(){
+  $('mask').classList.remove('on'); document.body.style.overflow = '';
+  renderJobs();                       // ให้แถวที่เพิ่งดูขึ้นไฮไลต์สีทอง
+  const r = document.querySelector('#tblJobs tbody tr.seen');
+  if (r) r.scrollIntoView({ block:'nearest' });
+}
 
 async function openJob(id){
   try {
@@ -1542,7 +1564,7 @@ async function openJob(id){
       sb.from('repair_photos').select('*').eq('job_id', id).order('created_at')
     ]);
     if (j.error) throw j.error;
-    S.job = j.data; S.lines = lines.data || []; S.photos = photos.data || [];
+    S.job = j.data; S.lines = lines.data || []; S.photos = photos.data || []; S.seen = id;
     renderJobModal();
     $('mask').classList.add('on'); document.body.style.overflow = 'hidden';
   } catch(e){ fail(e); }
