@@ -193,6 +193,30 @@ svg .nm{fill:var(--ink);font-size:12.5px;font-family:"Sarabun",sans-serif}
 .mhead{background:#fff;padding:15px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:11px;flex-wrap:wrap;position:sticky;top:0;z-index:5}
 .mbody{padding:18px}
 
+/* หน้าต่างฟอร์ม */
+.fmask{position:fixed;inset:0;background:rgba(18,27,45,.55);z-index:250;display:none;
+  align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto}
+.fmask.on{display:flex}
+.fmodal{background:#fff;border-radius:14px;width:100%;max-width:520px;
+  box-shadow:0 20px 60px rgba(0,0,0,.32);overflow:hidden;animation:pop .14s ease-out}
+@keyframes pop{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.fmodal{animation:none}}
+.fhead{padding:18px 22px 15px;border-bottom:1px solid var(--line2);display:flex;gap:12px;align-items:flex-start}
+.fhead .ttl{flex:1}
+.fhead h4{margin:0;font-size:17.5px;font-weight:800;color:var(--navy)}
+.fhead .sub{margin:3px 0 0;font-size:13px;color:var(--ink3)}
+.fhead .x{border:0;background:none;font-size:19px;color:var(--ink3);cursor:pointer;line-height:1;padding:2px 4px}
+.fhead .x:hover{color:var(--crit)}
+.fbody{padding:20px 22px;display:grid;grid-template-columns:1fr 1fr;gap:15px}
+.fbody .f{display:flex;flex-direction:column;gap:5px;grid-column:1/-1}
+.fbody .f.half{grid-column:auto}
+.fbody .f .hint{font-size:12px;color:var(--ink3)}
+.fbody .f .err{font-size:12.5px;color:var(--crit);font-weight:600}
+.fbody .f.bad input,.fbody .f.bad select{border-color:var(--crit);box-shadow:0 0 0 3px var(--crit-l)}
+.ffoot{padding:15px 22px;background:#f7f9fc;border-top:1px solid var(--line2);
+  display:flex;gap:10px;justify-content:flex-end}
+.cmsg{padding:20px 22px;font-size:14.5px;line-height:1.65;white-space:pre-line}
+
 .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--navy);color:#fff;padding:12px 22px;border-radius:11px;box-shadow:0 6px 22px rgba(0,0,0,.28);z-index:300;max-width:90vw;font-weight:600}
 .toast.err{background:var(--crit)}
 
@@ -554,6 +578,18 @@ form[hidden]{display:none}
   </div>
 </div>
 
+<div class="fmask" id="fmask">
+  <div class="fmodal">
+    <div class="fhead"><div class="ttl"><h4 id="fmTitle">—</h4><p class="sub" id="fmSub"></p></div>
+      <button class="x" type="button" id="fmX" aria-label="ปิด">✕</button></div>
+    <form id="fmForm"><div class="fbody" id="fmBody"></div>
+      <div class="ffoot">
+        <button type="button" class="btn" id="fmCancel">ยกเลิก</button>
+        <button type="submit" class="btn g" id="fmOk">บันทึก</button>
+      </div></form>
+  </div>
+</div>
+
 <div class="mask" id="mask" onclick="if(event.target===this)closeJob()">
   <div class="modal"><div id="jobWrap"></div></div>
 </div>
@@ -633,6 +669,99 @@ window.__pageAll = async function(build, size = 1000){
 };
 
 /* =====================================================================
+   หน้าต่างฟอร์ม — ใช้แทน prompt() / confirm() ทั้งระบบ
+   ===================================================================== */
+let _fmDone = null;
+
+function closeForm(v){
+  $('fmask').classList.remove('on');
+  document.body.style.overflow = '';
+  const d = _fmDone; _fmDone = null;
+  if (d) d(v);
+}
+$('fmX').onclick = () => closeForm(null);
+$('fmCancel').onclick = () => closeForm(null);
+$('fmask').onclick = e => { if (e.target === $('fmask')) closeForm(null); };
+
+/**
+ * fields: [{ k, label, type, value, placeholder, hint, options, required, half, min }]
+ * คืน object ค่าที่กรอก หรือ null ถ้ายกเลิก
+ */
+function formModal({ title, subtitle = '', fields = [], ok = 'บันทึก', danger = false }){
+  $('fmTitle').textContent = title;
+  $('fmSub').textContent = subtitle;
+  $('fmSub').style.display = subtitle ? '' : 'none';
+  $('fmOk').textContent = ok;
+  $('fmOk').className = 'btn ' + (danger ? 'dn' : 'g');
+  $('fmCancel').style.display = '';
+
+  $('fmBody').innerHTML = fields.map(f => {
+    const id = 'fm_' + f.k;
+    const inner = f.type === 'select'
+      ? `<select id="${id}">${(f.options||[]).map(o =>
+          `<option value="${esc(o.v)}" ${String(o.v)===String(f.value??'')?'selected':''}>${esc(o.t)}</option>`).join('')}</select>`
+      : f.type === 'textarea'
+        ? `<textarea id="${id}" placeholder="${esc(f.placeholder||'')}">${esc(f.value??'')}</textarea>`
+        : `<input type="${f.type||'text'}" id="${id}" value="${esc(f.value??'')}"
+             placeholder="${esc(f.placeholder||'')}" ${f.min!==undefined?`min="${f.min}"`:''}
+             ${f.upper?'style="text-transform:uppercase"':''}>`;
+    return `<div class="f ${f.half?'half':''}" data-k="${f.k}">
+      <label for="${id}">${esc(f.label)}${f.required?' <span class="req">*</span>':''}</label>
+      ${inner}${f.hint?`<span class="hint">${esc(f.hint)}</span>`:''}
+      <span class="err" hidden></span></div>`;
+  }).join('');
+
+  $('fmask').classList.add('on');
+  document.body.style.overflow = 'hidden';
+  setTimeout(() => $('fmBody').querySelector('input,select,textarea')?.focus(), 60);
+
+  return new Promise(res => {
+    _fmDone = res;
+    $('fmForm').onsubmit = e => {
+      e.preventDefault();
+      const out = {}; let bad = null;
+      for (const f of fields){
+        const el = $('fm_' + f.k), wrap = el.closest('.f'), err = wrap.querySelector('.err');
+        let v = (el.value ?? '').trim();
+        if (f.upper) v = v.toUpperCase();
+        wrap.classList.remove('bad'); err.hidden = true;
+        if (f.required && !v){
+          wrap.classList.add('bad'); err.textContent = 'จำเป็นต้องกรอก'; err.hidden = false;
+          bad = bad || el; continue;
+        }
+        out[f.k] = f.type === 'number' ? (v === '' ? null : Number(v)) : (v || null);
+      }
+      if (bad) return bad.focus();
+      closeForm(out);
+    };
+  });
+}
+
+/** กล่องยืนยัน — ใช้แทน confirm() */
+function confirmModal(title, msg, { ok = 'ยืนยัน', danger = true } = {}){
+  $('fmTitle').textContent = title;
+  $('fmSub').style.display = 'none';
+  $('fmOk').textContent = ok;
+  $('fmOk').className = 'btn ' + (danger ? 'dn' : 'g');
+  $('fmBody').outerHTML = `<div class="cmsg" id="fmBody">${esc(msg)}</div>`;
+  $('fmask').classList.add('on');
+  document.body.style.overflow = 'hidden';
+  setTimeout(() => $('fmOk').focus(), 60);
+  return new Promise(res => {
+    _fmDone = v => res(v === true);
+    $('fmForm').onsubmit = e => { e.preventDefault(); closeForm(true); };
+  }).finally(() => {
+    // คืน container กลับเป็น grid สำหรับฟอร์มครั้งถัดไป
+    const b = $('fmBody');
+    if (b && !b.classList.contains('fbody')) b.outerHTML = '<div class="fbody" id="fmBody"></div>';
+  });
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && $('fmask').classList.contains('on')) closeForm(null);
+});
+
+/* =====================================================================
    รูปภาพ — บีบอัดในเบราว์เซอร์ แล้วส่งตรงเข้า Google Drive
    ไฟล์ไม่ผ่าน Supabase เลย ฐานข้อมูลเก็บแค่ storage_key
    ===================================================================== */
@@ -697,7 +826,7 @@ async function uploadPhotos(files, jobId, jobNo, phase){
 }
 
 async function deletePhoto(id, key){
-  if (!confirm('ลบรูปนี้?')) return;
+  if (!await confirmModal('ลบรูปนี้?', 'ไฟล์จะถูกย้ายไปถังขยะใน Google Drive กู้คืนได้ภายใน 30 วัน', { ok:'ลบรูป' })) return;
   try {
     const { error } = await sb.from('repair_photos').delete().eq('id', id);
     if (error) throw error;
@@ -966,7 +1095,7 @@ $('signForm').addEventListener('submit', async e => {
 });
 
 $('logoutBtn').addEventListener('click', async () => {
-  if (!confirm('ออกจากระบบ?')) return;
+  if (!await confirmModal('ออกจากระบบ?', 'ครั้งหน้าต้องกรอกอีเมลและรหัสผ่านใหม่', { ok:'ออกจากระบบ' })) return;
   try { await sb.auth.signOut(); } catch(e){}
   location.reload();
 });
@@ -1500,7 +1629,7 @@ async function addLine(){
 }
 
 async function removeLine(id){
-  if (!confirm('ลบรายการนี้? ระบบจะคืนของเข้าสต็อกอัตโนมัติ')) return;
+  if (!await confirmModal('ลบรายการอะไหล่นี้?', 'ระบบจะคืนของเข้าสต็อกอัตโนมัติ และบันทึกลง log การเคลื่อนไหว', { ok:'ลบและคืนของ' })) return;
   try {
     const { error } = await sb.from('repair_parts_used').delete().eq('id', id);
     if (error) throw error;
@@ -1589,20 +1718,23 @@ function renderParts(){
     : '<tr><td colspan="8" class="empty">ยังไม่มีอะไหล่ในทะเบียน</td></tr>';
 }
 async function newPart(){
-  const part_no = prompt('รหัสอะไหล่ (Part No.) เช่น BR-00124');
-  if (!part_no) return;
-  const name = prompt('ชื่ออะไหล่ เช่น Bearing 6001ZZ');
-  if (!name) return;
-  const sell = Number(prompt('ราคาขาย (บาท)', '0')) || 0;
-  const cost = Number(prompt('ราคาทุน (บาท)', '0')) || 0;
-  const rp   = Number(prompt('จุดสั่งซื้อ — ต่ำกว่านี้แจ้งเตือน', '10')) || 0;
+  const f = await formModal({
+    title:'เพิ่มอะไหล่ใหม่', subtitle:'สร้าง SKU ในทะเบียนอะไหล่ · ยอดคงเหลือเริ่มที่ 0',
+    ok:'เพิ่มอะไหล่',
+    fields:[
+      { k:'part_no', label:'รหัสอะไหล่ (Part No.)', required:true, upper:true, half:true, placeholder:'BR-00124' },
+      { k:'name',    label:'ชื่ออะไหล่', required:true, half:true, placeholder:'Bearing 6001ZZ' },
+      { k:'sell_price', label:'ราคาขาย (บาท)', type:'number', value:0, min:0, half:true },
+      { k:'cost_price', label:'ราคาทุน (บาท)', type:'number', value:0, min:0, half:true },
+      { k:'unit', label:'หน่วยนับ', value:'ชิ้น', half:true },
+      { k:'reorder_point', label:'จุดสั่งซื้อ', type:'number', value:10, min:0, half:true,
+        hint:'ต่ำกว่านี้จะขึ้นเตือน "ต้องสั่ง"' }
+    ]});
+  if (!f) return;
   try {
-    const { error } = await sb.from('parts_master').insert({
-      part_no: part_no.trim().toUpperCase(), name: name.trim(),
-      sell_price: sell, cost_price: cost, reorder_point: rp
-    });
+    const { error } = await sb.from('parts_master').insert(f);
     if (error) throw error;
-    toast('✅ เพิ่มอะไหล่แล้ว');
+    toast('✅ เพิ่ม ' + f.part_no + ' แล้ว');
     const { data } = await sb.from('parts_master').select('id,part_no,name,sell_price').eq('is_active', true).order('part_no');
     S.parts = data || [];
     $('rcPart').innerHTML = '<option value="">— เลือกอะไหล่ —</option>'
@@ -1612,11 +1744,21 @@ async function newPart(){
 }
 
 async function editReorder(pn, cur){
-  const v = prompt('จุดสั่งซื้อใหม่ของ ' + pn, cur);
-  if (v === null) return;
+  const p = S.stock.find(x => x.part_no === pn) || {};
+  const f = await formModal({
+    title:'แก้ไขอะไหล่', subtitle:pn + ' · ' + (p.name || ''),
+    fields:[
+      { k:'name', label:'ชื่ออะไหล่', value:p.name, required:true },
+      { k:'sell_price', label:'ราคาขาย (บาท)', type:'number', value:p.sell_price ?? 0, min:0, half:true },
+      { k:'cost_price', label:'ราคาทุน (บาท)', type:'number', value:p.cost_price ?? 0, min:0, half:true },
+      { k:'reorder_point', label:'จุดสั่งซื้อ', type:'number', value:cur, min:0, half:true,
+        hint:'คงเหลือปัจจุบัน ' + (p.qty ?? 0) + ' ' + (p.unit || 'ชิ้น') }
+    ]});
+  if (!f) return;
   try {
-    const { error } = await sb.from('parts_master').update({ reorder_point: Number(v)||0 }).eq('part_no', pn);
+    const { error } = await sb.from('parts_master').update(f).eq('part_no', pn);
     if (error) throw error;
+    toast('✅ บันทึกแล้ว');
     await loadParts();
   } catch(e){ fail(e); }
 }
@@ -1762,29 +1904,38 @@ function renderSettings(){
 
 /* ---------- ช่าง ---------- */
 async function addTech(){
-  const code = prompt('รหัสช่าง เช่น TECH-04');            if (!code) return;
-  const name = prompt('ชื่อ-สกุล เช่น วิทยา ใจงาม');        if (!name) return;
-  const nick = prompt('ชื่อที่แสดงบนแดชบอร์ด', name.split(' ')[0]) || name;
-  const phone = prompt('เบอร์โทร (ข้ามได้)', '') || null;
-  const skill = prompt('ความถนัด เช่น มอเตอร์, แบตเตอรี่ (ข้ามได้)', '') || null;
+  const f = await formModal({
+    title:'เพิ่มช่างซ่อม', subtitle:'ช่างใหม่จะขึ้นในช่องมอบหมายงานและกราฟทันที', ok:'เพิ่มช่าง',
+    fields:[
+      { k:'code', label:'รหัสช่าง', required:true, upper:true, half:true, placeholder:'TECH-04' },
+      { k:'full_name', label:'ชื่อ-สกุล', required:true, half:true, placeholder:'วิทยา ใจงาม' },
+      { k:'nickname', label:'ชื่อที่แสดงบนแดชบอร์ด', half:true, placeholder:'วิทยา' },
+      { k:'phone', label:'เบอร์โทร', type:'tel', half:true, placeholder:'08X-XXX-XXXX' },
+      { k:'skill_note', label:'ความถนัด', placeholder:'มอเตอร์, แบตเตอรี่, ชุดเกียร์' }
+    ]});
+  if (!f) return;
+  if (!f.nickname) f.nickname = f.full_name.split(' ')[0];
   try {
-    const { error } = await sb.from('technicians').insert({
-      code: code.trim().toUpperCase(), full_name: name.trim(),
-      nickname: nick.trim(), phone, skill_note: skill });
+    const { error } = await sb.from('technicians').insert(f);
     if (error) throw error;
-    toast('✅ เพิ่มช่างแล้ว');
+    toast('✅ เพิ่มช่าง ' + f.nickname + ' แล้ว');
     await loadSettings(); refreshTechSelects();
   } catch(e){ fail(e); }
 }
 
 async function editTech(id){
   const t = (SET.techsAll || []).find(x => x.id === id); if (!t) return;
-  const nick  = prompt('ชื่อที่แสดง', t.nickname || t.full_name); if (nick === null) return;
-  const phone = prompt('เบอร์โทร', t.phone || '');
-  const skill = prompt('ความถนัด', t.skill_note || '');
+  const f = await formModal({
+    title:'แก้ไขข้อมูลช่าง', subtitle:t.code + ' · ' + t.full_name,
+    fields:[
+      { k:'full_name', label:'ชื่อ-สกุล', value:t.full_name, required:true, half:true },
+      { k:'nickname', label:'ชื่อที่แสดง', value:t.nickname, half:true },
+      { k:'phone', label:'เบอร์โทร', type:'tel', value:t.phone, half:true },
+      { k:'skill_note', label:'ความถนัด', value:t.skill_note, half:true }
+    ]});
+  if (!f) return;
   try {
-    const { error } = await sb.from('technicians').update({
-      nickname: nick.trim() || null, phone: phone || null, skill_note: skill || null }).eq('id', id);
+    const { error } = await sb.from('technicians').update(f).eq('id', id);
     if (error) throw error;
     toast('✅ บันทึกแล้ว');
     await loadSettings(); refreshTechSelects();
@@ -1792,7 +1943,8 @@ async function editTech(id){
 }
 
 async function toggleTech(id, on){
-  if (!on && !confirm('ปิดใช้งานช่างคนนี้? งานเดิมยังอยู่ครบ แต่จะไม่ขึ้นในช่องเลือกช่าง')) return;
+  if (!on && !await confirmModal('ปิดใช้งานช่างคนนี้?',
+      'ใบงานเดิมยังอยู่ครบและยังเห็นชื่อได้ตามปกติ\nแต่จะไม่ขึ้นในช่องเลือกช่างสำหรับงานใหม่', { ok:'ปิดใช้งาน' })) return;
   try {
     const { error } = await sb.from('technicians').update({ is_active: on }).eq('id', id);
     if (error) throw error;
@@ -1810,7 +1962,10 @@ function refreshTechSelects(){
 
 /* ---------- ผู้ใช้ ---------- */
 async function changeRole(email, role){
-  if (!confirm(`เปลี่ยนสิทธิ์ของ ${email} เป็น "${role}"?`)) { loadSettings(); return; }
+  const RL = { staff:'พนักงานรับเครื่อง', tech:'ช่างซ่อม', head:'หัวหน้าช่าง', admin:'ผู้ดูแลระบบ' };
+  if (!await confirmModal('เปลี่ยนสิทธิ์ผู้ใช้',
+      `${email}\nจะได้สิทธิ์ใหม่เป็น "${RL[role] || role}"\n\nเขาต้องออกจากระบบและเข้าใหม่ 1 ครั้ง สิทธิ์ถึงจะมีผล`,
+      { ok:'เปลี่ยนสิทธิ์', danger:false })) { loadSettings(); return; }
   try {
     const { data, error } = await sb.rpc('set_user_role', { p_email: email, p_role: role });
     if (error) throw error;
@@ -1820,7 +1975,9 @@ async function changeRole(email, role){
 }
 
 async function revokeUser(email){
-  if (!confirm(`ตัดสิทธิ์ ${email} ออกจากระบบ?\n\nบัญชียังอยู่ แต่จะเข้ามาแล้วไม่เห็นข้อมูลใด ๆ`)) return;
+  if (!await confirmModal('ตัดสิทธิ์ผู้ใช้',
+      `${email}\n\nบัญชียังอยู่ ล็อกอินได้ แต่จะไม่เห็นข้อมูลใด ๆ ในระบบ\nคืนสิทธิ์ทีหลังได้ด้วยการเปลี่ยน role`,
+      { ok:'ตัดสิทธิ์' })) return;
   try {
     const { data, error } = await sb.rpc('revoke_member', { p_email: email });
     if (error) throw error;
@@ -1831,17 +1988,22 @@ async function revokeUser(email){
 
 /* ---------- โค้ดเชิญ ---------- */
 async function addInvite(){
-  const code = prompt('โค้ดเชิญ เช่น MASARU-TECH-2026'); if (!code) return;
-  const role = prompt('สิทธิ์ที่จะได้ — staff / tech / head / admin', 'tech');
-  if (!role || !['staff','tech','head','admin'].includes(role)) return toast('สิทธิ์ไม่ถูกต้อง', true);
-  const label = prompt('คำอธิบายให้คนอ่านเข้าใจ', role === 'tech' ? 'ช่างซ่อม' : '') || null;
-  const mx = prompt('จำกัดกี่คน? (เว้นว่าง = ไม่จำกัด)', '10');
+  const f = await formModal({
+    title:'สร้างโค้ดเชิญ', subtitle:'คนที่ได้โค้ดนี้จะสมัครเข้าระบบเองได้ พร้อมสิทธิ์ที่กำหนด',
+    ok:'สร้างโค้ด',
+    fields:[
+      { k:'code', label:'โค้ดเชิญ', required:true, upper:true, placeholder:'MASARU-TECH-2026',
+        hint:'ตั้งให้เดายาก และไม่ซ้ำกับโค้ดเดิม' },
+      { k:'role', label:'สิทธิ์ที่จะได้', type:'select', value:'tech', half:true, options:[{v:'staff',t:'พนักงานรับเครื่อง'},{v:'tech',t:'ช่างซ่อม'},{v:'head',t:'หัวหน้าช่าง'},{v:'admin',t:'ผู้ดูแลระบบ'}] },
+      { k:'max_uses', label:'จำกัดกี่คน', type:'number', value:10, min:1, half:true,
+        hint:'เว้นว่าง = ไม่จำกัด' },
+      { k:'label', label:'คำอธิบาย', placeholder:'ช่างซ่อม รอบเดือน ก.ย.' }
+    ]});
+  if (!f) return;
   try {
-    const { error } = await sb.from('invite_codes').insert({
-      code: code.trim().toUpperCase(), role, label,
-      max_uses: mx && mx.trim() ? Number(mx) : null });
+    const { error } = await sb.from('invite_codes').insert(f);
     if (error) throw error;
-    toast('✅ สร้างโค้ดแล้ว');
+    toast('✅ สร้างโค้ด ' + f.code + ' แล้ว');
     await loadSettings();
   } catch(e){ fail(e); }
 }
@@ -1857,17 +2019,24 @@ async function toggleInvite(code, on){
 
 function copyCode(c){
   navigator.clipboard?.writeText(c).then(() => toast('📋 คัดลอกโค้ด ' + c + ' แล้ว'))
-    .catch(() => prompt('คัดลอกโค้ดนี้', c));
+    .catch(() => formModal({ title:'คัดลอกโค้ดเชิญ', subtitle:'กดค้างเพื่อเลือกแล้วคัดลอก',
+        fields:[{ k:'c', label:'โค้ดเชิญ', value:c }], ok:'ปิด' }));
 }
 
 /* ---------- หมวดอาการ ---------- */
 async function addSym(){
-  const code = prompt('รหัสหมวด (อังกฤษพิมพ์ใหญ่) เช่น CABLE'); if (!code) return;
-  const name = prompt('ชื่อหมวดภาษาไทย เช่น สายไฟขาด');       if (!name) return;
-  const ord  = Number(prompt('ลำดับการแสดง (เลขน้อยขึ้นก่อน)', '100')) || 100;
+  const f = await formModal({
+    title:'เพิ่มหมวดอาการเสีย', subtitle:'ใช้เป็นแกนของกราฟ "อาการเสียที่พบบ่อย Top 5"',
+    ok:'เพิ่มหมวด',
+    fields:[
+      { k:'code', label:'รหัสหมวด (อังกฤษพิมพ์ใหญ่)', required:true, upper:true, half:true, placeholder:'CABLE' },
+      { k:'name_th', label:'ชื่อหมวดภาษาไทย', required:true, half:true, placeholder:'สายไฟขาด' },
+      { k:'sort_order', label:'ลำดับการแสดง', type:'number', value:100, min:1,
+        hint:'เลขน้อยขึ้นก่อน — "อื่น ๆ" ใช้ 999' }
+    ]});
+  if (!f) return;
   try {
-    const { error } = await sb.from('symptom_categories')
-      .insert({ code: code.trim().toUpperCase(), name_th: name.trim(), sort_order: ord });
+    const { error } = await sb.from('symptom_categories').insert(f);
     if (error) throw error;
     toast('✅ เพิ่มหมวดแล้ว');
     const { data } = await sb.from('symptom_categories').select('*').eq('is_active', true).order('sort_order');
