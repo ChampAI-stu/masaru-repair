@@ -324,7 +324,10 @@ form[hidden]{display:none}
 
       <!-- ============ แดชบอร์ด ============ -->
       <div class="page on" id="p-dash">
-        <div class="card"><div class="cb"><div class="steps" id="stepBar"></div></div></div>
+        <div class="card"><div class="cb" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+          <div class="steps" id="stepBar" style="flex:1"></div>
+          <div class="chips" id="rangeChips"></div>
+        </div></div>
         <div class="kpis" id="dashKpi"></div>
         <div class="card">
           <h3>ติดตามสถานะ 6 ขั้นตอน</h3>
@@ -383,25 +386,24 @@ form[hidden]{display:none}
 
       <!-- ============ รับเครื่อง ============ -->
       <div class="page" id="p-intake">
-        <div class="card"><div class="cb"><div class="steps" id="stepBar2"></div></div></div>
+        <div class="card"><div class="cb">
+          <div class="steps" id="stepBar2"></div>
+          <div id="stepHint" class="sub2" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line2)"></div>
+        </div></div>
         <div class="card" style="max-width:900px;margin:0 auto">
-          <h3>1 · รับเครื่อง — สร้างใบงานซ่อมใหม่</h3>
+          <h3>1 · รับเครื่อง — สร้างใบงานซ่อมใหม่ <span class="sp"></span>
+            <span class="sub2">เลขที่ใบงานอัตโนมัติ: <b class="mono" id="nextJobNo" style="color:var(--gold)">—</b></span></h3>
           <div class="cb">
             <div class="split" style="grid-template-columns:1fr 1fr">
               <div>
                 <div style="font-weight:700;color:var(--navy);margin-bottom:11px">👤 ข้อมูลลูกค้า</div>
                 <div class="grid">
                   <div>
-                    <label>เบอร์โทร</label>
+                    <label>เบอร์โทร <span class="req">*</span></label>
                     <div class="row"><input type="tel" id="nPhone" placeholder="08X-XXX-XXXX" style="flex:1;min-width:110px">
                       <button class="btn sm" onclick="lookupCustomer()">ค้นลูกค้าเดิม</button></div>
                   </div>
                   <div><label>ชื่อลูกค้า <span class="req">*</span></label><input type="text" id="nCustName" placeholder="เช่น ABC Engineering"></div>
-                  <div><label>ประเภทลูกค้า</label>
-                    <select id="nCustType">
-                      <option value="end_user">ลูกค้าทั่วไป</option><option value="dealer">ดีลเลอร์ / ร้านค้า</option>
-                      <option value="shop">หน้าร้าน</option><option value="internal">ภายในบริษัท</option>
-                    </select></div>
                   <div><label>ที่อยู่</label><textarea id="nAddress" placeholder="ที่อยู่สำหรับติดต่อ / จัดส่ง" style="min-height:60px"></textarea></div>
                 </div>
                 <div id="custHint" class="sub2" style="margin-top:8px"></div>
@@ -409,21 +411,19 @@ form[hidden]{display:none}
               <div>
                 <div style="font-weight:700;color:var(--navy);margin-bottom:11px">🔧 รายละเอียดเครื่องมือ</div>
                 <div class="grid">
-                  <div><label>Serial No.</label>
-                    <div class="row"><input type="text" id="nSerial" placeholder="สแกน / พิมพ์ Serial" style="flex:1;min-width:110px">
-                      <button class="btn sm p" onclick="lookupWarranty()">เช็คประกัน</button></div>
-                  </div>
-                  <div><label>ประเภทเครื่อง</label><input type="text" id="nToolType" placeholder="เช่น Rotary Hammer"></div>
                   <div class="grid g2" style="gap:11px">
+                    <div><label>ประเภทเครื่อง <span class="req">*</span></label><input type="text" id="nToolType" placeholder="เช่น Rotary Hammer"></div>
                     <div><label>แบรนด์</label><input type="text" id="nBrand" placeholder="Bosch / Makita…"></div>
-                    <div><label>รุ่น</label><input type="text" id="nModel" placeholder="เช่น GBH 2-26"></div>
                   </div>
                   <div class="grid g2" style="gap:11px">
-                    <div><label>ช่างผู้รับผิดชอบ</label><select id="nTech"><option value="">— ยังไม่มอบหมาย —</option></select></div>
+                    <div><label>รุ่น</label><input type="text" id="nModel" placeholder="เช่น GBH 2-26"></div>
+                    <div><label>Serial No.</label><input type="text" id="nSerial" placeholder="—"></div>
+                  </div>
+                  <div class="grid g2" style="gap:11px">
+                    <div><label>วันที่รับ</label><input type="date" id="nRecv"></div>
                     <div><label>กำหนดเสร็จ</label><input type="date" id="nDue"></div>
                   </div>
                 </div>
-                <div id="warrBox" style="margin-top:11px"></div>
               </div>
             </div>
 
@@ -479,10 +479,11 @@ form[hidden]{display:none}
         </div>
         <div class="card">
           <h3>สต็อกและการเบิกใช้ <span class="sp"></span>
-            <input type="text" id="pSearch" placeholder="ค้นหา Part No. / ชื่อ" style="width:auto;min-width:190px">
+            <input type="text" id="pSearch" placeholder="ค้นหา Part No. / ชื่อ" style="width:auto;min-width:180px">
+            <button class="btn sm g" onclick="newPart()">+ เพิ่มอะไหล่</button>
           </h3>
           <div class="cb"><div class="tw"><table id="tblParts">
-            <thead><tr><th>PART NO.</th><th>รายการ</th><th class="num">ราคา/หน่วย</th><th class="num">ใช้ไป 90 วัน</th><th class="num">จุดสั่งซื้อ</th><th class="num">คงเหลือ</th><th>สถานะ</th><th class="noprint"></th></tr></thead>
+            <thead><tr><th>PART NO.</th><th>รายการ</th><th class="num">ราคา/หน่วย</th><th class="num">เบิกใช้แล้ว</th><th class="num">จุดสั่งซื้อ</th><th class="num">คงเหลือ</th><th>สถานะ</th><th class="noprint"></th></tr></thead>
             <tbody></tbody></table></div>
           </div>
         </div>
@@ -545,7 +546,7 @@ const CLOSED = ['delivered','cancelled'];
 const stepOf = st => STEP_OF[st] || 0;
 
 let sb = null;
-const S = { jobs:[], techs:[], cats:[], parts:[], custs:[], stock:[], job:null, lines:[], photos:[], filter:'open' };
+const S = { jobs:[], techs:[], cats:[], parts:[], custs:[], stock:[], job:null, lines:[], photos:[], filter:'open', range:'all' };
 
 /* ---------- helpers ---------- */
 const $ = id => document.getElementById(id);
@@ -975,7 +976,6 @@ async function startApp(session){
   $('avatar').textContent = (ME.name || '—').slice(0,2);
 
   const to = S.techs.map(t => `<option value="${t.id}">${esc(t.nickname || t.full_name)}</option>`).join('');
-  $('nTech').insertAdjacentHTML('beforeend', to);
   $('fTech').insertAdjacentHTML('beforeend', to);
   $('nSymCat').insertAdjacentHTML('beforeend', S.cats.map(c => `<option value="${c.code}">${esc(c.name_th)}</option>`).join(''));
   $('rcPart').insertAdjacentHTML('beforeend', S.parts.map(p => `<option value="${esc(p.part_no)}">${esc(p.part_no)} · ${esc(p.name)}</option>`).join(''));
@@ -989,6 +989,7 @@ async function startApp(session){
   if (ME.role === 'tech' && ME.techId) $('fTech').value = ME.techId;
 
   $('gate').hidden = true; $('app').hidden = false;
+  clearIntake();
   goPage(allow[0]);
   await reloadAll();
 
@@ -1013,10 +1014,24 @@ async function reloadAll(){
    ===================================================================== */
 function stepCounts(){
   const c = {1:0,2:0,3:0,4:0,5:0,6:0};
-  S.jobs.forEach(j => { const s = stepOf(j.status); if (s) c[s]++; });
+  inRange().forEach(j => { const s = stepOf(j.status); if (s) c[s]++; });
   return c;
 }
-function openJobs(){ return S.jobs.filter(j => !CLOSED.includes(j.status)); }
+function openJobs(){ return inRange().filter(j => !CLOSED.includes(j.status)); }
+
+const RANGES = [['today','วันนี้'],['week','สัปดาห์นี้'],['month','เดือนนี้'],['all','ทั้งหมด']];
+function rangeStart(){
+  const t = new Date(); t.setHours(0,0,0,0);
+  if (S.range === 'today') return t;
+  if (S.range === 'week')  { const d = new Date(t); d.setDate(d.getDate() - ((d.getDay()+6)%7)); return d; }
+  if (S.range === 'month') return new Date(t.getFullYear(), t.getMonth(), 1);
+  return null;
+}
+function inRange(){
+  const s = rangeStart();
+  return s ? S.jobs.filter(j => new Date(j.received_at) >= s) : S.jobs;
+}
+function setRange(k){ S.range = k; renderDash(); renderChips(); }
 
 function renderStepBar(el){
   const c = stepCounts();
@@ -1027,32 +1042,42 @@ function renderStepBar(el){
 }
 
 function renderDash(){
+  $('rangeChips').innerHTML = RANGES.map(([k,l]) =>
+    `<button class="chip ${S.range===k?'on':''}" onclick="setRange('${k}')">${l}</button>`).join('');
   renderStepBar($('stepBar')); renderStepBar($('stepBar2'));
+  const sh = $('stepHint');
+  if (sh) sh.innerHTML = 'ขั้นตอนปัจจุบัน: <b style="color:var(--navy)">1/6 รับเครื่อง</b> — ' + esc(STEPS[0].hint) + ' · มอบหมายช่างในขั้นที่ 3';
 
-  const open = openJobs();
+  const scope = inRange(), open = openJobs();
   const today = new Date().toISOString().slice(0,10);
-  const doneToday = S.jobs.filter(j => (j.finished_at||'').slice(0,10) === today).length;
+  const doneToday = scope.filter(j => (j.finished_at||'').slice(0,10) === today).length;
   const overdue = open.filter(j => j.days_overdue > 0);
-  const waitParts = S.jobs.filter(j => j.status === 'wait_parts').length;
-  const dl = S.jobs.filter(j => j.delivered_at && j.received_at);
+  const waitParts = scope.filter(j => j.status === 'wait_parts').length;
+  const unassigned = open.filter(j => !j.technician_id).length;
+  const dl = scope.filter(j => j.delivered_at && j.received_at);
   const avg = dl.length
     ? (dl.reduce((s,j) => s + (new Date(j.delivered_at) - new Date(j.received_at))/864e5, 0) / dl.length).toFixed(1)
     : '—';
 
-  const cards = [
-    ['na','📋','งานทั้งหมด', S.jobs.length, 'ใบ'],
-    ['nb','⏳','งานค้าง',    open.length,   'ใบ'],
-    ['nc','✅','เสร็จวันนี้',  doneToday,     'ใบ'],
-    ['nd','🚨','เกินกำหนด',  overdue.length,'ใบ'],
-    ['ne','📦','รออะไหล่',   waitParts,     'ใบ'],
-    ['na','⏱️','เฉลี่ยเวลาซ่อม', avg,       'วัน']
-  ];
-  $('dashKpi').innerHTML = cards.map(([c,e,l,n,u]) =>
+  const kpi = (a) => a.map(([c,e,l,n,u]) =>
     `<div class="kpi ${c}"><div class="t"><span class="l">${l}</span><span class="e">${e}</span></div>
-     <div class="n">${n}<small>${u}</small></div></div>`).join('');
-  $('jobKpi').innerHTML = cards.slice(0,5).map(([c,e,l,n,u]) =>
-    `<div class="kpi ${c}"><div class="t"><span class="l">${l}</span><span class="e">${e}</span></div>
-     <div class="n">${n}<small>${u}</small></div></div>`).join('');
+     <div class="n">${n}<small>${u||''}</small></div></div>`).join('');
+
+  $('dashKpi').innerHTML = kpi([
+    ['na','📋','งานทั้งหมด',   scope.length,   'งาน'],
+    ['nb','⏳','งานค้าง',      open.length,    'งาน'],
+    ['nc','✅','เสร็จวันนี้',   doneToday,      'งาน'],
+    ['nd','🚨','เกินกำหนด',    overdue.length, 'งาน'],
+    ['ne','📦','รออะไหล่',     waitParts,      'งาน'],
+    ['na','⏱️','เฉลี่ยเวลาซ่อม', avg,          'วัน']
+  ]);
+  $('jobKpi').innerHTML = kpi([
+    ['na','📋','ใบงานทั้งหมด',  S.jobs.length,  'ใบ'],
+    ['nb','⏳','งานค้าง',       S.jobs.filter(j => !CLOSED.includes(j.status)).length, 'ใบ'],
+    ['nd','🚨','เกินกำหนด',     S.jobs.filter(j => !CLOSED.includes(j.status) && j.days_overdue > 0).length, 'ใบ'],
+    ['ne','📦','รออะไหล่',      S.jobs.filter(j => j.status === 'wait_parts').length, 'ใบ'],
+    ['nb','👤','ยังไม่มอบหมาย', S.jobs.filter(j => !CLOSED.includes(j.status) && !j.technician_id).length, 'ใบ']
+  ]);
 
   // การ์ด 6 ขั้นตอน
   const sc = stepCounts();
@@ -1076,7 +1101,7 @@ function renderDash(){
   // ผลงานแยกตามช่าง
   const names = [], d1 = [], d2 = [], d3 = [];
   S.techs.forEach(t => {
-    const mine = S.jobs.filter(j => j.technician_id === t.id);
+    const mine = scope.filter(j => j.technician_id === t.id);
     names.push(t.nickname || t.full_name);
     d1.push(mine.filter(j => !CLOSED.includes(j.status)).length);
     d2.push(mine.filter(j => CLOSED.includes(j.status)).length);
@@ -1101,7 +1126,7 @@ function renderDash(){
 
   // อาการเสียบ่อย 90 วัน
   const since = Date.now() - 90*864e5, cnt = {};
-  S.jobs.filter(j => new Date(j.received_at).getTime() >= since)
+  scope.filter(j => new Date(j.received_at).getTime() >= since)
         .forEach(j => { const k = j.symptom_name || 'ยังไม่ระบุ'; cnt[k] = (cnt[k]||0) + 1; });
   const tot2 = Object.values(cnt).reduce((a,b) => a+b, 0) || 1;
   const top = Object.entries(cnt).sort((a,b) => b[1]-a[1]).slice(0,5)
@@ -1202,73 +1227,63 @@ async function assignTech(id, tid){
 /* =====================================================================
    รับเครื่อง
    ===================================================================== */
-async function lookupWarranty(){
-  const sn = val('nSerial');
-  if (!sn) return toast('ใส่ Serial ก่อน', true);
-  try {
-    const { data, error } = await sb.rpc('check_warranty', { p_serial: sn });
-    if (error) throw error;
-    const wr = Array.isArray(data) ? data[0] : data, box = $('warrBox');
-    if (!wr || !wr.found){
-      box.innerHTML = '<div class="box-warn">⚠️ <b>ไม่พบ Serial นี้ในระบบประกัน</b> — กรอกข้อมูลเครื่องเอง</div>';
-      box.dataset.status = 'unknown'; box.dataset.expire = ''; box.dataset.purchase = ''; return;
-    }
-    if (wr.brand) $('nBrand').value = wr.brand;
-    if (wr.model) $('nModel').value = wr.model;
-    if (wr.product_name && !val('nToolType')) $('nToolType').value = wr.product_name;
-    if (wr.buyer_name && !val('nCustName'))   $('nCustName').value = wr.buyer_name;
-    if (wr.buyer_phone && !val('nPhone'))     $('nPhone').value = wr.buyer_phone;
-    box.dataset.status = wr.warranty_status;
-    box.dataset.expire = wr.expire_date || ''; box.dataset.purchase = wr.purchase_date || '';
-    box.innerHTML = wr.warranty_status === 'in_warranty'
-      ? `<div class="box-ok">✅ <b>อยู่ในประกัน</b> · ซื้อ ${dth(wr.purchase_date)} · หมด ${dth(wr.expire_date)} <b>(เหลือ ${wr.days_left} วัน)</b></div>`
-      : `<div class="box-crit">🔴 <b>หมดประกันแล้ว</b> · หมด ${dth(wr.expire_date)} — ต้องแจ้งค่าซ่อมลูกค้า</div>`;
-  } catch(e){ fail(e); }
-}
-
 async function lookupCustomer(){
   const ph = val('nPhone');
   if (!ph) return toast('ใส่เบอร์โทรก่อน', true);
   const c = S.custs.find(x => (x.phone||'') === ph);
   if (!c){ $('nCustId').value = ''; $('custHint').textContent = 'ไม่พบลูกค้าเดิม — จะสร้างรายการใหม่ให้ตอนบันทึก'; return; }
   $('nCustId').value = c.id; $('nCustName').value = c.name || '';
-  $('nAddress').value = c.address || ''; $('nCustType').value = c.customer_type || 'end_user';
+  $('nAddress').value = c.address || '';
   const n = S.jobs.filter(j => j.customer_id === c.id).length;
   $('custHint').innerHTML = `✅ พบลูกค้าเดิม — <b>เคยซ่อมมาแล้ว ${n} ครั้ง</b>`;
 }
 
 function clearIntake(){
-  ['nSerial','nToolType','nBrand','nModel','nPhone','nCustName','nAddress','nSymptom','nAcc','nDue','nCustId']
+  ['nSerial','nToolType','nBrand','nModel','nPhone','nCustName','nAddress','nSymptom','nAcc','nCustId']
     .forEach(id => $(id).value = '');
-  $('nSymCat').value = ''; $('nTech').value = '';
-  $('warrBox').innerHTML = ''; $('warrBox').dataset.status = ''; $('custHint').textContent = '';
+  $('nSymCat').value = '';
+  const t = new Date(), d = n => String(n).padStart(2,'0');
+  const iso = x => x.getFullYear() + '-' + d(x.getMonth()+1) + '-' + d(x.getDate());
+  $('nRecv').value = iso(t);
+  $('nDue').value  = iso(new Date(t.getTime() + 3*864e5));
+  $('custHint').textContent = '';
   INTAKE_FILES = []; renderStaged();
+  previewJobNo();
+}
+
+/** โชว์เลขใบงานที่กำลังจะได้ ก่อนกดบันทึก */
+async function previewJobNo(){
+  const el = $('nextJobNo'); if (!el) return;
+  try {
+    const y = new Date().getFullYear();
+    const { data } = await sb.from('job_counter').select('last_no').eq('yr', y).maybeSingle();
+    el.textContent = 'REP-' + y + '-' + String((data?.last_no || 0) + 1).padStart(4,'0');
+  } catch(e){ el.textContent = 'REP-' + new Date().getFullYear() + '-????'; }
 }
 
 async function saveJob(){
   if (!val('nCustName')) return toast('กรอกชื่อลูกค้าก่อน', true);
+  if (!val('nPhone'))    return toast('กรอกเบอร์โทรก่อน', true);
+  if (!val('nToolType')) return toast('กรอกประเภทเครื่องก่อน', true);
   if (!val('nSymptom'))  return toast('กรอกอาการเสียก่อน', true);
   try {
     let cid = val('nCustId');
     if (!cid){
       const { data, error } = await sb.from('repair_customers').insert({
-        name: val('nCustName'), phone: val('nPhone') || null,
-        address: val('nAddress') || null, customer_type: val('nCustType')
+        name: val('nCustName'), phone: val('nPhone') || null, address: val('nAddress') || null
       }).select('id').single();
       if (error) throw error;
       cid = data.id;
     }
-    const box = $('warrBox');
+    const rec = val('nRecv');
     const { data: job, error } = await sb.from('repair_jobs').insert({
       customer_id: cid,
       tool_type: val('nToolType') || null, brand: val('nBrand') || null,
       model: val('nModel') || null, serial_no: val('nSerial') || null,
-      warranty_status: box.dataset.status || 'unknown',
-      purchase_date: box.dataset.purchase || null, warranty_expire: box.dataset.expire || null,
       symptom: val('nSymptom'), symptom_category: val('nSymCat') || null,
       accessories: val('nAcc') || null,
-      technician_id: val('nTech') || null,
-      status: val('nTech') ? 'assigned' : 'received',
+      status: 'received',
+      received_at: rec ? new Date(rec + 'T09:00:00').toISOString() : undefined,
       due_date: val('nDue') || null, created_by: who()
     }).select('id, job_no').single();
     if (error) throw error;
@@ -1308,16 +1323,12 @@ function renderJobModal(){
   const j = S.job, st = stepOf(j.status), sd = STEPS[st-1];
   const late = j.days_overdue > 0;
   const pc = S.lines.reduce((s,l) => s + Number(l.line_total||0), 0);
-  const warr = j.warranty_status === 'in_warranty' ? '<span class="pill tag-good">อยู่ในประกัน</span>'
-             : j.warranty_status === 'out_of_warranty' ? '<span class="pill tag-crit">หมดประกัน</span>'
-             : '<span class="pill st0">ไม่ทราบประกัน</span>';
 
   $('jobWrap').innerHTML = `
   <div class="mhead">
     <span class="mono" style="font-size:18px;font-weight:800;color:var(--navy)">${esc(j.job_no)}</span>
     <span class="pill st${st||0}"><span class="d"></span>${STATUS[j.status]||j.status}</span>
     ${sd ? `<span class="pill" style="background:${sd.c};color:${sd.ink}">ขั้น ${st}/6 · ${esc(sd.label)}</span>` : ''}
-    ${warr}
     ${late ? `<span class="pill tag-crit">เกินกำหนด ${j.days_overdue} วัน</span>` : ''}
     <span class="sp"></span>
     <button class="btn sm noprint" onclick="window.print()">🖨️ พิมพ์</button>
@@ -1337,7 +1348,6 @@ function renderJobModal(){
           <tr><td class="muted" style="width:115px">ประเภท</td><td>${esc(j.tool_type||'—')}</td></tr>
           <tr><td class="muted">แบรนด์ / รุ่น</td><td><b>${esc([j.brand,j.model].filter(Boolean).join(' ')||'—')}</b></td></tr>
           <tr><td class="muted">Serial No.</td><td class="mono">${esc(j.serial_no||'—')}</td></tr>
-          <tr><td class="muted">หมดประกัน</td><td>${dth(j.warranty_expire)}</td></tr>
           <tr><td class="muted">ของที่มาด้วย</td><td>${esc(j.accessories||'—')}</td></tr>
         </table></div>
       </div>
@@ -1512,9 +1522,9 @@ function renderParts(){
 
   $('partKpi').innerHTML = [
     ['na','📦','รายการอะไหล่', S.stock.length, 'SKU'],
-    ['nd','⚠️','ต้องสั่งเพิ่ม',  low, 'รายการ'],
+    ['nd','⚠️','สต็อกต่ำ',  low, 'รายการ'],
     ['nc','💰','มูลค่าคลัง',   '฿' + money(value), ''],
-    ['ne','🔧','เบิกใช้ 90 วัน', used, 'ชิ้น']
+    ['ne','🔧','เบิกใช้สะสม', used, 'ชิ้น']
   ].map(([cl,e,l,n,u]) => `<div class="kpi ${cl}"><div class="t"><span class="l">${l}</span><span class="e">${e}</span></div>
     <div class="n">${n}<small>${u}</small></div></div>`).join('');
 
@@ -1526,10 +1536,44 @@ function renderParts(){
     <td class="num"><b style="font-size:16px">${p.qty}</b> <span class="sub2">${esc(p.unit||'')}</span></td>
     <td><span class="pill ${cls[p.stock_state]||'st0'}">${esc(p.stock_state)}</span></td>
     <td class="num noprint">
-      <button class="btn ic" onclick="adjust('${esc(p.part_no)}',1)">+</button>
-      <button class="btn ic" onclick="adjust('${esc(p.part_no)}',-1)">−</button></td></tr>`).join('')
+      <button class="btn ic" onclick="adjust('${esc(p.part_no)}',1)" title="รับเข้า 1">+</button>
+      <button class="btn ic" onclick="adjust('${esc(p.part_no)}',-1)" title="เบิกออก 1">−</button>
+      <button class="btn ic" onclick="editReorder('${esc(p.part_no)}',${p.reorder_point})" title="แก้จุดสั่งซื้อ">✏️</button></td></tr>`).join('')
     : '<tr><td colspan="8" class="empty">ยังไม่มีอะไหล่ในทะเบียน</td></tr>';
 }
+async function newPart(){
+  const part_no = prompt('รหัสอะไหล่ (Part No.) เช่น BR-00124');
+  if (!part_no) return;
+  const name = prompt('ชื่ออะไหล่ เช่น Bearing 6001ZZ');
+  if (!name) return;
+  const sell = Number(prompt('ราคาขาย (บาท)', '0')) || 0;
+  const cost = Number(prompt('ราคาทุน (บาท)', '0')) || 0;
+  const rp   = Number(prompt('จุดสั่งซื้อ — ต่ำกว่านี้แจ้งเตือน', '10')) || 0;
+  try {
+    const { error } = await sb.from('parts_master').insert({
+      part_no: part_no.trim().toUpperCase(), name: name.trim(),
+      sell_price: sell, cost_price: cost, reorder_point: rp
+    });
+    if (error) throw error;
+    toast('✅ เพิ่มอะไหล่แล้ว');
+    const { data } = await sb.from('parts_master').select('id,part_no,name,sell_price').eq('is_active', true).order('part_no');
+    S.parts = data || [];
+    $('rcPart').innerHTML = '<option value="">— เลือกอะไหล่ —</option>'
+      + S.parts.map(p => `<option value="${esc(p.part_no)}">${esc(p.part_no)} · ${esc(p.name)}</option>`).join('');
+    await loadParts();
+  } catch(e){ fail(e); }
+}
+
+async function editReorder(pn, cur){
+  const v = prompt('จุดสั่งซื้อใหม่ของ ' + pn, cur);
+  if (v === null) return;
+  try {
+    const { error } = await sb.from('parts_master').update({ reorder_point: Number(v)||0 }).eq('part_no', pn);
+    if (error) throw error;
+    await loadParts();
+  } catch(e){ fail(e); }
+}
+
 async function adjust(pn, d){
   try {
     const { error } = await sb.rpc('receive_parts', { p_part_no:pn, p_qty:d, p_note:'ปรับยอดจากหน้าคลัง', p_by:who() });
