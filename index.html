@@ -243,12 +243,44 @@ svg .nm{fill:var(--ink);font-size:12.5px;font-family:"Sarabun",sans-serif}
 .muted{color:var(--ink3)}
 .empty{text-align:center;padding:38px 14px;color:var(--ink3)}
 
-/* modal */
-.mask{position:fixed;inset:0;background:rgba(20,30,50,.55);z-index:100;display:none;overflow-y:auto;padding:22px 14px}
-.mask.on{display:block}
-.modal{background:var(--bg);max-width:1050px;margin:0 auto;border-radius:14px;overflow:hidden;box-shadow:0 18px 50px rgba(0,0,0,.3)}
-.mhead{background:#fff;padding:15px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:11px;flex-wrap:wrap;position:sticky;top:0;z-index:5}
-.mbody{padding:18px}
+/* ---------- หน้าใบงาน (wizard) ---------- */
+.prog{display:flex;align-items:center;flex-wrap:wrap;gap:6px 0}
+.pstep{display:flex;align-items:center;gap:8px;white-space:nowrap;flex:0 0 auto}
+.pstep .b{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:12.5px;font-weight:800;flex:0 0 auto;border:2px solid transparent}
+.pstep .n{font-size:13px;font-weight:600;color:var(--ink3)}
+.pstep.done .b{background:var(--good);color:#fff}
+.pstep.done .n{color:var(--good)}
+.pstep.now  .b{background:var(--navy);color:#fff;box-shadow:0 0 0 4px var(--blue-l)}
+.pstep.now  .n{color:var(--navy);font-weight:800}
+.pstep.todo .b{background:#fff;color:var(--ink3);border-color:var(--line)}
+.pline{height:2px;background:var(--line);flex:1 1 20px;min-width:16px;margin:0 10px}
+.pline.done{background:var(--good)}
+
+.jgrid{display:grid;grid-template-columns:308px minmax(0,1fr);gap:18px;align-items:start}
+@media(max-width:960px){.jgrid{grid-template-columns:1fr}}
+.jnum{display:inline-flex;width:22px;height:22px;border-radius:6px;align-items:center;justify-content:center;
+  font-size:12px;font-weight:800;background:var(--navy);color:#fff;margin-right:2px}
+.kv{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid var(--line2);font-size:13.5px}
+.kv:last-of-type{border-bottom:0}
+.kv .k{color:var(--ink3);flex:0 0 auto}
+.kv .v{font-weight:700;text-align:right;word-break:break-word}
+.kv .v.mono{font-weight:600}
+.jhint{background:var(--blue-l);border:1px solid #cadff2;border-radius:9px;padding:10px 14px;
+  font-size:13.5px;color:var(--navy);margin-bottom:16px}
+.chipset{display:flex;gap:6px;flex-wrap:wrap}
+.chipset span{background:var(--gold-l);border:1px solid #e8d9a8;border-radius:7px;padding:3px 9px;font-size:12.5px}
+.jfoot{display:flex;gap:9px;justify-content:flex-end;flex-wrap:wrap;
+  margin-top:18px;padding-top:16px;border-top:1px solid var(--line2)}
+.addrow{display:grid;grid-template-columns:minmax(120px,1.2fr) minmax(120px,1.6fr) 74px 92px 44px;gap:8px;
+  margin-top:11px;padding-top:11px;border-top:1px solid var(--line2)}
+@media(max-width:700px){.addrow{grid-template-columns:1fr 1fr;}}
+.sumrow{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:9px 0;
+  border-bottom:1px solid var(--line2);font-size:14px}
+.sumrow.total{border-bottom:0;border-top:2px solid var(--line);margin-top:4px;padding-top:13px;
+  font-size:17px;font-weight:800;color:var(--navy)}
+.sumrow input{max-width:150px;text-align:right}
+
 
 /* หน้าต่างฟอร์ม */
 .fmask{position:fixed;inset:0;background:rgba(18,27,45,.55);z-index:250;display:none;
@@ -320,7 +352,8 @@ form[hidden]{display:none}
 .burger{display:none;background:none;border:1px solid var(--line);border-radius:8px;padding:6px 10px;cursor:pointer}
 
 @media print{
-  aside,.phead,.noprint,nav{display:none !important}
+  aside,.phead,.noprint,nav,.npanel,.fmask{display:none !important}
+  .jgrid{grid-template-columns:1fr !important}
   body{background:#fff}.mask{position:static;background:none;padding:0}
   .modal{box-shadow:none;max-width:none}.card{break-inside:avoid;box-shadow:none}
 }
@@ -606,6 +639,9 @@ form[hidden]{display:none}
         </div>
       </div>
 
+      <!-- ============ ใบงาน (หน้าเต็ม) ============ -->
+      <div class="page" id="p-job"><div id="jobWrap"></div></div>
+
       <!-- ============ ตั้งค่า ============ -->
       <div class="page" id="p-setting">
         <div class="card">
@@ -658,10 +694,6 @@ form[hidden]{display:none}
   </div>
 </div>
 
-<div class="mask" id="mask" onclick="if(event.target===this)closeJob()">
-  <div class="modal"><div id="jobWrap"></div></div>
-</div>
-
 <script>
 /* =====================================================================
    ⚙️ ตั้งค่า
@@ -677,12 +709,12 @@ const UPLOAD_TOKEN = 'masaru-repair-6heftvnll9fldpgb';   // ตรงกับ T
 
 /* ---------- ขั้นตอน 6 ขั้น + สี ramp เดียวไล่อ่อน→เข้ม ---------- */
 const STEPS = [
-  { n:1, label:'รับเครื่อง',            hint:'บันทึกลูกค้า เครื่องมือ อาการเสีย',   st:['received'],                 c:'#c3d6ec', ink:'#2b4a7a' },
-  { n:2, label:'ตรวจเช็ค',              hint:'บันทึกอาการที่พบจากการตรวจเช็ค',       st:['inspecting'],               c:'#9cbbdf', ink:'#26456f' },
-  { n:3, label:'มอบหมายงาน',            hint:'เลือกช่างผู้รับผิดชอบและเวลาทำงาน',    st:['assigned','wait_approve'],  c:'#75a0d0', ink:'#1f3c63' },
-  { n:4, label:'ซ่อม / เปลี่ยนอะไหล่',   hint:'ซ่อม เปลี่ยนอะไหล่ หรือรออุปกรณ์',    st:['repairing','wait_parts'],   c:'#4f83bb', ink:'#fff'    },
-  { n:5, label:'ตรวจสอบ',               hint:'ทดสอบเครื่องก่อนส่งมอบ',              st:['testing'],                  c:'#35659c', ink:'#fff'    },
-  { n:6, label:'ส่งมอบลูกค้า',           hint:'นัดรับเครื่องและปิดงาน',              st:['ready','delivered'],        c:'#1F3864', ink:'#fff'    }
+  { n:1, main:'received',   label:'รับเครื่อง',            hint:'บันทึกลูกค้า เครื่องมือ อาการเสีย',   st:['received'],                 c:'#c3d6ec', ink:'#2b4a7a' },
+  { n:2, main:'inspecting', label:'ตรวจเช็ค',              hint:'บันทึกอาการที่พบจากการตรวจเช็ค',       st:['inspecting'],               c:'#9cbbdf', ink:'#26456f' },
+  { n:3, main:'assigned',   label:'มอบหมายงาน',            hint:'เลือกช่างผู้รับผิดชอบและเวลาทำงาน',    st:['assigned','wait_approve'],  c:'#75a0d0', ink:'#1f3c63' },
+  { n:4, main:'repairing',  label:'ซ่อม / เปลี่ยนอะไหล่',   hint:'ซ่อม เปลี่ยนอะไหล่ หรือรออุปกรณ์',    st:['repairing','wait_parts'],   c:'#4f83bb', ink:'#fff'    },
+  { n:5, main:'testing',    label:'ตรวจสอบ',               hint:'ทดสอบเครื่องก่อนส่งมอบ',              st:['testing'],                  c:'#35659c', ink:'#fff'    },
+  { n:6, main:'ready',      label:'ส่งมอบลูกค้า',           hint:'นัดรับเครื่องและปิดงาน',              st:['ready','delivered'],        c:'#1F3864', ink:'#fff'    }
 ];
 const STATUS = {
   received:'ได้รับเครื่อง', inspecting:'ตรวจเช็ค', assigned:'มอบหมายแล้ว', wait_approve:'รออนุมัติ',
@@ -711,10 +743,10 @@ const who = () => ME.name || ME.email || 'ไม่ระบุ';
 const isBoss = () => ME.role === 'head' || ME.role === 'admin';
 const ROLE_LABEL = { staff:'พนักงานรับเครื่อง', tech:'ช่างซ่อม', head:'หัวหน้าช่าง', admin:'ผู้ดูแลระบบ' };
 const ROLE_PAGES = {
-  staff: ['dash','jobs','intake','cust'],
-  tech:  ['dash','jobs','parts'],
-  head:  ['dash','jobs','intake','cust','parts','report','setting'],
-  admin: ['dash','jobs','intake','cust','parts','report','setting']
+  staff: ['dash','jobs','intake','cust','job'],
+  tech:  ['dash','jobs','parts','job'],
+  head:  ['dash','jobs','intake','cust','parts','report','setting','job'],
+  admin: ['dash','jobs','intake','cust','parts','report','setting','job']
 };
 
 function toast(m, err){
@@ -1030,7 +1062,8 @@ const PGT = {
   cust:   ['ลูกค้า','ประวัติลูกค้าและการซ่อม'],
   parts:  ['คลังอะไหล่','สต็อกและการเบิกใช้'],
   report: ['รายงาน','วิเคราะห์ข้อมูลเชิงลึก'],
-  setting:['ตั้งค่าระบบ','ช่างซ่อม · ผู้ใช้งาน · โค้ดเชิญ · หมวดอาการ']
+  setting:['ตั้งค่าระบบ','ช่างซ่อม · ผู้ใช้งาน · โค้ดเชิญ · หมวดอาการ'],
+  job:    ['ใบงานซ่อม','รายละเอียดและบันทึกงานตามขั้นตอน']
 };
 document.querySelectorAll('aside nav button').forEach(b => b.onclick = () => goPage(b.dataset.p));
 function goPage(p){
@@ -1549,9 +1582,7 @@ async function saveJob(){
 /* =====================================================================
    ใบงาน (modal)
    ===================================================================== */
-function closeJob(){
-  $('mask').classList.remove('on'); document.body.style.overflow = '';
-  renderJobs();                       // ให้แถวที่เพิ่งดูขึ้นไฮไลต์สีทอง
+function closeJob(){ goPage('jobs'); renderJobs();
   const r = document.querySelector('#tblJobs tbody tr.seen');
   if (r) r.scrollIntoView({ block:'nearest' });
 }
@@ -1565,143 +1596,298 @@ async function openJob(id){
     ]);
     if (j.error) throw j.error;
     S.job = j.data; S.lines = lines.data || []; S.photos = photos.data || []; S.seen = id;
-    renderJobModal();
-    $('mask').classList.add('on'); document.body.style.overflow = 'hidden';
+    goPage('job');
+    renderJobPage();
   } catch(e){ fail(e); }
 }
 
-function renderJobModal(){
-  const j = S.job, st = stepOf(j.status), sd = STEPS[st-1];
+/* ---------- แถบความคืบหน้า 6 ขั้น ---------- */
+function progBar(cur){
+  return STEPS.map((s,i) => {
+    const st = s.n < cur ? 'done' : s.n === cur ? 'now' : 'todo';
+    return `${i ? `<span class="pline ${s.n <= cur ? 'done' : ''}"></span>` : ''}
+      <span class="pstep ${st}"><span class="b">${st === 'done' ? '✓' : s.n}</span>
+      <span class="n">${esc(s.label)}</span></span>`;
+  }).join('');
+}
+
+/* ---------- กล่องรูปตามช่วง ---------- */
+function photoBox(phase, label, max){
+  const list = S.photos.filter(x => x.phase === phase);
+  return `<div class="phgrp"><div class="t">${label}<span class="c">${list.length}/${max}</span></div>
+    <div class="phs">
+      ${list.map(p => `<div class="ph">
+        <img src="${photoUrl(p.storage_key)}" alt="${label}" loading="lazy"
+             onclick="window.open('${photoOpen(p.storage_key)}','_blank')">
+        <button class="x noprint" onclick="deletePhoto('${p.id}','${p.storage_key}')" title="ลบรูป">✕</button></div>`).join('')}
+      ${uploadOn() && list.length < max ? `<label class="ph add noprint">＋
+        <input type="file" accept="image/*" multiple hidden onchange="addPhotos(this,'${phase}')"></label>` : ''}
+    </div></div>`;
+}
+
+/* =====================================================================
+   หน้าใบงาน — โชว์เฉพาะฟอร์มของขั้นที่กำลังทำ
+   ===================================================================== */
+function renderJobPage(){
+  const j = S.job, cur = stepOf(j.status) || 1, sd = STEPS[cur-1];
   const late = j.days_overdue > 0;
   const pc = S.lines.reduce((s,l) => s + Number(l.line_total||0), 0);
+  const hist = S.jobs.filter(x => x.customer_id === j.customer_id && x.id !== j.id).length;
 
   $('jobWrap').innerHTML = `
-  <div class="mhead">
+  <div class="card noprint"><div class="cb">
+    <div class="prog">${progBar(cur)}</div>
+    <div class="sub2" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line2)">
+      ขั้นตอนปัจจุบัน: <b style="color:var(--navy)">${cur}/6 ${esc(sd.label)}</b> — ${esc(sd.hint)}</div>
+  </div></div>
+
+  <div class="card"><div class="cb" style="display:flex;align-items:center;gap:11px;flex-wrap:wrap;padding:13px 18px">
+    <button class="btn sm noprint" onclick="closeJob()" title="กลับรายการใบงาน">←</button>
     <span class="mono" style="font-size:18px;font-weight:800;color:var(--navy)">${esc(j.job_no)}</span>
-    <span class="pill st${st||0}"><span class="d"></span>${STATUS[j.status]||j.status}</span>
-    ${sd ? `<span class="pill" style="background:${sd.c};color:${sd.ink}">ขั้น ${st}/6 · ${esc(sd.label)}</span>` : ''}
+    <span class="pill st${cur}"><span class="d"></span>${STATUS[j.status]||j.status}</span>
     ${late ? `<span class="pill tag-crit">เกินกำหนด ${j.days_overdue} วัน</span>` : ''}
-    <span class="sp"></span>
-    <button class="btn sm noprint" onclick="window.print()">🖨️ พิมพ์</button>
-    <button class="btn sm noprint" onclick="closeJob()">✕ ปิด</button>
-  </div>
-  <div class="mbody">
-    <div class="card"><h3>ข้อมูลใบงาน</h3><div class="cb">
-      <div class="split" style="grid-template-columns:1fr 1fr">
-        <div><table>
-          <tr><td class="muted" style="width:115px">ลูกค้า</td><td><b>${esc(j.customer_name||'—')}</b></td></tr>
-          <tr><td class="muted">เบอร์โทร</td><td>${esc(j.customer_phone||'—')}</td></tr>
-          <tr><td class="muted">วันที่รับ</td><td>${dtth(j.received_at)}</td></tr>
-          <tr><td class="muted">กำหนดเสร็จ</td><td ${late?'style="color:var(--crit);font-weight:700"':''}>${dth(j.due_date)}</td></tr>
-          <tr><td class="muted">อยู่ในร้าน</td><td>${j.days_in_shop ?? 0} วัน</td></tr>
-        </table></div>
-        <div><table>
-          <tr><td class="muted" style="width:115px">ประเภท</td><td>${esc(j.tool_type||'—')}</td></tr>
-          <tr><td class="muted">แบรนด์ / รุ่น</td><td><b>${esc([j.brand,j.model].filter(Boolean).join(' ')||'—')}</b></td></tr>
-          <tr><td class="muted">Serial No.</td><td class="mono">${esc(j.serial_no||'—')}</td></tr>
-          <tr><td class="muted">ของที่มาด้วย</td><td>${esc(j.accessories||'—')}</td></tr>
-        </table></div>
-      </div>
-      <div style="margin-top:13px"><label>อาการเสียที่ลูกค้าแจ้ง</label>
-        <div style="background:#f7fafd;border:1px solid var(--line2);border-radius:9px;padding:11px">
-          ${esc(j.symptom||'—')} ${j.symptom_name ? `<span class="pill st1">${esc(j.symptom_name)}</span>` : ''}</div></div>
-      <div class="noprint" style="margin-top:13px"><label>QR Code ใบงาน</label><div id="qrbox"></div></div>
-    </div></div>
-
-    <div class="card"><h3>📸 รูปภาพ <span class="sp"></span>
-      <span class="muted" style="font-weight:400;font-size:13px">
-        ${uploadOn() ? 'ย่อขนาดในเครื่องก่อนอัปโหลด · เก็บที่ Google Drive' : '⚠️ ยังไม่ได้ตั้งค่า UPLOAD_URL'}</span></h3>
-      <div class="cb">${PHASES.map(p => {
-        const list = S.photos.filter(x => x.phase === p.k);
-        return `<div class="phgrp">
-          <div class="t">${p.label}<span class="c">${list.length}/${p.max}</span></div>
-          <div class="phs">
-            ${list.map(ph => `<div class="ph">
-              <img src="${photoUrl(ph.storage_key)}" alt="${p.label}" loading="lazy"
-                   onclick="window.open('${photoOpen(ph.storage_key)}','_blank')">
-              <button class="x noprint" onclick="deletePhoto('${ph.id}','${ph.storage_key}')" title="ลบรูป">✕</button>
-            </div>`).join('')}
-            ${uploadOn() && list.length < p.max ? `<label class="ph add noprint">＋
-              <input type="file" accept="image/*" multiple hidden onchange="addPhotos(this,'${p.k}')"></label>` : ''}
-          </div></div>`;
-      }).join('')}</div>
+    <span class="sp" style="flex:1"></span>
+    <div style="display:flex;align-items:center;gap:9px">
+      <div class="avatar" style="width:32px;height:32px;font-size:12px">${esc((j.tech_name||'—').slice(0,2))}</div>
+      <div style="line-height:1.3"><div class="sub2">ช่างผู้รับผิดชอบ</div>
+        <b>${esc(j.tech_name || 'ยังไม่มอบหมาย')}</b></div>
     </div>
+  </div></div>
 
-    <div class="card"><h3>🔧 ส่วนช่าง</h3><div class="cb">
-      <div class="grid g2">
-        <div><label>ช่างผู้รับผิดชอบ</label><select id="jTech"><option value="">— ยังไม่มอบหมาย —</option>
-          ${S.techs.map(t => `<option value="${t.id}" ${t.id===j.technician_id?'selected':''}>${esc(t.nickname||t.full_name)}</option>`).join('')}
-        </select></div>
-        <div><label>สถานะงาน</label><select id="jStatus">
-          ${Object.entries(STATUS).map(([k,v]) => `<option value="${k}" ${k===j.status?'selected':''}>${stepOf(k)?stepOf(k)+'. ':''}${v}</option>`).join('')}
-        </select></div>
-        <div style="grid-column:1/-1"><label>ผลการตรวจเช็ค — อาการที่พบ</label><textarea id="jInspect">${esc(j.inspect_result||'')}</textarea></div>
-        <div><label>สาเหตุ</label><textarea id="jCause">${esc(j.cause||'')}</textarea></div>
-        <div><label>วิธีการซ่อม</label><textarea id="jMethod">${esc(j.repair_method||'')}</textarea></div>
-      </div>
-    </div></div>
-
-    <div class="card"><h3>อะไหล่ที่ใช้ <span class="sp"></span>
-      <span class="muted" style="font-weight:400;font-size:13px">เพิ่ม/ลบแล้วตัดคืนสต็อกทันที</span></h3>
+  <div class="jgrid">
+    <div class="card">
+      <h3><span class="jnum">1</span> ข้อมูลรับเครื่อง</h3>
       <div class="cb">
-        <div class="tw"><table>
-          <thead><tr><th>รหัส</th><th>รายการ</th><th class="num">จำนวน</th><th class="num">ราคา/หน่วย</th><th class="num">รวม</th><th class="noprint"></th></tr></thead>
-          <tbody>${S.lines.length ? S.lines.map(l => `<tr>
-            <td class="mono">${esc(l.parts_master?.part_no||'')}</td><td>${esc(l.parts_master?.name||'')}</td>
-            <td class="num">${l.qty}</td><td class="num">${money2(l.unit_price)}</td>
-            <td class="num"><b>${money2(l.line_total)}</b></td>
-            <td class="noprint num"><button class="btn ic dn" onclick="removeLine('${l.id}')">✕</button></td></tr>`).join('')
-            : '<tr><td colspan="6" class="muted" style="text-align:center;padding:18px">ยังไม่มีอะไหล่</td></tr>'}</tbody>
-        </table></div>
-        <div class="grid g4 noprint" style="margin-top:13px;padding-top:13px;border-top:1px solid var(--line2)">
-          <div style="grid-column:span 2"><label>เพิ่มอะไหล่</label><select id="addPart"><option value="">— เลือกอะไหล่ —</option>
-            ${S.parts.map(p => `<option value="${p.id}" data-price="${p.sell_price}">${esc(p.part_no)} · ${esc(p.name)}</option>`).join('')}
-          </select></div>
-          <div><label>จำนวน</label><input type="number" id="addQty" value="1" min="1"></div>
-          <div style="display:flex;align-items:flex-end"><button class="btn p" style="width:100%" onclick="addLine()">➕ เพิ่ม</button></div>
+        <div class="kv"><span class="k">ลูกค้า</span><span class="v">${esc(j.customer_name||'—')}</span></div>
+        <div class="kv"><span class="k">เบอร์โทร</span><span class="v">${esc(j.customer_phone||'—')}</span></div>
+        <div class="kv"><span class="k">ประวัติซ่อม</span><span class="v">
+          ${hist ? `<a href="#" onclick="showHistory('${j.customer_id}');return false" style="color:var(--blue)">ดูประวัติ (${hist})</a>`
+                 : '<span class="muted">ครั้งแรก</span>'}</span></div>
+        <div class="kv"><span class="k">ประเภทเครื่อง</span><span class="v">${esc(j.tool_type||'—')}</span></div>
+        <div class="kv"><span class="k">แบรนด์ / รุ่น</span><span class="v">${esc([j.brand,j.model].filter(Boolean).join(' ')||'—')}</span></div>
+        <div class="kv"><span class="k">Serial No.</span><span class="v mono">${esc(j.serial_no||'—')}</span></div>
+        <div class="kv"><span class="k">วันที่รับ</span><span class="v">${dth(j.received_at)}</span></div>
+        <div class="kv"><span class="k">กำหนดเสร็จ</span>
+          <span class="v" ${late?'style="color:var(--crit)"':''}>${dth(j.due_date)}</span></div>
+
+        <div style="margin-top:13px">
+          <label>อาการเสียที่ลูกค้าแจ้ง</label>
+          <div class="box-warn">${esc(j.symptom||'—')}</div>
+        </div>
+        ${j.accessories ? `<div style="margin-top:13px"><label>ของที่นำมาด้วย</label>
+          <div class="chipset">${j.accessories.split(/[,·]/).filter(x=>x.trim())
+            .map(x => `<span>${esc(x.trim())}</span>`).join('')}</div></div>` : ''}
+
+        <div style="margin-top:15px">${photoBox('before','รูปภาพก่อนซ่อม',6)}</div>
+
+        <div class="noprint" style="margin-top:6px;text-align:center">
+          <label style="text-align:left">QR Code ใบงาน</label>
+          <div id="qrbox"></div>
+          <button class="btn sm" style="margin-top:9px" onclick="window.print()">🖨️ พิมพ์ใบงาน</button>
         </div>
       </div>
     </div>
 
-    <div class="card"><h3>สรุปค่าใช้จ่าย</h3><div class="cb">
-      <div class="grid g4">
-        <div><label>ค่าอะไหล่</label><input type="text" value="${money2(pc)}" disabled></div>
-        <div><label>ค่าแรง</label><input type="number" id="jLabor" value="${Number(j.labor_cost)||0}" min="0" step="10"></div>
-        <div><label>ส่วนลด</label><input type="number" id="jDiscount" value="${Number(j.discount)||0}" min="0" step="10"></div>
-        <div><label>รวมทั้งหมด</label>
-          <div id="jTotal" style="font-size:25px;font-weight:800;color:var(--navy);font-variant-numeric:tabular-nums">
-            ฿${money2(pc + (Number(j.labor_cost)||0) - (Number(j.discount)||0))}</div></div>
-      </div>
-      <div class="row noprint" style="margin-top:16px">
-        <button class="btn g" onclick="saveWork()">💾 บันทึกงานช่าง</button>
-        <span class="muted" style="font-size:13px">แก้ไขล่าสุด ${dtth(j.updated_at)} · ${esc(who())}</span>
-      </div>
-    </div></div>
+    <div class="card">
+      <h3><span class="jnum" style="background:${sd.c};color:${sd.ink}">${cur}</span> ${esc(sd.label)}</h3>
+      <div class="cb" id="stepForm">${stepForm(cur, j, pc)}</div>
+    </div>
   </div>`;
 
   const qb = $('qrbox');
   if (qb && window.QRCode){
     qb.innerHTML = '';
-    new QRCode(qb, { text: location.origin + location.pathname + '?job=' + j.id, width:120, height:120, correctLevel: QRCode.CorrectLevel.M });
+    new QRCode(qb, { text: location.origin + location.pathname + '?job=' + j.id, width:118, height:118, correctLevel: QRCode.CorrectLevel.M });
   }
-  ['jLabor','jDiscount'].forEach(id => $(id).addEventListener('input', () => {
-    $('jTotal').textContent = '฿' + money2(pc + (Number(val('jLabor'))||0) - (Number(val('jDiscount'))||0));
-  }));
+  bindStepForm(cur, pc);
 }
 
-async function addLine(){
-  const sel = $('addPart'), pid = sel.value, q = Number(val('addQty'))||0;
-  if (!pid) return toast('เลือกอะไหล่ก่อน', true);
-  if (q < 1) return toast('จำนวนต้องมากกว่า 0', true);
+/* ---------- ฟอร์มของแต่ละขั้น ---------- */
+function stepForm(cur, j, pc){
+  const hint = t => `<div class="jhint">${esc(t)}</div>`;
+  const back = cur > 1 ? `<button class="btn" onclick="moveStep(${cur-1})">← ย้อนขั้น</button>` : '';
+  const save = `<button class="btn" onclick="saveStep()">💾 บันทึก</button>`;
+
+  if (cur === 1) return hint('ข้อมูลรับเครื่องบันทึกครบแล้ว · ตรวจสอบทางซ้ายอีกครั้งก่อนไปขั้นถัดไป') + `
+    <div class="grid g2">
+      <div><label>กำหนดเสร็จ</label><input type="date" id="sDue" value="${(j.due_date||'').slice(0,10)}"></div>
+      <div><label>หมวดอาการ (ใช้ทำสถิติ)</label><select id="sCat">
+        <option value="">— ยังไม่ระบุ —</option>
+        ${S.cats.map(c => `<option value="${c.code}" ${c.code===j.symptom_category?'selected':''}>${esc(c.name_th)}</option>`).join('')}
+      </select></div>
+    </div>
+    <div class="jfoot">${save}<button class="btn g" onclick="moveStep(2)">ไปตรวจเช็ค →</button></div>`;
+
+  if (cur === 2) return hint('บันทึกอาการที่พบจากการตรวจเช็คจริง และสาเหตุที่ทำให้เสีย') + `
+    <div class="grid">
+      <div><label>อาการที่พบจากการตรวจเช็ค <span class="req">*</span></label>
+        <textarea id="sInspect" placeholder="เช่น แรงกระแทกกลาง มีเสียงดังจากชุดเกียร์">${esc(j.inspect_result||'')}</textarea></div>
+      <div><label>สาเหตุ</label>
+        <textarea id="sCause" placeholder="เช่น ลูกปืนชุด Hammer เสื่อมสภาพ">${esc(j.cause||'')}</textarea></div>
+    </div>
+    <div class="jfoot">${back}${save}<button class="btn g" onclick="moveStep(3)">ไปมอบหมายงาน →</button></div>`;
+
+  if (cur === 3) return hint('เลือกช่างผู้รับผิดชอบและยืนยันกำหนดเสร็จ') + `
+    <div class="grid g2">
+      <div><label>ช่างผู้รับผิดชอบ <span class="req">*</span></label><select id="sTech">
+        <option value="">— เลือกช่าง —</option>
+        ${S.techs.map(t => `<option value="${t.id}" ${t.id===j.technician_id?'selected':''}>${esc(t.nickname||t.full_name)}
+          — งานค้าง ${S.jobs.filter(x => x.technician_id===t.id && !CLOSED.includes(x.status)).length}</option>`).join('')}
+      </select></div>
+      <div><label>กำหนดเสร็จ</label><input type="date" id="sDue" value="${(j.due_date||'').slice(0,10)}"></div>
+    </div>
+    <div class="jfoot">${back}${save}<button class="btn g" onclick="moveStep(4)">เริ่มซ่อม →</button></div>`;
+
+  if (cur === 4) return hint('ซ่อม เปลี่ยนอะไหล่ หรือรออุปกรณ์ · กำลังดำเนินการ') + `
+    <div><label>วิธีการซ่อม <span class="req">*</span></label>
+      <textarea id="sMethod" placeholder="เปลี่ยนลูกปืน, ทำความสะอาด Gear Housing, เติม Grease">${esc(j.repair_method||'')}</textarea></div>
+
+    <div style="margin-top:16px"><label>อะไหล่ที่ใช้ <span class="muted" style="font-weight:400">(ตัดสต็อกอัตโนมัติ)</span></label>
+      <div class="tw"><table>
+        <thead><tr><th>PART NO.</th><th>รายการ</th><th class="num">จำนวน</th><th class="num">ราคา</th><th class="num noprint"></th></tr></thead>
+        <tbody>${S.lines.length ? S.lines.map(l => `<tr>
+          <td class="mono"><b>${esc(l.parts_master?.part_no||'')}</b></td>
+          <td>${esc(l.parts_master?.name||'')}</td>
+          <td class="num">${l.qty}</td>
+          <td class="num">฿${money2(l.line_total)}</td>
+          <td class="num noprint"><button class="btn ic dn" onclick="removeLine('${l.id}')">✕</button></td></tr>`).join('')
+          : '<tr><td colspan="5" class="muted" style="text-align:center;padding:16px">ยังไม่มีอะไหล่</td></tr>'}</tbody>
+      </table></div>
+      <div class="addrow noprint">
+        <input list="partList" id="aPart" placeholder="Part No." autocomplete="off">
+        <input id="aName" placeholder="ชื่ออะไหล่" disabled>
+        <input type="number" id="aQty" value="1" min="1" title="จำนวน">
+        <input type="number" id="aPrice" placeholder="ราคา" min="0" title="ราคา/หน่วย">
+        <button class="btn p" onclick="addLineInline()" title="เพิ่ม">＋</button>
+      </div>
+      <datalist id="partList">${S.parts.map(p =>
+        `<option value="${esc(p.part_no)}">${esc(p.name)}</option>`).join('')}</datalist>
+    </div>
+
+    <div style="margin-top:16px">
+      <div class="sumrow"><span>รวมค่าอะไหล่</span><b>฿${money2(pc)}</b></div>
+      <div class="sumrow"><span>ค่าแรง</span>
+        <input type="number" id="sLabor" value="${Number(j.labor_cost)||0}" min="0" step="10"></div>
+      <div class="sumrow"><span>ส่วนลด</span>
+        <input type="number" id="sDiscount" value="${Number(j.discount)||0}" min="0" step="10"></div>
+      <div class="sumrow total"><span>รวมทั้งหมด</span><span id="sTotal">฿${money2(pc + (Number(j.labor_cost)||0) - (Number(j.discount)||0))}</span></div>
+    </div>
+
+    <div style="margin-top:16px">${photoBox('during','รูประหว่างซ่อม',6)}</div>
+
+    <div class="jfoot">${back}${save}
+      ${j.status !== 'wait_parts'
+        ? `<button class="btn" onclick="setStatus('wait_parts')">📦 รออะไหล่</button>`
+        : `<button class="btn p" onclick="setStatus('repairing')">▶️ อะไหล่มาแล้ว</button>`}
+      <button class="btn g" onclick="moveStep(5)">ไปตรวจสอบ →</button></div>`;
+
+  if (cur === 5) return hint('ทดสอบเครื่องให้แน่ใจก่อนแจ้งลูกค้ามารับ') + `
+    <div><label>ผลการทดสอบ / หมายเหตุ</label>
+      <textarea id="sNote" placeholder="ทดสอบเดินเครื่อง 10 นาที ทำงานปกติ ไม่มีเสียงผิดปกติ">${esc(j.note||'')}</textarea></div>
+    <div style="margin-top:16px">${photoBox('after','รูปหลังซ่อม',4)}</div>
+    <div class="sumrow total" style="margin-top:16px">
+      <span>ยอดที่ต้องเก็บลูกค้า</span><span>฿${money2(j.total_cost)}</span></div>
+    <div class="jfoot">${back}${save}<button class="btn g" onclick="moveStep(6)">พร้อมส่งมอบ →</button></div>`;
+
+  // ขั้น 6
+  const done = j.status === 'delivered';
+  return hint(done ? 'ปิดงานเรียบร้อยแล้ว' : 'นัดลูกค้ามารับเครื่อง แล้วกดปิดงาน') + `
+    <div class="sumrow"><span>ค่าอะไหล่</span><b>฿${money2(j.parts_cost)}</b></div>
+    <div class="sumrow"><span>ค่าแรง</span><b>฿${money2(j.labor_cost)}</b></div>
+    <div class="sumrow"><span>ส่วนลด</span><b>−฿${money2(j.discount)}</b></div>
+    <div class="sumrow total"><span>รวมทั้งหมด</span><span>฿${money2(j.total_cost)}</span></div>
+    <div class="grid g2" style="margin-top:16px">
+      <div><label>ลูกค้า</label><input type="text" value="${esc(j.customer_name||'')}" disabled></div>
+      <div><label>เบอร์ติดต่อ</label><input type="text" value="${esc(j.customer_phone||'—')}" disabled></div>
+    </div>
+    ${done ? `<div class="box-ok" style="margin-top:16px">✅ ส่งมอบแล้วเมื่อ ${dtth(j.delivered_at)}</div>` : ''}
+    <div style="margin-top:16px">${photoBox('document','เอกสาร / ใบเสร็จ',4)}</div>
+    <div class="jfoot">${back}
+      ${done ? `<button class="btn" onclick="setStatus('ready')">↩ เปิดงานใหม่</button>`
+             : `<button class="btn g" onclick="setStatus('delivered')">✅ ส่งมอบแล้ว ปิดงาน</button>`}</div>`;
+}
+
+function bindStepForm(cur, pc){
+  if (cur === 4){
+    const upd = () => $('sTotal').textContent = '฿' + money2(pc + (Number(val('sLabor'))||0) - (Number(val('sDiscount'))||0));
+    ['sLabor','sDiscount'].forEach(id => $(id)?.addEventListener('input', upd));
+    $('aPart')?.addEventListener('input', () => {
+      const p = S.parts.find(x => x.part_no.toUpperCase() === val('aPart').toUpperCase());
+      $('aName').value = p ? p.name : '';
+      if (p && !val('aPrice')) $('aPrice').value = p.sell_price;
+    });
+  }
+}
+
+/* ---------- เก็บค่าจากฟอร์มขั้นปัจจุบัน ---------- */
+function collectStep(){
+  const p = { created_by: who() };
+  const g = id => $(id) ? val(id) : undefined;
+  if ($('sDue'))      p.due_date        = g('sDue') || null;
+  if ($('sCat'))      p.symptom_category= g('sCat') || null;
+  if ($('sInspect'))  p.inspect_result  = g('sInspect') || null;
+  if ($('sCause'))    p.cause           = g('sCause') || null;
+  if ($('sTech'))     p.technician_id   = g('sTech') || null;
+  if ($('sMethod'))   p.repair_method   = g('sMethod') || null;
+  if ($('sNote'))     p.note            = g('sNote') || null;
+  if ($('sLabor'))    p.labor_cost      = Number(g('sLabor')) || 0;
+  if ($('sDiscount')) p.discount        = Number(g('sDiscount')) || 0;
+  return p;
+}
+
+async function saveStep(extra){
   try {
-    const price = Number(sel.selectedOptions[0].dataset.price) || 0;
-    const { error } = await sb.from('repair_parts_used')
-      .insert({ job_id:S.job.id, part_id:pid, qty:q, unit_price:price, created_by:who() });
+    const { error } = await sb.from('repair_jobs').update({ ...collectStep(), ...(extra||{}) }).eq('id', S.job.id);
     if (error) throw error;
-    toast('✅ เพิ่มอะไหล่ — ตัดสต็อกแล้ว');
-    await openJob(S.job.id); await reloadAll();
+    toast('✅ บันทึกแล้ว');
+    await openJob(S.job.id); reloadAll();
   } catch(e){ fail(e); }
 }
+
+async function setStatus(st){
+  await saveStep({ status: st });
+}
+
+async function moveStep(to){
+  const cur = stepOf(S.job.status) || 1;
+  // ตรวจข้อมูลจำเป็นก่อนเดินหน้า
+  if (to > cur){
+    if (cur === 2 && !val('sInspect')) return toast('กรอกอาการที่พบก่อน', true);
+    if (cur === 3 && !val('sTech'))    return toast('เลือกช่างผู้รับผิดชอบก่อน', true);
+    if (cur === 4 && !val('sMethod'))  return toast('กรอกวิธีการซ่อมก่อน', true);
+  }
+  await saveStep({ status: STEPS[to-1].main });
+}
+
+async function showHistory(cid){
+  const rows = S.jobs.filter(j => j.customer_id === cid && j.id !== S.job.id);
+  await formModal({
+    title:'ประวัติการซ่อมของลูกค้ารายนี้',
+    subtitle: S.job.customer_name + ' · ' + rows.length + ' ครั้ง',
+    ok:'ปิด',
+    fields: rows.slice(0,12).map((j,i) => ({
+      k:'h'+i, label:`${j.job_no} · ${dth(j.received_at)}`,
+      value:`${[j.brand,j.model].filter(Boolean).join(' ')} — ${j.symptom||''} (${STATUS[j.status]||''})`
+    }))
+  });
+}
+
+async function addLineInline(){
+  const pn = val('aPart').toUpperCase();
+  const p = S.parts.find(x => x.part_no.toUpperCase() === pn);
+  if (!p) return toast('ไม่พบอะไหล่รหัสนี้ในทะเบียน', true);
+  const q = Number(val('aQty')) || 0;
+  if (q < 1) return toast('จำนวนต้องมากกว่า 0', true);
+  try {
+    const { error } = await sb.from('repair_parts_used').insert({
+      job_id:S.job.id, part_id:p.id, qty:q,
+      unit_price: Number(val('aPrice')) || p.sell_price || 0, created_by:who() });
+    if (error) throw error;
+    toast('✅ เพิ่ม ' + p.part_no + ' — ตัดสต็อกแล้ว');
+    await openJob(S.job.id); reloadAll();
+  } catch(e){ fail(e); }
+}
+
 
 async function removeLine(id){
   if (!await confirmModal('ลบรายการอะไหล่นี้?', 'ระบบจะคืนของเข้าสต็อกอัตโนมัติ และบันทึกลง log การเคลื่อนไหว', { ok:'ลบและคืนของ' })) return;
@@ -1709,24 +1895,10 @@ async function removeLine(id){
     const { error } = await sb.from('repair_parts_used').delete().eq('id', id);
     if (error) throw error;
     toast('ลบแล้ว — คืนของเข้าสต็อก');
-    await openJob(S.job.id); await reloadAll();
+    await openJob(S.job.id); reloadAll();
   } catch(e){ fail(e); }
 }
 
-async function saveWork(){
-  try {
-    const { error } = await sb.from('repair_jobs').update({
-      technician_id: val('jTech') || null, status: val('jStatus'),
-      inspect_result: val('jInspect') || null, cause: val('jCause') || null,
-      repair_method: val('jMethod') || null,
-      labor_cost: Number(val('jLabor'))||0, discount: Number(val('jDiscount'))||0,
-      created_by: who()
-    }).eq('id', S.job.id);
-    if (error) throw error;
-    toast('✅ บันทึกแล้ว');
-    await openJob(S.job.id); await reloadAll();
-  } catch(e){ fail(e); }
-}
 
 /* =====================================================================
    ลูกค้า
@@ -2233,7 +2405,7 @@ window.addEventListener('load', () => {
   const id = new URLSearchParams(location.search).get('job');
   if (id) setTimeout(() => { if (sb) openJob(id); }, 900);
 });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeJob(); });
+
 </script>
 </body>
 </html>
