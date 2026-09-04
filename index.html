@@ -192,6 +192,23 @@ svg .nm{fill:var(--ink);font-size:12.5px;font-family:"Sarabun",sans-serif}
 .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--navy);color:#fff;padding:12px 22px;border-radius:11px;box-shadow:0 6px 22px rgba(0,0,0,.28);z-index:300;max-width:90vw;font-weight:600}
 .toast.err{background:var(--crit)}
 
+/* ล็อกอิน */
+.gate{position:fixed;inset:0;z-index:400;background:linear-gradient(155deg,#1b2f52 0%,#132340 55%,#0e1a30 100%);
+  display:flex;align-items:center;justify-content:center;padding:22px}
+.gate[hidden]{display:none}
+.gbox{background:#fff;border-radius:16px;padding:32px 30px 24px;width:100%;max-width:400px;box-shadow:0 22px 60px rgba(0,0,0,.4)}
+.glogo{display:flex;gap:12px;align-items:center;margin-bottom:24px}
+.glogo .ic{width:46px;height:46px;border-radius:12px;background:var(--gold);display:flex;align-items:center;justify-content:center;font-size:23px}
+.glogo b{display:block;font-size:17px;font-weight:800;color:var(--navy);letter-spacing:.4px}
+.glogo small{font-size:12px;color:var(--ink3)}
+.gate input{padding:11px 13px}
+.gerr{margin-top:13px;background:var(--crit-l);border:1px solid #f0cbc8;color:var(--crit);
+  border-radius:9px;padding:10px 13px;font-size:13.5px;font-weight:600}
+.gerr[hidden]{display:none}
+.gfoot{margin-top:18px;padding-top:16px;border-top:1px solid var(--line2);font-size:12.5px;color:var(--ink3);text-align:center}
+.app[hidden]{display:none}
+.rolepill{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--gold);color:#3a2d05;margin-left:6px}
+
 .setup{background:#fff;border:2px solid var(--gold);border-radius:var(--r);padding:22px;margin-bottom:18px}
 #qrbox{display:flex;justify-content:center;padding:6px}
 
@@ -213,7 +230,24 @@ svg .nm{fill:var(--ink);font-size:12.5px;font-family:"Sarabun",sans-serif}
 </head>
 <body>
 
-<div class="app">
+<!-- ============ หน้าล็อกอิน ============ -->
+<div class="gate" id="gate">
+  <div class="gbox">
+    <div class="glogo"><div class="ic">🔧</div>
+      <div><b>TOOL REPAIR</b><small>ระบบรับซ่อมเครื่องมือ · MASARU</small></div></div>
+    <form id="loginForm" autocomplete="on">
+      <label for="liEmail">อีเมล</label>
+      <input type="email" id="liEmail" required autocomplete="username" placeholder="you@masaru.co.th">
+      <label for="liPass" style="margin-top:12px">รหัสผ่าน</label>
+      <input type="password" id="liPass" required autocomplete="current-password" placeholder="••••••••">
+      <div id="liErr" class="gerr" hidden></div>
+      <button class="btn g" id="liBtn" type="submit" style="width:100%;margin-top:16px;padding:11px">เข้าสู่ระบบ</button>
+    </form>
+    <div class="gfoot">ลืมรหัสผ่าน หรือยังไม่มีบัญชี — ติดต่อหัวหน้าช่างหรือผู้ดูแลระบบ</div>
+  </div>
+</div>
+
+<div class="app" id="app" hidden>
   <aside id="side">
     <div class="logo">
       <div class="ic">🔧</div>
@@ -229,9 +263,11 @@ svg .nm{fill:var(--ink);font-size:12.5px;font-family:"Sarabun",sans-serif}
       <button data-p="report"><span class="e">📈</span>รายงาน</button>
     </nav>
     <div class="sidefoot">
-      <div class="k">ผู้ใช้งานปัจจุบัน</div>
-      <select id="whoSel" style="margin-top:6px;background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2);color:#fff"></select>
+      <div class="k" id="roleLbl">ผู้ใช้งาน</div>
+      <div class="v" id="userName">—</div>
       <div class="st" id="connSt">● กำลังเชื่อมต่อ…</div>
+      <button class="btn" id="logoutBtn" style="width:100%;margin-top:11px;background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.2);color:#fff">
+        ออกจากระบบ</button>
     </div>
   </aside>
 
@@ -490,7 +526,17 @@ const money = n => (Number(n)||0).toLocaleString('th-TH',{maximumFractionDigits:
 const money2 = n => (Number(n)||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
 const dth = d => d ? new Date(d).toLocaleDateString('th-TH',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
 const dtth = d => d ? new Date(d).toLocaleString('th-TH',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
-const who = () => { try { return localStorage.getItem('repair_who') || 'ไม่ระบุ'; } catch(e){ return 'ไม่ระบุ'; } };
+/* ---------- ผู้ใช้ที่ล็อกอินอยู่ ---------- */
+let ME = { id:null, email:'', name:'', role:'staff', techId:null };
+const who = () => ME.name || ME.email || 'ไม่ระบุ';
+const isBoss = () => ME.role === 'head' || ME.role === 'admin';
+const ROLE_LABEL = { staff:'พนักงานรับเครื่อง', tech:'ช่างซ่อม', head:'หัวหน้าช่าง', admin:'ผู้ดูแลระบบ' };
+const ROLE_PAGES = {
+  staff: ['dash','jobs','intake','cust'],
+  tech:  ['dash','jobs','parts'],
+  head:  ['dash','jobs','intake','cust','parts','report'],
+  admin: ['dash','jobs','intake','cust','parts','report']
+};
 
 function toast(m, err){
   document.querySelectorAll('.toast').forEach(t => t.remove());
@@ -715,6 +761,8 @@ const PGT = {
 };
 document.querySelectorAll('aside nav button').forEach(b => b.onclick = () => goPage(b.dataset.p));
 function goPage(p){
+  const allow = ROLE_PAGES[ME.role] || ROLE_PAGES.staff;
+  if (ME.id && !allow.includes(p)) { toast('ไม่มีสิทธิ์เข้าหน้านี้', true); return; }
   document.querySelectorAll('aside nav button').forEach(b => b.classList.toggle('on', b.dataset.p === p));
   document.querySelectorAll('.page').forEach(el => el.classList.toggle('on', el.id === 'p-' + p));
   $('pgTitle').textContent = PGT[p][0]; $('pgSub').textContent = PGT[p][1];
@@ -730,29 +778,86 @@ function goPage(p){
    ===================================================================== */
 (async function boot(){
   if (!SUPABASE_URL || !SUPABASE_KEY){
+    $('gate').hidden = true; $('app').hidden = false;
     $('setup').style.display = 'block';
     document.querySelectorAll('.page').forEach(v => v.classList.remove('on'));
     return;
   }
   sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  try {
+    const { data:{ session } } = await sb.auth.getSession();
+    if (session) return startApp(session);
+  } catch(e){ console.warn(e); }
+  $('liEmail').focus();
+})();
+
+/* ---------- ล็อกอิน ---------- */
+function authMsg(e){
+  const m = (e?.message || '').toLowerCase();
+  if (m.includes('invalid login'))       return 'อีเมลหรือรหัสผ่านไม่ถูกต้อง';
+  if (m.includes('email not confirmed')) return 'อีเมลนี้ยังไม่ได้ยืนยัน — ให้ผู้ดูแลติ๊ก Auto Confirm ให้';
+  if (m.includes('rate limit') || m.includes('too many')) return 'ลองบ่อยเกินไป รอสักครู่แล้วลองใหม่';
+  if (m.includes('failed to fetch'))     return 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ — ตรวจอินเทอร์เน็ตหรือค่า SUPABASE_URL';
+  return e?.message || 'เข้าสู่ระบบไม่สำเร็จ';
+}
+
+$('loginForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const btn = $('liBtn');
+  btn.disabled = true; btn.textContent = 'กำลังเข้าสู่ระบบ…'; $('liErr').hidden = true;
+  try {
+    const { data, error } = await sb.auth.signInWithPassword({
+      email: val('liEmail'), password: $('liPass').value
+    });
+    if (error) throw error;
+    await startApp(data.session);
+  } catch(err){
+    $('liErr').textContent = authMsg(err); $('liErr').hidden = false;
+    $('liPass').value = ''; $('liPass').focus();
+  } finally { btn.disabled = false; btn.textContent = 'เข้าสู่ระบบ'; }
+});
+
+$('logoutBtn').addEventListener('click', async () => {
+  if (!confirm('ออกจากระบบ?')) return;
+  try { await sb.auth.signOut(); } catch(e){}
+  location.reload();
+});
+
+/* ---------- เริ่มระบบหลังล็อกอินผ่าน ---------- */
+async function startApp(session){
+  ME.id = session.user.id;
+  ME.email = session.user.email || '';
+  ME.role = session.user.app_metadata?.role || 'staff';
+  ME.name = ME.email.split('@')[0];
 
   try {
-    const [techs, cats, parts] = await Promise.all([
+    const [prof, techs, cats, parts] = await Promise.all([
+      sb.from('app_users').select('full_name, role, technician_id').eq('id', ME.id).maybeSingle(),
       sb.from('technicians').select('*').eq('is_active', true).order('code'),
       sb.from('symptom_categories').select('*').eq('is_active', true).order('sort_order'),
       sb.from('parts_master').select('id,part_no,name,sell_price').eq('is_active', true).order('part_no')
     ]);
     if (techs.error) throw techs.error;
+    if (prof.data){
+      ME.name = prof.data.full_name || ME.name;
+      ME.role = prof.data.role || ME.role;
+      ME.techId = prof.data.technician_id || null;
+    }
     S.techs = techs.data || []; S.cats = cats.data || []; S.parts = parts.data || [];
-  } catch(e){ $('connSt').textContent = '● เชื่อมต่อไม่สำเร็จ'; $('connSt').style.color = '#f0928c'; return fail(e); }
+  } catch(e){
+    $('liErr').textContent = 'เข้าสู่ระบบได้ แต่โหลดข้อมูลไม่สำเร็จ: ' + (e.message || e);
+    $('liErr').hidden = false;
+    try { await sb.auth.signOut(); } catch(_){}
+    return;
+  }
 
-  const w = $('whoSel');
-  w.innerHTML = '<option value="">— เลือกผู้ใช้งาน —</option>'
-    + S.techs.map(t => `<option>${esc(t.nickname || t.full_name)}</option>`).join('')
-    + '<option>พนักงานรับเครื่อง</option><option>หัวหน้าช่าง</option>';
-  try { w.value = localStorage.getItem('repair_who') || ''; } catch(e){}
-  setAvatar();
-  w.onchange = () => { try { localStorage.setItem('repair_who', w.value); } catch(e){} setAvatar(); };
+  // เมนูตามตำแหน่ง
+  const allow = ROLE_PAGES[ME.role] || ROLE_PAGES.staff;
+  document.querySelectorAll('aside nav button').forEach(b => { b.hidden = !allow.includes(b.dataset.p); });
+
+  $('userName').innerHTML = esc(ME.name) + `<span class="rolepill">${ROLE_LABEL[ME.role] || ME.role}</span>`;
+  $('roleLbl').textContent = ME.email;
+  $('avatar').textContent = (ME.name || '—').slice(0,2);
 
   const to = S.techs.map(t => `<option value="${t.id}">${esc(t.nickname || t.full_name)}</option>`).join('');
   $('nTech').insertAdjacentHTML('beforeend', to);
@@ -765,12 +870,15 @@ function goPage(p){
   $('cSearch').addEventListener('input', renderCust);
   $('pSearch').addEventListener('input', renderParts);
 
-  await reloadAll();
-})();
+  // ช่างเปิดมาที่รายการงานของตัวเองเลย
+  if (ME.role === 'tech' && ME.techId) $('fTech').value = ME.techId;
 
-function setAvatar(){
-  const n = who();
-  $('avatar').textContent = n && n !== 'ไม่ระบุ' ? n.slice(0,2) : '—';
+  $('gate').hidden = true; $('app').hidden = false;
+  goPage(allow[0]);
+  await reloadAll();
+
+  // token หมดอายุ → กลับไปหน้าล็อกอิน
+  sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_OUT') location.reload(); });
 }
 
 async function reloadAll(){
