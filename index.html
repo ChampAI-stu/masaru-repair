@@ -43,6 +43,7 @@ aside nav button{
 }
 aside nav button:hover{background:rgba(255,255,255,.07);color:#fff}
 aside nav button.on{background:var(--gold);color:#3a2d05}
+aside nav button[hidden]{display:none !important}   /* ต้องมี ไม่งั้น display:flex ทับ hidden */
 aside nav button .e{font-size:16px;width:20px;text-align:center}
 .sidefoot{margin-top:auto;padding:16px 18px 20px;border-top:1px solid rgba(255,255,255,.1)}
 .sidefoot .k{font-size:11.5px;color:#8fa2c1}
@@ -926,7 +927,8 @@ $('logoutBtn').addEventListener('click', async () => {
 async function startApp(session){
   ME.id = session.user.id;
   ME.email = session.user.email || '';
-  ME.role = session.user.app_metadata?.role || 'staff';
+  const jwtRole = session.user.app_metadata?.role || null;
+  ME.role = jwtRole || 'staff';
   ME.name = ME.email.split('@')[0];
 
   try {
@@ -937,15 +939,29 @@ async function startApp(session){
       sb.from('parts_master').select('id,part_no,name,sell_price').eq('is_active', true).order('part_no')
     ]);
     if (techs.error) throw techs.error;
-    if (prof.data){
-      ME.name = prof.data.full_name || ME.name;
-      ME.role = prof.data.role || ME.role;
-      ME.techId = prof.data.technician_id || null;
-    }
+
+    // โปรไฟล์คือแหล่งความจริงของสิทธิ์ — ถ้าอ่านไม่ได้ ต้องบอกให้ชัด ไม่ใช่เงียบแล้วลดสิทธิ์
+    if (prof.error) throw new Error('อ่านตาราง app_users ไม่ได้ (' + prof.error.message + ') — รัน 06_auth_rls.sql แล้วหรือยัง?');
+    if (!prof.data)  throw new Error('บัญชี ' + ME.email + ' ยังไม่ได้ผูกกับสิทธิ์ใด ๆ — สมัครใหม่ด้วยโค้ดเชิญ หรือให้แอดมินรัน set_user_role()');
+
+    ME.name   = prof.data.full_name || ME.name;
+    ME.role   = prof.data.role || 'staff';
+    ME.techId = prof.data.technician_id || null;
     S.techs = techs.data || []; S.cats = cats.data || []; S.parts = parts.data || [];
+
+    // role ใน token ไม่ตรงกับในตาราง → ต่ออายุ token 1 รอบ ไม่งั้น RLS ฝั่ง DB จะมองเป็นสิทธิ์เก่า
+    if (jwtRole !== ME.role){
+      try {
+        const { data: fresh } = await sb.auth.refreshSession();
+        const nr = fresh?.session?.user?.app_metadata?.role;
+        if (nr && nr !== ME.role) console.warn('token role =', nr, '/ app_users role =', ME.role);
+      } catch(e){ console.warn('refreshSession ไม่สำเร็จ', e); }
+    }
+    console.info('[repair] เข้าสู่ระบบเป็น', ME.name, '· สิทธิ์', ME.role, '· เมนู', (ROLE_PAGES[ME.role]||[]).join(', '));
   } catch(e){
-    $('liErr').textContent = 'เข้าสู่ระบบได้ แต่โหลดข้อมูลไม่สำเร็จ: ' + (e.message || e);
+    $('liErr').innerHTML = '⚠️ ' + esc(e.message || e);
     $('liErr').hidden = false;
+    $('gate').hidden = false; $('app').hidden = true;
     try { await sb.auth.signOut(); } catch(_){}
     return;
   }
