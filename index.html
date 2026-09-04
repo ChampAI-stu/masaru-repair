@@ -59,7 +59,7 @@ aside nav button .e{font-size:16px;width:20px;text-align:center}
 .phead .sub{font-size:12.5px;color:var(--ink3)}
 .phead .sp{flex:1}
 .search{position:relative;min-width:210px}
-.search input{width:100%;padding:9px 12px 9px 34px;border:1px solid var(--line);border-radius:999px;background:#f7f9fc}
+.phead .search input{width:100%;padding:9px 14px 9px 34px;border:1px solid var(--line);border-radius:999px;background:#f7f9fc}
 .search .mg{position:absolute;left:12px;top:8px;color:var(--ink3)}
 .avatar{width:36px;height:36px;border-radius:50%;background:var(--navy);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px}
 .content{padding:20px 22px 60px;max-width:1500px;width:100%}
@@ -79,8 +79,11 @@ aside nav button .e{font-size:16px;width:20px;text-align:center}
 
 label{display:block;font-size:12.5px;font-weight:600;color:var(--ink2);margin-bottom:5px}
 label .req{color:var(--crit)}
-input[type=text],input[type=date],input[type=number],input[type=tel],select,textarea{
-  width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:#fff;outline:none}
+/* เดิมตกหล่น email/password ทำให้ช่องกว้างไม่เท่ากัน */
+input[type=text],input[type=email],input[type=password],input[type=date],
+input[type=number],input[type=tel],input[type=search],select,textarea{
+  width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:#fff;outline:none;
+  font-size:15px;line-height:1.4;display:block}
 input:focus,select:focus,textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px var(--blue-l)}
 textarea{resize:vertical;min-height:74px}
 select.mini{padding:5px 8px;font-size:13px;border-radius:7px}
@@ -202,11 +205,15 @@ svg .nm{fill:var(--ink);font-size:12.5px;font-family:"Sarabun",sans-serif}
 .glogo .ic{width:46px;height:46px;border-radius:12px;background:var(--gold);display:flex;align-items:center;justify-content:center;font-size:23px}
 .glogo b{display:block;font-size:17px;font-weight:800;color:var(--navy);letter-spacing:.4px}
 .glogo small{font-size:12px;color:var(--ink3)}
-.gate input{padding:11px 13px}
+.gate form{display:flex;flex-direction:column;gap:14px}
+.gate form .f{display:flex;flex-direction:column;gap:5px}
+.gate form label{margin:0}
+.gate input{padding:11px 13px;width:100%}
+.gate .btn{margin:2px 0 0}
 .gerr{margin-top:13px;background:var(--crit-l);border:1px solid #f0cbc8;color:var(--crit);
   border-radius:9px;padding:10px 13px;font-size:13.5px;font-weight:600}
 .gerr[hidden]{display:none}
-.gok{margin-top:9px;background:var(--good-l);border:1px solid #b6ddca;color:var(--good);
+.gok{margin-top:4px;background:var(--good-l);border:1px solid #b6ddca;color:var(--good);
   border-radius:9px;padding:8px 12px;font-size:13px;font-weight:600}
 .gok[hidden]{display:none}
 .gok.bad{background:var(--crit-l);border-color:#f0cbc8;color:var(--crit)}
@@ -251,24 +258,25 @@ form[hidden]{display:none}
     </div>
 
     <form id="loginForm" autocomplete="on">
-      <label for="liEmail">อีเมล</label>
-      <input type="email" id="liEmail" required autocomplete="username" placeholder="you@masaru.co.th">
-      <label for="liPass" style="margin-top:12px">รหัสผ่าน</label>
-      <input type="password" id="liPass" required autocomplete="current-password" placeholder="••••••••">
-      <button class="btn g" id="liBtn" type="submit" style="width:100%;margin-top:16px;padding:11px">เข้าสู่ระบบ</button>
+      <div class="f"><label for="liEmail">อีเมล</label>
+        <input type="email" id="liEmail" required autocomplete="username" placeholder="you@masaru.co.th"></div>
+      <div class="f"><label for="liPass">รหัสผ่าน</label>
+        <input type="password" id="liPass" required autocomplete="current-password" placeholder="••••••••"></div>
+      <button class="btn g" id="liBtn" type="submit" style="width:100%;padding:12px;margin-top:4px">เข้าสู่ระบบ</button>
     </form>
 
     <form id="signForm" autocomplete="on" hidden>
-      <label for="suCode">โค้ดเชิญ <span class="req">*</span></label>
-      <input type="text" id="suCode" required placeholder="MASARU-XXXX-XXXX" style="text-transform:uppercase">
-      <div id="suCodeMsg" class="gok" hidden></div>
-      <label for="suName" style="margin-top:12px">ชื่อ-สกุล / ชื่อเล่น <span class="req">*</span></label>
-      <input type="text" id="suName" required placeholder="เช่น แชมป์">
-      <label for="suEmail" style="margin-top:12px">อีเมล <span class="req">*</span></label>
-      <input type="email" id="suEmail" required autocomplete="username" placeholder="you@masaru.co.th">
-      <label for="suPass" style="margin-top:12px">รหัสผ่าน <span class="req">*</span> <span class="muted" style="font-weight:400">(อย่างน้อย 6 ตัว)</span></label>
-      <input type="password" id="suPass" required minlength="6" autocomplete="new-password" placeholder="••••••••">
-      <button class="btn g" id="suBtn" type="submit" style="width:100%;margin-top:16px;padding:11px">สมัครและเข้าใช้งาน</button>
+      <div class="f"><label for="suCode">โค้ดเชิญ <span class="req">*</span></label>
+        <input type="text" id="suCode" required placeholder="MASARU-XXXX-XXXX" style="text-transform:uppercase">
+        <div id="suCodeMsg" class="gok" hidden></div></div>
+      <div class="f"><label for="suName">ชื่อ-สกุล / ชื่อเล่น <span class="req">*</span></label>
+        <input type="text" id="suName" required placeholder="เช่น แชมป์"></div>
+      <div class="f"><label for="suEmail">อีเมล <span class="req">*</span></label>
+        <input type="email" id="suEmail" required autocomplete="username" placeholder="you@masaru.co.th"></div>
+      <div class="f"><label for="suPass">รหัสผ่าน <span class="req">*</span>
+          <span class="muted" style="font-weight:400">(อย่างน้อย 6 ตัว)</span></label>
+        <input type="password" id="suPass" required minlength="6" autocomplete="new-password" placeholder="••••••••"></div>
+      <button class="btn g" id="suBtn" type="submit" style="width:100%;padding:12px;margin-top:4px">สมัครและเข้าใช้งาน</button>
     </form>
 
     <div id="liErr" class="gerr" hidden></div>
