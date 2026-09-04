@@ -205,6 +205,15 @@ svg .nm{fill:var(--ink);font-size:12.5px;font-family:"Sarabun",sans-serif}
 .gerr{margin-top:13px;background:var(--crit-l);border:1px solid #f0cbc8;color:var(--crit);
   border-radius:9px;padding:10px 13px;font-size:13.5px;font-weight:600}
 .gerr[hidden]{display:none}
+.gok{margin-top:9px;background:var(--good-l);border:1px solid #b6ddca;color:var(--good);
+  border-radius:9px;padding:8px 12px;font-size:13px;font-weight:600}
+.gok[hidden]{display:none}
+.gok.bad{background:var(--crit-l);border-color:#f0cbc8;color:var(--crit)}
+.gtabs{display:flex;gap:6px;background:#f1f4f9;padding:4px;border-radius:10px;margin-bottom:20px}
+.gtab{flex:1;border:0;background:none;padding:9px;border-radius:8px;font-weight:700;font-size:14px;
+  color:var(--ink2);cursor:pointer}
+.gtab.on{background:#fff;color:var(--navy);box-shadow:0 1px 3px rgba(26,36,54,.12)}
+form[hidden]{display:none}
 .gfoot{margin-top:18px;padding-top:16px;border-top:1px solid var(--line2);font-size:12.5px;color:var(--ink3);text-align:center}
 .app[hidden]{display:none}
 .rolepill{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--gold);color:#3a2d05;margin-left:6px}
@@ -235,15 +244,34 @@ svg .nm{fill:var(--ink);font-size:12.5px;font-family:"Sarabun",sans-serif}
   <div class="gbox">
     <div class="glogo"><div class="ic">🔧</div>
       <div><b>TOOL REPAIR</b><small>ระบบรับซ่อมเครื่องมือ · MASARU</small></div></div>
+    <div class="gtabs">
+      <button class="gtab on" data-t="login">เข้าสู่ระบบ</button>
+      <button class="gtab" data-t="signup">สมัครสมาชิก</button>
+    </div>
+
     <form id="loginForm" autocomplete="on">
       <label for="liEmail">อีเมล</label>
       <input type="email" id="liEmail" required autocomplete="username" placeholder="you@masaru.co.th">
       <label for="liPass" style="margin-top:12px">รหัสผ่าน</label>
       <input type="password" id="liPass" required autocomplete="current-password" placeholder="••••••••">
-      <div id="liErr" class="gerr" hidden></div>
       <button class="btn g" id="liBtn" type="submit" style="width:100%;margin-top:16px;padding:11px">เข้าสู่ระบบ</button>
     </form>
-    <div class="gfoot">ลืมรหัสผ่าน หรือยังไม่มีบัญชี — ติดต่อหัวหน้าช่างหรือผู้ดูแลระบบ</div>
+
+    <form id="signForm" autocomplete="on" hidden>
+      <label for="suCode">โค้ดเชิญ <span class="req">*</span></label>
+      <input type="text" id="suCode" required placeholder="MASARU-XXXX-XXXX" style="text-transform:uppercase">
+      <div id="suCodeMsg" class="gok" hidden></div>
+      <label for="suName" style="margin-top:12px">ชื่อ-สกุล / ชื่อเล่น <span class="req">*</span></label>
+      <input type="text" id="suName" required placeholder="เช่น แชมป์">
+      <label for="suEmail" style="margin-top:12px">อีเมล <span class="req">*</span></label>
+      <input type="email" id="suEmail" required autocomplete="username" placeholder="you@masaru.co.th">
+      <label for="suPass" style="margin-top:12px">รหัสผ่าน <span class="req">*</span> <span class="muted" style="font-weight:400">(อย่างน้อย 6 ตัว)</span></label>
+      <input type="password" id="suPass" required minlength="6" autocomplete="new-password" placeholder="••••••••">
+      <button class="btn g" id="suBtn" type="submit" style="width:100%;margin-top:16px;padding:11px">สมัครและเข้าใช้งาน</button>
+    </form>
+
+    <div id="liErr" class="gerr" hidden></div>
+    <div class="gfoot" id="gFoot">ยังไม่มีบัญชี — ขอโค้ดเชิญจากผู้ดูแลระบบ แล้วกดแท็บ "สมัครสมาชิก"</div>
   </div>
 </div>
 
@@ -492,7 +520,7 @@ const SUPABASE_KEY = 'sb_publishable_m10p5I53UNKTZbUAEiUaCw_OCSR63mq';
 
 /* รูปภาพ — เอา URL ที่ลงท้ายด้วย /exec จาก Apps Script มาใส่
    ปล่อยว่างไว้ = ปิดฟีเจอร์รูป ระบบส่วนอื่นยังใช้ได้ปกติ */
-const UPLOAD_URL   = '';                                 // ← ใส่ URL /exec จาก Apps Script ตรงนี้
+const UPLOAD_URL   = 'https://script.google.com/macros/s/AKfycbxsh18xEyOaOb6sWKwF55I786IDXB0yASFiZ-j8hGWXOMBbwBLEvd7k0OkP-9D1y35V/exec';
 const UPLOAD_TOKEN = 'masaru-repair-6heftvnll9fldpgb';   // ตรงกับ TOKEN ใน upload.gs แล้ว
 /* ===================================================================== */
 
@@ -798,6 +826,12 @@ function authMsg(e){
   if (m.includes('email not confirmed')) return 'อีเมลนี้ยังไม่ได้ยืนยัน — ให้ผู้ดูแลติ๊ก Auto Confirm ให้';
   if (m.includes('rate limit') || m.includes('too many')) return 'ลองบ่อยเกินไป รอสักครู่แล้วลองใหม่';
   if (m.includes('failed to fetch'))     return 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ — ตรวจอินเทอร์เน็ตหรือค่า SUPABASE_URL';
+  if (m.includes('already registered') || m.includes('already been registered'))
+    return 'อีเมลนี้สมัครไว้แล้ว — กดแท็บ "เข้าสู่ระบบ" แทน';
+  if (m.includes('signups not allowed') || m.includes('signup is disabled'))
+    return 'ยังปิดการสมัครอยู่ — ผู้ดูแลต้องเปิด Enable email signups ใน Supabase';
+  if (m.includes('password'))            return 'รหัสผ่านสั้นเกินไป — ต้องอย่างน้อย 6 ตัวอักษร';
+  if (m.includes('โค้ด'))                 return e.message;
   return e?.message || 'เข้าสู่ระบบไม่สำเร็จ';
 }
 
@@ -815,6 +849,71 @@ $('loginForm').addEventListener('submit', async e => {
     $('liErr').textContent = authMsg(err); $('liErr').hidden = false;
     $('liPass').value = ''; $('liPass').focus();
   } finally { btn.disabled = false; btn.textContent = 'เข้าสู่ระบบ'; }
+});
+
+/* ---------- สลับแท็บ เข้าสู่ระบบ / สมัครสมาชิก ---------- */
+document.querySelectorAll('.gtab').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.gtab').forEach(x => x.classList.toggle('on', x === b));
+  const su = b.dataset.t === 'signup';
+  $('loginForm').hidden = su; $('signForm').hidden = !su;
+  $('liErr').hidden = true;
+  $('gFoot').textContent = su
+    ? 'ต้องมีโค้ดเชิญจากผู้ดูแลระบบก่อนถึงจะสมัครได้'
+    : 'ยังไม่มีบัญชี — ขอโค้ดเชิญจากผู้ดูแลระบบ แล้วกดแท็บ "สมัครสมาชิก"';
+});
+
+/* ---------- ตรวจโค้ดเชิญทันทีที่พิมพ์ครบ ---------- */
+let codeOk = false;
+$('suCode').addEventListener('blur', checkCode);
+$('suCode').addEventListener('change', checkCode);
+async function checkCode(){
+  const box = $('suCodeMsg'), code = val('suCode').toUpperCase();
+  $('suCode').value = code;
+  codeOk = false;
+  if (!code){ box.hidden = true; return; }
+  try {
+    const { data, error } = await sb.rpc('check_invite', { p_code: code });
+    if (error) throw error;
+    const r = Array.isArray(data) ? data[0] : data;
+    box.hidden = false;
+    if (r && r.valid){
+      codeOk = true;
+      box.className = 'gok'; box.textContent = '✅ โค้ดถูกต้อง — สิทธิ์: ' + (r.label || r.role);
+    } else {
+      box.className = 'gok bad'; box.textContent = '❌ โค้ดไม่ถูกต้อง หมดอายุ หรือถูกใช้ครบแล้ว';
+    }
+  } catch(e){ box.hidden = false; box.className = 'gok bad'; box.textContent = 'ตรวจโค้ดไม่สำเร็จ: ' + e.message; }
+}
+
+/* ---------- สมัครสมาชิก ---------- */
+$('signForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const btn = $('suBtn');
+  $('liErr').hidden = true;
+  if (!codeOk){ await checkCode(); if (!codeOk){ $('suCode').focus(); return; } }
+
+  btn.disabled = true; btn.textContent = 'กำลังสมัคร…';
+  try {
+    const email = val('suEmail'), pass = $('suPass').value, name = val('suName');
+    const { data, error } = await sb.auth.signUp({ email, password: pass });
+    if (error) throw error;
+
+    // ถ้าตั้งค่าให้ยืนยันอีเมล จะยังไม่มี session
+    let sess = data.session;
+    if (!sess){
+      const r = await sb.auth.signInWithPassword({ email, password: pass });
+      if (r.error) throw new Error('สมัครแล้วแต่เข้าระบบอัตโนมัติไม่ได้ — ผู้ดูแลต้องปิด "Confirm email" ใน Supabase');
+      sess = r.data.session;
+    }
+
+    const { error: rErr } = await sb.rpc('redeem_invite', { p_code: val('suCode'), p_name: name });
+    if (rErr){ await sb.auth.signOut(); throw rErr; }
+
+    const { data: fresh } = await sb.auth.refreshSession();   // ดึง role เข้า token
+    await startApp(fresh?.session || sess);
+  } catch(err){
+    $('liErr').textContent = authMsg(err); $('liErr').hidden = false;
+  } finally { btn.disabled = false; btn.textContent = 'สมัครและเข้าใช้งาน'; }
 });
 
 $('logoutBtn').addEventListener('click', async () => {
