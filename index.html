@@ -181,6 +181,21 @@ td.nostop{cursor:default}
 .mono{font-family:ui-monospace,"SF Mono",Consolas,monospace;font-size:13px}
 .sub2{font-size:12px;color:var(--ink3)}
 
+/* แบ่งหน้า */
+.pager{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:13px 4px 2px;border-top:1px solid var(--line2);margin-top:6px}
+.pager .info{font-size:13px;color:var(--ink3);flex:1;min-width:150px}
+.pager .info b{color:var(--ink);font-variant-numeric:tabular-nums}
+.pgbtns{display:flex;gap:5px;flex-wrap:wrap}
+.pgbtn{min-width:34px;height:34px;padding:0 9px;border:1px solid var(--line);background:#fff;
+  border-radius:8px;font-size:13.5px;font-weight:600;cursor:pointer;font-variant-numeric:tabular-nums}
+.pgbtn:hover:not(:disabled){background:#f0f5fb;border-color:var(--blue);color:var(--blue)}
+.pgbtn.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.pgbtn:disabled{opacity:.4;cursor:not-allowed}
+.pgdots{align-self:center;color:var(--ink3);padding:0 2px}
+.perpage{font-size:13px;color:var(--ink3);display:flex;align-items:center;gap:6px}
+.perpage select{width:auto;padding:5px 8px;font-size:13px}
+
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:13px;margin-bottom:18px}
 .kpi{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:15px 17px;box-shadow:var(--sh);display:flex;flex-direction:column;gap:3px}
 .kpi .t{display:flex;align-items:flex-start;gap:8px}
@@ -534,6 +549,7 @@ form[hidden]{display:none}
               <thead><tr><th>เลขที่งาน</th><th>ลูกค้า</th><th>เครื่องมือ</th><th>อาการ</th><th>ช่าง</th><th>สถานะ</th><th>กำหนดเสร็จ</th><th class="num">รวม</th><th class="num noprint">จัดการ</th></tr></thead>
               <tbody></tbody></table></div>
             <div id="jobsEmpty" class="empty" style="display:none">ไม่มีใบงานที่ตรงเงื่อนไข</div>
+            <div id="pgJobs"></div>
           </div>
         </div>
       </div>
@@ -634,6 +650,7 @@ form[hidden]{display:none}
             <thead><tr><th>ชื่อลูกค้า</th><th>เบอร์โทร</th><th>ประเภท</th><th class="num">เคยซ่อม</th><th class="num">ยอดรวม</th><th>ซ่อมล่าสุด</th></tr></thead>
             <tbody></tbody></table></div>
             <div id="custEmpty" class="empty" style="display:none">ยังไม่มีลูกค้า</div>
+            <div id="pgCust"></div>
           </div>
         </div>
         </div>
@@ -659,6 +676,7 @@ form[hidden]{display:none}
           <div class="cb"><div class="tw"><table id="tblParts">
             <thead><tr><th>PART NO.</th><th>รายการ</th><th class="num">ราคา/หน่วย</th><th class="num">เบิกใช้แล้ว</th><th class="num">จุดสั่งซื้อ</th><th class="num">คงเหลือ</th><th>สถานะ</th><th class="noprint"></th></tr></thead>
             <tbody></tbody></table></div>
+            <div id="pgParts"></div>
           </div>
         </div>
       </div>
@@ -767,7 +785,7 @@ const CLOSED = ['delivered','cancelled'];
 const stepOf = st => STEP_OF[st] || 0;
 
 let sb = null;
-const S = { jobs:[], techs:[], cats:[], parts:[], custs:[], stock:[], job:null, lines:[], photos:[], slog:[], filter:'open', range:'all', seen:null, peek:null, custView:null };
+const S = { jobs:[], techs:[], cats:[], parts:[], custs:[], stock:[], job:null, lines:[], photos:[], slog:[], filter:'open', range:'all', seen:null, peek:null, custView:null, pg:{jobs:1,cust:1,parts:1}, per:30 };
 
 /* ---------- helpers ---------- */
 const $ = id => document.getElementById(id);
@@ -1002,6 +1020,53 @@ function renderStaged(){
      <button class="x" onclick="unstage(${i})" title="เอาออก">✕</button></div>`).join('')
     + (INTAKE_FILES.length < 6
       ? `<label class="ph add">＋<input type="file" accept="image/*" multiple hidden onchange="stageIntake(this)"></label>` : '');
+}
+
+/* =====================================================================
+   แบ่งหน้า — ใช้ร่วมกันทุกตาราง
+   ===================================================================== */
+function paginate(rows, key){
+  const per = S.per || 30;
+  const max = Math.max(1, Math.ceil(rows.length / per));
+  S.pg[key] = Math.min(Math.max(1, S.pg[key] || 1), max);
+  const p = S.pg[key], from = (p-1)*per;
+  return { slice: rows.slice(from, from + per), total: rows.length, page: p, max, from, per };
+}
+
+function pagerHTML(m, key){
+  if (!m.total) return '';
+  const btn = (p, txt, dis, on) =>
+    `<button class="pgbtn ${on?'on':''}" ${dis?'disabled':''} onclick="setPg('${key}',${p})">${txt}</button>`;
+  let nums = '', prev = 0;
+  const near = [1, m.max, m.page, m.page-1, m.page+1];
+  for (let i = 1; i <= m.max; i++){
+    if (!near.includes(i)) continue;
+    if (i - prev > 1) nums += '<span class="pgdots">…</span>';
+    nums += btn(i, i, false, i === m.page);
+    prev = i;
+  }
+  return `<div class="pager">
+    <span class="info">แสดง <b>${m.from + 1}–${Math.min(m.from + m.per, m.total)}</b> จาก <b>${m.total}</b> รายการ</span>
+    ${m.max > 1 ? `<div class="pgbtns">
+      ${btn(m.page-1, '‹ ก่อนหน้า', m.page === 1)}${nums}${btn(m.page+1, 'ถัดไป ›', m.page === m.max)}
+    </div>` : ''}
+    <label class="perpage">แสดงหน้าละ
+      <select onchange="setPer(this.value)">
+        ${[20,30,50,100].map(v => `<option value="${v}" ${v===(S.per||30)?'selected':''}>${v}</option>`).join('')}
+      </select></label>
+  </div>`;
+}
+
+function setPg(key, p){
+  S.pg[key] = p;
+  ({ jobs: renderJobs, cust: renderCust, parts: renderParts })[key]?.();
+  window.scrollTo({ top:0, behavior:'smooth' });
+}
+function setPer(v){
+  S.per = Number(v) || 30;
+  try { localStorage.setItem('repair_per', S.per); } catch(e){}
+  S.pg = { jobs:1, cust:1, parts:1 };
+  renderJobs(); renderCust(); renderParts();
 }
 
 /* =====================================================================
@@ -1297,10 +1362,15 @@ async function startApp(session){
   $('nSymCat').insertAdjacentHTML('beforeend', S.cats.map(c => `<option value="${c.code}">${esc(c.name_th)}</option>`).join(''));
   $('rcPart').insertAdjacentHTML('beforeend', S.parts.map(p => `<option value="${esc(p.part_no)}">${esc(p.part_no)} · ${esc(p.name)}</option>`).join(''));
 
-  $('gSearch').addEventListener('input', () => { if (!$('p-jobs').classList.contains('on')) goPage('jobs'); renderJobs(); });
-  $('fTech').addEventListener('change', renderJobs);
-  $('cSearch').addEventListener('input', renderCust);
-  $('pSearch').addEventListener('input', renderParts);
+  $('gSearch').addEventListener('input', () => {
+    S.pg.jobs = 1;
+    if (!$('p-jobs').classList.contains('on')) goPage('jobs');
+    renderJobs();
+  });
+  $('fTech').addEventListener('change', () => { S.pg.jobs = 1; renderJobs(); });
+  $('cSearch').addEventListener('input',  () => { S.pg.cust = 1; renderCust(); });
+  $('pSearch').addEventListener('input',  () => { S.pg.parts = 1; renderParts(); });
+  try { S.per = Number(localStorage.getItem('repair_per')) || 30; } catch(e){}
 
   // ช่างเปิดมาที่รายการงานของตัวเองเลย
   if (ME.role === 'tech' && ME.techId) $('fTech').value = ME.techId;
@@ -1481,7 +1551,7 @@ function renderChips(){
        <span class="pill" style="background:${s.c};color:${s.ink};padding:1px 7px">${s.n}</span>${esc(s.label)}
        <span class="c">${c['step'+s.n]}</span></button>`).join('');
 }
-function setFilter(k){ S.filter = k; renderChips(); renderJobs(); }
+function setFilter(k){ S.filter = k; S.pg.jobs = 1; renderChips(); renderJobs(); }
 
 function matchFilter(j){
   const f = S.filter;
@@ -1506,7 +1576,9 @@ function renderJobs(){
   });
   $('jobCount').textContent = rows.length + ' รายการ';
   $('jobsEmpty').style.display = rows.length ? 'none' : 'block';
-  $('tblJobs').querySelector('tbody').innerHTML = rows.map(j => {
+  const m = paginate(rows, 'jobs');
+  $('pgJobs').innerHTML = pagerHTML(m, 'jobs');
+  $('tblJobs').querySelector('tbody').innerHTML = m.slice.map(j => {
     const s = stepOf(j.status), sd = STEPS[s-1];
     const late = j.days_overdue > 0;
     return `<tr class="click ${S.seen === j.id ? 'seen' : ''}" tabindex="0"
@@ -2049,7 +2121,9 @@ function renderCust(){
     <div class="n">${n}<small>${u}</small></div></div>`).join('');
 
   $('custEmpty').style.display = rows.length ? 'none' : 'block';
-  $('tblCust').querySelector('tbody').innerHTML = rows.map(c => `<tr class="click" tabindex="0"
+  const mc = paginate(rows, 'cust');
+  $('pgCust').innerHTML = pagerHTML(mc, 'cust');
+  $('tblCust').querySelector('tbody').innerHTML = mc.slice.map(c => `<tr class="click" tabindex="0"
     onclick="openCust('${c.id}')" onkeydown="if(event.key==='Enter')openCust('${c.id}')">
     <td><b>${esc(c.name)}</b><div class="sub2">${esc(c.address||'')}</div></td>
     <td>${esc(c.phone||'—')}</td>
@@ -2125,7 +2199,9 @@ function renderParts(){
     <div class="n">${n}<small>${u}</small></div></div>`).join('');
 
   const cls = { 'ติดลบ':'tag-crit', 'หมด':'tag-crit', 'ต้องสั่ง':'tag-warn', 'ปกติ':'tag-good' };
-  $('tblParts').querySelector('tbody').innerHTML = rows.length ? rows.map(p => `<tr>
+  const mp = paginate(rows, 'parts');
+  $('pgParts').innerHTML = pagerHTML(mp, 'parts');
+  $('tblParts').querySelector('tbody').innerHTML = rows.length ? mp.slice.map(p => `<tr>
     <td class="mono"><b>${esc(p.part_no)}</b></td><td>${esc(p.name)}</td>
     <td class="num">฿${money(p.sell_price)}</td><td class="num">${p.used_90d}</td>
     <td class="num muted">${p.reorder_point}</td>
