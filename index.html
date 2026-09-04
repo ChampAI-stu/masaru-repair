@@ -55,10 +55,11 @@ aside nav button .e{font-size:16px;width:20px;text-align:center}
   background:#fff;border-bottom:1px solid var(--line);padding:14px 22px;
   display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:30;flex-wrap:wrap;
 }
-.phead h1{margin:0;font-size:20px;font-weight:800;color:var(--navy);line-height:1.25}
+.phead h1{margin:0;font-size:20px;font-weight:800;color:var(--navy);line-height:1.25;white-space:nowrap}
+.phead > div:nth-child(2){min-width:0}
 .phead .sub{font-size:12.5px;color:var(--ink3)}
 .phead .sp{flex:1}
-.search{position:relative;min-width:210px}
+.search{position:relative;flex:1 1 250px;max-width:360px;min-width:200px}
 .phead .search input{width:100%;padding:9px 14px 9px 34px;border:1px solid var(--line);border-radius:999px;background:#f7f9fc}
 .search .mg{position:absolute;left:12px;top:8px;color:var(--ink3)}
 /* กระดิ่งแจ้งเตือน */
@@ -175,13 +176,17 @@ tbody tr.click{cursor:pointer}tbody tr.click:hover{background:#f7fafd}
 .kpi.nc .n{color:var(--good)}.kpi.nd .n{color:var(--crit)}
 .kpi.ne .n{color:var(--blue)}
 
-/* stepper */
-.steps{display:flex;gap:0;align-items:center;overflow-x:auto;padding:4px 0}
-.stp{display:flex;align-items:center;gap:9px;white-space:nowrap;padding:0 4px}
-.stp .b{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:800;color:#fff;flex:0 0 auto}
+/* stepper — ห่อบรรทัดได้ ไม่ตัดตัวอักษรทิ้ง */
+.steps{display:flex;flex-wrap:wrap;align-items:center;gap:8px 0;padding:2px 0;min-width:0}
+.stp{display:flex;align-items:center;gap:8px;white-space:nowrap;padding:2px 10px 2px 0;flex:0 0 auto}
+.stp .b{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:12.5px;font-weight:800;color:#fff;flex:0 0 auto}
 .stp .n{font-size:13.5px;font-weight:600}
-.stp .q{font-weight:800;font-variant-numeric:tabular-nums}
-.stpline{height:2px;background:var(--line);flex:1;min-width:22px}
+.stp .q{font-weight:800;font-variant-numeric:tabular-nums;min-width:12px;text-align:right}
+.stpline{height:2px;background:var(--line);flex:1 1 16px;min-width:16px;max-width:46px;margin-right:10px}
+.dashtop{display:flex;gap:12px 16px;align-items:center;flex-wrap:wrap}
+.dashtop .steps{flex:1 1 560px}
+.dashtop .chips{flex:0 0 auto;margin-left:auto}
 
 .stepcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
 .stepcard{border:1px solid var(--line);border-radius:10px;padding:13px 15px;background:#fbfcfe}
@@ -379,7 +384,8 @@ form[hidden]{display:none}
       <div class="sp"></div>
       <div class="search">
         <span class="mg">🔍</span>
-        <input type="text" id="gSearch" placeholder="ค้นหาเลขที่งาน / ลูกค้า / Serial…">
+        <input type="text" id="gSearch" placeholder="ค้นหาใบงาน / ลูกค้า"
+               title="ค้นได้จากเลขที่งาน ชื่อลูกค้า Serial รุ่น หรืออาการเสีย">
       </div>
       <button class="bell" id="bellBtn" title="การแจ้งเตือน" aria-haspopup="true" aria-expanded="false">
         🔔<span class="badge" id="bellCount" hidden>0</span></button>
@@ -403,8 +409,8 @@ form[hidden]{display:none}
 
       <!-- ============ แดชบอร์ด ============ -->
       <div class="page on" id="p-dash">
-        <div class="card"><div class="cb" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
-          <div class="steps" id="stepBar" style="flex:1"></div>
+        <div class="card"><div class="cb dashtop">
+          <div class="steps" id="stepBar"></div>
           <div class="chips" id="rangeChips"></div>
         </div></div>
         <div class="kpis" id="dashKpi"></div>
@@ -465,8 +471,8 @@ form[hidden]{display:none}
 
       <!-- ============ รับเครื่อง ============ -->
       <div class="page" id="p-intake">
-        <div class="card"><div class="cb">
-          <div class="steps" id="stepBar2"></div>
+        <div class="card"><div class="cb dashtop">
+          <div class="steps" id="stepBar2" style="flex:1 1 100%"></div>
           <div id="stepHint" class="sub2" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line2)"></div>
         </div></div>
         <div class="card" style="max-width:900px;margin:0 auto">
@@ -1259,9 +1265,9 @@ function setRange(k){ S.range = k; renderDash(); renderChips(); }
 function renderStepBar(el){
   const c = stepCounts();
   el.innerHTML = STEPS.map((s,i) =>
-    `${i ? '<div class="stpline"></div>' : ''}
-     <div class="stp"><span class="b" style="background:${s.c};color:${s.ink}">${s.n}</span>
-     <span class="n">${esc(s.label)}</span><span class="q">${c[s.n]}</span></div>`).join('');
+    `${i ? '<span class="stpline" aria-hidden="true"></span>' : ''}
+     <span class="stp"><span class="b" style="background:${s.c};color:${s.ink}">${s.n}</span>
+     <span class="n">${esc(s.label)}</span><span class="q">${c[s.n]}</span></span>`).join('');
 }
 
 function renderDash(){
