@@ -244,6 +244,26 @@ svg .nm{fill:var(--ink);font-size:12.5px;font-family:"Sarabun",sans-serif}
 .empty{text-align:center;padding:38px 14px;color:var(--ink3)}
 
 /* ---------- หน้าใบงาน (wizard) ---------- */
+.pstep{cursor:default}
+.pstep.can{cursor:pointer}
+.pstep.can:hover .n{text-decoration:underline}
+.pstep.can:hover .b{filter:brightness(1.08)}
+.pstep.peek .b{box-shadow:0 0 0 4px var(--gold-l);background:var(--gold);color:#3a2d05}
+.pstep.peek .n{color:var(--gold);font-weight:800}
+.peekbar{background:var(--gold-l);border:1px solid var(--gold-line);border-radius:9px;
+  padding:10px 14px;margin-bottom:16px;display:flex;gap:11px;align-items:center;flex-wrap:wrap;font-size:13.5px}
+.peekbar .sp{flex:1}
+.robox{background:#f7fafd;border:1px solid var(--line2);border-radius:9px;padding:11px 14px;
+  font-size:14px;white-space:pre-line;min-height:42px}
+.robox.empty{color:var(--ink3);font-style:italic}
+.tl{position:relative;padding-left:20px;margin-top:6px}
+.tl::before{content:'';position:absolute;left:5px;top:6px;bottom:6px;width:2px;background:var(--line)}
+.tl .e{position:relative;padding:5px 0;font-size:13px}
+.tl .e::before{content:'';position:absolute;left:-18px;top:11px;width:8px;height:8px;border-radius:50%;
+  background:var(--blue);border:2px solid #fff}
+.tl .e b{color:var(--navy)}
+.custhead{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:16px 18px}
+.custhead h2{margin:0;font-size:21px;font-weight:800;color:var(--navy)}
 .prog{display:flex;align-items:center;flex-wrap:wrap;gap:6px 0}
 .pstep{display:flex;align-items:center;gap:8px;white-space:nowrap;flex:0 0 auto}
 .pstep .b{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;
@@ -586,6 +606,25 @@ form[hidden]{display:none}
 
       <!-- ============ ลูกค้า ============ -->
       <div class="page" id="p-cust">
+        <!-- มุมมองลูกค้ารายคน -->
+        <div id="custDetail" hidden>
+          <div class="card"><div class="custhead">
+            <button class="btn sm" onclick="closeCust()" title="กลับรายชื่อลูกค้า">←</button>
+            <div style="flex:1;min-width:0">
+              <h2 id="cdName">—</h2>
+              <div class="sub2" id="cdMeta"></div>
+            </div>
+            <span class="pill tag-crit" id="cdCount">0 งาน</span>
+          </div></div>
+          <div class="kpis" id="cdKpi"></div>
+          <div class="card"><div class="cb" style="padding:0">
+            <div class="tw"><table id="tblCustJobs">
+              <thead><tr><th>เลขที่งาน</th><th>เครื่องมือ</th><th>อาการ</th><th>สถานะ</th><th>วันที่รับ</th><th class="num">รวม</th></tr></thead>
+              <tbody></tbody></table></div>
+          </div></div>
+        </div>
+
+        <div id="custList">
         <div class="kpis" id="custKpi"></div>
         <div class="card">
           <h3>รายชื่อลูกค้า <span class="sp"></span>
@@ -596,6 +635,7 @@ form[hidden]{display:none}
             <tbody></tbody></table></div>
             <div id="custEmpty" class="empty" style="display:none">ยังไม่มีลูกค้า</div>
           </div>
+        </div>
         </div>
       </div>
 
@@ -727,7 +767,7 @@ const CLOSED = ['delivered','cancelled'];
 const stepOf = st => STEP_OF[st] || 0;
 
 let sb = null;
-const S = { jobs:[], techs:[], cats:[], parts:[], custs:[], stock:[], job:null, lines:[], photos:[], filter:'open', range:'all', seen:null };
+const S = { jobs:[], techs:[], cats:[], parts:[], custs:[], stock:[], job:null, lines:[], photos:[], slog:[], filter:'open', range:'all', seen:null, peek:null, custView:null };
 
 /* ---------- helpers ---------- */
 const $ = id => document.getElementById(id);
@@ -1074,7 +1114,7 @@ function goPage(p){
   $('pgTitle').textContent = PGT[p][0]; $('pgSub').textContent = PGT[p][1];
   $('side').classList.remove('open');
   window.scrollTo(0,0);
-  if (p === 'cust')   renderCust();
+  if (p === 'cust')   { closeCust(); renderCust(); }
   if (p === 'parts')  loadParts();
   if (p === 'report') loadReport();
   if (p === 'setting') loadSettings();
@@ -1589,13 +1629,15 @@ function closeJob(){ goPage('jobs'); renderJobs();
 
 async function openJob(id){
   try {
-    const [j, lines, photos] = await Promise.all([
+    const [j, lines, photos, slog] = await Promise.all([
       sb.from('v_jobs').select('*').eq('id', id).single(),
       sb.from('repair_parts_used').select('*, parts_master(part_no,name)').eq('job_id', id).order('created_at'),
-      sb.from('repair_photos').select('*').eq('job_id', id).order('created_at')
+      sb.from('repair_photos').select('*').eq('job_id', id).order('created_at'),
+      sb.from('repair_status_log').select('*').eq('job_id', id).order('created_at')
     ]);
     if (j.error) throw j.error;
-    S.job = j.data; S.lines = lines.data || []; S.photos = photos.data || []; S.seen = id;
+    S.job = j.data; S.lines = lines.data || []; S.photos = photos.data || [];
+    S.slog = slog.data || []; S.seen = id; S.peek = null;
     goPage('job');
     renderJobPage();
   } catch(e){ fail(e); }
@@ -1604,11 +1646,28 @@ async function openJob(id){
 /* ---------- แถบความคืบหน้า 6 ขั้น ---------- */
 function progBar(cur){
   return STEPS.map((s,i) => {
-    const st = s.n < cur ? 'done' : s.n === cur ? 'now' : 'todo';
+    let st = s.n < cur ? 'done' : s.n === cur ? 'now' : 'todo';
+    const can = s.n <= cur;
+    if (S.peek === s.n) st += ' peek';
     return `${i ? `<span class="pline ${s.n <= cur ? 'done' : ''}"></span>` : ''}
-      <span class="pstep ${st}"><span class="b">${st === 'done' ? '✓' : s.n}</span>
-      <span class="n">${esc(s.label)}</span></span>`;
+      <span class="pstep ${st} ${can ? 'can' : ''}" ${can ? `onclick="peekStep(${s.n})"` : ''}
+        title="${can ? 'ดูสิ่งที่บันทึกไว้ในขั้นนี้' : 'ยังไม่ถึงขั้นนี้'}">
+        <span class="b">${st.startsWith('done') ? '✓' : s.n}</span>
+        <span class="n">${esc(s.label)}</span></span>`;
   }).join('');
+}
+
+/** กดเลขขั้นตอน → ดูย้อนหลังว่าบันทึกอะไรไว้ */
+function peekStep(nStep){
+  const cur = stepOf(S.job.status) || 1;
+  S.peek = (nStep === cur || S.peek === nStep) ? null : nStep;
+  renderJobPage();
+}
+
+/** เวลาที่เข้าสู่ขั้นนั้น + ใครทำ */
+function stepLog(nStep){
+  const sts = STEPS[nStep-1].st;
+  return (S.slog || []).filter(l => sts.includes(l.to_status));
 }
 
 /* ---------- กล่องรูปตามช่วง ---------- */
@@ -1689,8 +1748,10 @@ function renderJobPage(){
     </div>
 
     <div class="card">
-      <h3><span class="jnum" style="background:${sd.c};color:${sd.ink}">${cur}</span> ${esc(sd.label)}</h3>
-      <div class="cb" id="stepForm">${stepForm(cur, j, pc)}</div>
+      <h3><span class="jnum" style="background:${(S.peek?STEPS[S.peek-1]:sd).c};color:${(S.peek?STEPS[S.peek-1]:sd).ink}">${S.peek||cur}</span>
+        ${esc((S.peek?STEPS[S.peek-1]:sd).label)}
+        ${S.peek ? '<span class="pill tag-warn">ย้อนดูประวัติ</span>' : ''}</h3>
+      <div class="cb" id="stepForm">${S.peek ? stepReadOnly(S.peek, j) : stepForm(cur, j, pc)}</div>
     </div>
   </div>`;
 
@@ -1699,7 +1760,7 @@ function renderJobPage(){
     qb.innerHTML = '';
     new QRCode(qb, { text: location.origin + location.pathname + '?job=' + j.id, width:118, height:118, correctLevel: QRCode.CorrectLevel.M });
   }
-  bindStepForm(cur, pc);
+  if (!S.peek) bindStepForm(cur, pc);
 }
 
 /* ---------- ฟอร์มของแต่ละขั้น ---------- */
@@ -1807,6 +1868,82 @@ function stepForm(cur, j, pc){
              : `<button class="btn g" onclick="setStatus('delivered')">✅ ส่งมอบแล้ว ปิดงาน</button>`}</div>`;
 }
 
+/* ---------- ย้อนดูสิ่งที่บันทึกไว้ในขั้นก่อนหน้า (อ่านอย่างเดียว) ---------- */
+function stepReadOnly(nStep, j){
+  const cur = stepOf(j.status) || 1;
+  const logs = stepLog(nStep);
+  const ro = (v, empty) => `<div class="robox ${v ? '' : 'empty'}">${esc(v || empty || 'ยังไม่ได้บันทึก')}</div>`;
+  const kv = (k, v) => `<div class="kv"><span class="k">${k}</span><span class="v">${esc(v ?? '—')}</span></div>`;
+
+  const bar = `<div class="peekbar">
+    <span>🕘 กำลังดูย้อนหลัง <b>ขั้นที่ ${nStep} · ${esc(STEPS[nStep-1].label)}</b> — แก้ไขไม่ได้</span>
+    <span class="sp"></span>
+    <button class="btn sm g" onclick="peekStep(${cur})">กลับไปขั้นที่ทำอยู่ (${cur}) →</button></div>`;
+
+  const time = logs.length
+    ? `<div style="margin-top:16px"><label>บันทึกการเปลี่ยนสถานะ</label><div class="tl">
+        ${logs.map(l => `<div class="e"><b>${STATUS[l.to_status] || l.to_status}</b>
+          — ${dtth(l.created_at)}${l.changed_by ? ' · โดย ' + esc(l.changed_by) : ''}</div>`).join('')}
+      </div></div>`
+    : `<div class="sub2" style="margin-top:16px">ยังไม่มีบันทึกการเข้าสู่ขั้นนี้</div>`;
+
+  let body = '';
+  if (nStep === 1){
+    body = `${kv('ลูกค้า', j.customer_name)}${kv('เบอร์โทร', j.customer_phone)}
+      ${kv('ประเภทเครื่อง', j.tool_type)}${kv('แบรนด์ / รุ่น', [j.brand,j.model].filter(Boolean).join(' '))}
+      ${kv('Serial No.', j.serial_no)}${kv('วันที่รับ', dth(j.received_at))}
+      ${kv('กำหนดเสร็จ', dth(j.due_date))}${kv('หมวดอาการ', j.symptom_name)}
+      ${kv('ผู้รับเรื่อง', j.created_by)}
+      <div style="margin-top:14px"><label>อาการเสียที่ลูกค้าแจ้ง</label>${ro(j.symptom)}</div>
+      <div style="margin-top:14px"><label>ของที่นำมาด้วย</label>${ro(j.accessories, 'ไม่มี')}</div>`;
+  }
+  else if (nStep === 2){
+    body = `<div><label>อาการที่พบจากการตรวจเช็ค</label>${ro(j.inspect_result)}</div>
+      <div style="margin-top:14px"><label>สาเหตุ</label>${ro(j.cause)}</div>`;
+  }
+  else if (nStep === 3){
+    body = `${kv('ช่างผู้รับผิดชอบ', j.tech_name)}${kv('กำหนดเสร็จ', dth(j.due_date))}
+      ${kv('อยู่ในร้านมาแล้ว', (j.days_in_shop ?? 0) + ' วัน')}`;
+  }
+  else if (nStep === 4){
+    const pc = S.lines.reduce((s,l) => s + Number(l.line_total||0), 0);
+    body = `<div><label>วิธีการซ่อม</label>${ro(j.repair_method)}</div>
+      <div style="margin-top:16px"><label>อะไหล่ที่ใช้</label>
+        <div class="tw"><table>
+          <thead><tr><th>PART NO.</th><th>รายการ</th><th class="num">จำนวน</th><th class="num">ราคา</th></tr></thead>
+          <tbody>${S.lines.length ? S.lines.map(l => `<tr>
+            <td class="mono"><b>${esc(l.parts_master?.part_no||'')}</b></td>
+            <td>${esc(l.parts_master?.name||'')}</td>
+            <td class="num">${l.qty}</td><td class="num">฿${money2(l.line_total)}</td></tr>`).join('')
+            : '<tr><td colspan="4" class="muted" style="text-align:center;padding:14px">ไม่ได้ใช้อะไหล่</td></tr>'}</tbody>
+        </table></div></div>
+      <div style="margin-top:14px">
+        <div class="sumrow"><span>รวมค่าอะไหล่</span><b>฿${money2(pc)}</b></div>
+        <div class="sumrow"><span>ค่าแรง</span><b>฿${money2(j.labor_cost)}</b></div>
+      </div>
+      <div style="margin-top:14px">${photoBoxRO('during','รูประหว่างซ่อม')}</div>`;
+  }
+  else if (nStep === 5){
+    body = `<div><label>ผลการทดสอบ / หมายเหตุ</label>${ro(j.note)}</div>
+      <div style="margin-top:14px">${photoBoxRO('after','รูปหลังซ่อม')}</div>`;
+  }
+  else {
+    body = `${kv('ค่าอะไหล่', '฿' + money2(j.parts_cost))}${kv('ค่าแรง', '฿' + money2(j.labor_cost))}
+      ${kv('ส่วนลด', '฿' + money2(j.discount))}${kv('รวมทั้งหมด', '฿' + money2(j.total_cost))}
+      ${kv('ส่งมอบเมื่อ', j.delivered_at ? dtth(j.delivered_at) : 'ยังไม่ส่งมอบ')}
+      <div style="margin-top:14px">${photoBoxRO('document','เอกสาร / ใบเสร็จ')}</div>`;
+  }
+  return bar + body + time;
+}
+
+function photoBoxRO(phase, label){
+  const list = S.photos.filter(x => x.phase === phase);
+  return `<label>${label} (${list.length})</label><div class="phs">
+    ${list.length ? list.map(p => `<div class="ph"><img src="${photoUrl(p.storage_key)}" alt="${label}" loading="lazy"
+      onclick="window.open('${photoOpen(p.storage_key)}','_blank')"></div>`).join('')
+      : '<span class="muted" style="font-size:13px">ไม่มีรูปในขั้นนี้</span>'}</div>`;
+}
+
 function bindStepForm(cur, pc){
   if (cur === 4){
     const upd = () => $('sTotal').textContent = '฿' + money2(pc + (Number(val('sLabor'))||0) - (Number(val('sDiscount'))||0));
@@ -1859,18 +1996,7 @@ async function moveStep(to){
   await saveStep({ status: STEPS[to-1].main });
 }
 
-async function showHistory(cid){
-  const rows = S.jobs.filter(j => j.customer_id === cid && j.id !== S.job.id);
-  await formModal({
-    title:'ประวัติการซ่อมของลูกค้ารายนี้',
-    subtitle: S.job.customer_name + ' · ' + rows.length + ' ครั้ง',
-    ok:'ปิด',
-    fields: rows.slice(0,12).map((j,i) => ({
-      k:'h'+i, label:`${j.job_no} · ${dth(j.received_at)}`,
-      value:`${[j.brand,j.model].filter(Boolean).join(' ')} — ${j.symptom||''} (${STATUS[j.status]||''})`
-    }))
-  });
-}
+function showHistory(cid){ goPage('cust'); openCust(cid); }
 
 async function addLineInline(){
   const pn = val('aPart').toUpperCase();
@@ -1923,10 +2049,57 @@ function renderCust(){
     <div class="n">${n}<small>${u}</small></div></div>`).join('');
 
   $('custEmpty').style.display = rows.length ? 'none' : 'block';
-  $('tblCust').querySelector('tbody').innerHTML = rows.map(c => `<tr>
-    <td><b>${esc(c.name)}</b></td><td>${esc(c.phone||'—')}</td>
+  $('tblCust').querySelector('tbody').innerHTML = rows.map(c => `<tr class="click" tabindex="0"
+    onclick="openCust('${c.id}')" onkeydown="if(event.key==='Enter')openCust('${c.id}')">
+    <td><b>${esc(c.name)}</b><div class="sub2">${esc(c.address||'')}</div></td>
+    <td>${esc(c.phone||'—')}</td>
     <td><span class="pill st1">${CT[c.customer_type]||c.customer_type}</span></td>
     <td class="num">${c.n}</td><td class="num">฿${money(c.sum)}</td><td>${dth(c.last)}</td></tr>`).join('');
+}
+
+function openCust(id){
+  const c = S.custs.find(x => x.id === id); if (!c) return;
+  S.custView = id;
+  const rows = S.jobs.filter(j => j.customer_id === id)
+                     .sort((a,b) => new Date(b.received_at) - new Date(a.received_at));
+  const sum = rows.reduce((s,j) => s + Number(j.total_cost||0), 0);
+  const open = rows.filter(j => !CLOSED.includes(j.status)).length;
+
+  $('cdName').textContent = c.name;
+  $('cdMeta').textContent = [c.phone, c.address].filter(Boolean).join(' · ') || 'ไม่มีข้อมูลติดต่อ';
+  $('cdCount').textContent = rows.length + ' งาน';
+
+  $('cdKpi').innerHTML = [
+    ['na','🔧','ซ่อมทั้งหมด', rows.length, 'ครั้ง'],
+    ['nb','⏳','งานค้างอยู่', open, 'ใบ'],
+    ['nc','💰','ยอดรวมสะสม', '฿' + money(sum), ''],
+    ['ne','📅','ซ่อมล่าสุด', rows.length ? dth(rows[0].received_at) : '—', '']
+  ].map(([cl,e,l,v,u]) => `<div class="kpi ${cl}"><div class="t"><span class="l">${l}</span><span class="e">${e}</span></div>
+    <div class="n" style="font-size:${String(v).length > 7 ? '20px' : '29px'}">${v}<small>${u}</small></div></div>`).join('');
+
+  $('tblCustJobs').querySelector('tbody').innerHTML = rows.length ? rows.map(j => {
+    const s = stepOf(j.status);
+    return `<tr class="click" tabindex="0" onclick="openJob('${j.id}')"
+      onkeydown="if(event.key==='Enter')openJob('${j.id}')">
+      <td class="mono"><b>${esc(j.job_no)}</b></td>
+      <td>${esc([j.brand,j.model].filter(Boolean).join(' ') || j.tool_type || '—')}
+        <div class="sub2">${esc(j.serial_no||'')}</div></td>
+      <td>${esc(j.symptom||'—')}</td>
+      <td><span class="pill st${s||0}"><span class="d"></span>${STATUS[j.status]||j.status}</span></td>
+      <td>${dth(j.received_at)}</td>
+      <td class="num"><b>฿${money(j.total_cost)}</b></td></tr>`;
+  }).join('') : '<tr><td colspan="6" class="empty">ยังไม่เคยส่งซ่อม</td></tr>';
+
+  $('custList').hidden = true; $('custDetail').hidden = false;
+  $('pgTitle').textContent = c.name;
+  $('pgSub').textContent = 'ประวัติการซ่อมของลูกค้ารายนี้';
+  window.scrollTo(0,0);
+}
+
+function closeCust(){
+  S.custView = null;
+  $('custDetail').hidden = true; $('custList').hidden = false;
+  $('pgTitle').textContent = PGT.cust[0]; $('pgSub').textContent = PGT.cust[1];
 }
 
 /* =====================================================================
