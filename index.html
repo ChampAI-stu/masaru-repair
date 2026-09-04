@@ -9,405 +9,475 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
 :root{
-  --navy:#1F3864; --navy-d:#16294a; --blue:#2E75B6; --blue-l:#eaf1f9;
-  --gold:#C9A84C; --gold-l:#faf3e0;
-  --ink:#1b2436; --ink2:#5b6880; --ink3:#8d99b0;
-  --bg:#eef2f7; --card:#fff; --line:#dbe3ee; --line2:#eef2f8;
-  --ok:#2E7D5B; --ok-l:#e6f4ee;
-  --warn:#B7791F; --warn-l:#fdf3e0;
-  --danger:#B3322C; --danger-l:#fbeceb;
-  --r:10px; --sh:0 1px 3px rgba(27,36,54,.08);
+  --navy:#1F3864; --navy-d:#16294a; --blue:#2E75B6; --blue-l:#eaf1f9; --gold:#C9A84C; --gold-l:#faf3e0;
+  --good:#12875C; --good-l:#e4f2ec;
+  --warn:#C98A12; --warn-l:#fbf1dc;
+  --crit:#BE3A32; --crit-l:#fbeae9;
+  --ink:#1a2436; --ink2:#5c6a83; --ink3:#8c99b0;
+  --bg:#f2f5f9; --card:#fff; --side:#1b2f52; --line:#dde5f0; --line2:#eaeff7;
+  /* ramp 6 ขั้นตอน — สีเดียว ไล่อ่อน→เข้ม ตามลำดับขั้น */
+  --s1:#c3d6ec; --s2:#9cbbdf; --s3:#75a0d0; --s4:#4f83bb; --s5:#35659c; --s6:#1F3864;
+  --r:11px; --sh:0 1px 3px rgba(26,36,54,.07);
 }
 *{box-sizing:border-box}
-html,body{margin:0;padding:0}
-body{
-  font-family:"Sarabun",system-ui,-apple-system,sans-serif;
-  background:var(--bg); color:var(--ink); font-size:15px; line-height:1.6;
-  -webkit-text-size-adjust:100%;
-}
+html,body{margin:0;padding:0;height:100%}
+body{font-family:"Sarabun",system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.6}
 button,input,select,textarea{font-family:inherit;font-size:inherit;color:inherit}
 
-/* ---------- layout ---------- */
-.topbar{
-  background:var(--navy); color:#fff; padding:0 16px;
-  display:flex; align-items:center; gap:14px; height:56px;
-  position:sticky; top:0; z-index:50; box-shadow:0 2px 8px rgba(0,0,0,.12);
-}
-.brand{font-weight:800; font-size:17px; letter-spacing:.2px; white-space:nowrap}
-.brand span{color:var(--gold)}
-.topbar .sp{flex:1}
-.who{
-  background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.25); color:#fff;
-  border-radius:8px; padding:5px 10px; font-size:13px; max-width:150px;
-}
-.who option{color:#000}
+/* ================= layout ================= */
+.app{display:flex;min-height:100vh}
 
-nav{
-  background:var(--navy-d); display:flex; gap:2px; padding:0 8px;
-  overflow-x:auto; position:sticky; top:56px; z-index:49;
+aside{
+  width:246px;flex:0 0 246px;background:var(--side);color:#dbe4f2;
+  display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;
 }
-nav button{
-  background:none; border:0; color:#b9c6dd; padding:11px 15px; cursor:pointer;
-  font-size:14px; font-weight:600; white-space:nowrap; border-bottom:3px solid transparent;
+.logo{display:flex;gap:11px;align-items:center;padding:20px 18px 18px}
+.logo .ic{width:40px;height:40px;border-radius:10px;background:var(--gold);display:flex;align-items:center;justify-content:center;font-size:21px}
+.logo b{display:block;font-size:15.5px;font-weight:800;color:#fff;letter-spacing:.4px}
+.logo small{font-size:11.5px;color:#93a6c4}
+.navlbl{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#7d90b0;padding:4px 20px 8px;font-weight:700}
+aside nav{display:flex;flex-direction:column;gap:3px;padding:0 11px}
+aside nav button{
+  display:flex;align-items:center;gap:11px;background:none;border:0;color:#c3d0e4;
+  padding:10px 12px;border-radius:9px;cursor:pointer;font-size:14.5px;font-weight:600;text-align:left;width:100%;
 }
-nav button.on{color:#fff; border-bottom-color:var(--gold)}
-nav button:hover{color:#fff}
+aside nav button:hover{background:rgba(255,255,255,.07);color:#fff}
+aside nav button.on{background:var(--gold);color:#3a2d05}
+aside nav button .e{font-size:16px;width:20px;text-align:center}
+.sidefoot{margin-top:auto;padding:16px 18px 20px;border-top:1px solid rgba(255,255,255,.1)}
+.sidefoot .k{font-size:11.5px;color:#8fa2c1}
+.sidefoot .v{font-weight:700;color:#fff;font-size:14.5px}
+.sidefoot .st{font-size:12px;color:#7fd4a8;margin-top:3px}
 
-main{max-width:1180px; margin:0 auto; padding:18px 14px 60px}
-.view{display:none}
-.view.on{display:block}
-
-/* ---------- pieces ---------- */
-h2.vt{font-size:20px; font-weight:800; margin:0 0 14px; color:var(--navy)}
-.card{background:var(--card); border:1px solid var(--line); border-radius:var(--r); box-shadow:var(--sh); margin-bottom:16px}
-.card > h3{
-  margin:0; padding:13px 16px; border-bottom:1px solid var(--line2);
-  font-size:15px; font-weight:700; color:var(--navy);
-  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+.mainarea{flex:1;min-width:0;display:flex;flex-direction:column}
+.phead{
+  background:#fff;border-bottom:1px solid var(--line);padding:14px 22px;
+  display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:30;flex-wrap:wrap;
 }
-.card > h3 .sp{flex:1}
-.cb{padding:16px}
+.phead h1{margin:0;font-size:20px;font-weight:800;color:var(--navy);line-height:1.25}
+.phead .sub{font-size:12.5px;color:var(--ink3)}
+.phead .sp{flex:1}
+.search{position:relative;min-width:210px}
+.search input{width:100%;padding:9px 12px 9px 34px;border:1px solid var(--line);border-radius:999px;background:#f7f9fc}
+.search .mg{position:absolute;left:12px;top:8px;color:var(--ink3)}
+.avatar{width:36px;height:36px;border-radius:50%;background:var(--navy);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px}
+.content{padding:20px 22px 60px;max-width:1500px;width:100%}
+.page{display:none}.page.on{display:block}
 
-.grid{display:grid; gap:13px}
-.g2{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
-.g3{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
-.g4{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+/* ================= pieces ================= */
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);margin-bottom:18px}
+.card>h3{margin:0;padding:14px 18px;border-bottom:1px solid var(--line2);font-size:15.5px;font-weight:700;color:var(--navy);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.card>h3 .sp{flex:1}
+.cb{padding:18px}
+.grid{display:grid;gap:14px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(250px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+.g4{grid-template-columns:repeat(auto-fit,minmax(145px,1fr))}
+.split{display:grid;gap:18px;grid-template-columns:minmax(320px,1fr) minmax(340px,1.25fr)}
+@media(max-width:900px){.split{grid-template-columns:1fr}}
 
-label{display:block; font-size:12.5px; font-weight:600; color:var(--ink2); margin-bottom:4px}
-label .req{color:var(--danger)}
+label{display:block;font-size:12.5px;font-weight:600;color:var(--ink2);margin-bottom:5px}
+label .req{color:var(--crit)}
 input[type=text],input[type=date],input[type=number],input[type=tel],select,textarea{
-  width:100%; padding:9px 11px; border:1px solid var(--line); border-radius:8px;
-  background:#fff; outline:none;
-}
-input:focus,select:focus,textarea:focus{border-color:var(--blue); box-shadow:0 0 0 3px var(--blue-l)}
-textarea{resize:vertical; min-height:72px}
+  width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:#fff;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px var(--blue-l)}
+textarea{resize:vertical;min-height:74px}
+select.mini{padding:5px 8px;font-size:13px;border-radius:7px}
 
-.btn{
-  border:1px solid var(--line); background:#fff; padding:9px 16px; border-radius:8px;
-  font-weight:600; cursor:pointer; white-space:nowrap;
-}
+.btn{border:1px solid var(--line);background:#fff;padding:9px 16px;border-radius:9px;font-weight:600;cursor:pointer;white-space:nowrap}
 .btn:hover{background:#f6f9fd}
-.btn.p{background:var(--blue); border-color:var(--blue); color:#fff}
-.btn.p:hover{background:#2a6aa5}
-.btn.g{background:var(--navy); border-color:var(--navy); color:#fff}
-.btn.g:hover{background:var(--navy-d)}
-.btn.sm{padding:6px 11px; font-size:13px}
-.btn.dn{color:var(--danger); border-color:#f0d3d1}
-.btn.dn:hover{background:var(--danger-l)}
-.btn:disabled{opacity:.5; cursor:not-allowed}
-.row{display:flex; gap:9px; flex-wrap:wrap; align-items:center}
+.btn.p{background:var(--blue);border-color:var(--blue);color:#fff}.btn.p:hover{background:#2a6aa5}
+.btn.g{background:var(--navy);border-color:var(--navy);color:#fff}.btn.g:hover{background:var(--navy-d)}
+.btn.sm{padding:6px 12px;font-size:13px}
+.btn.ic{padding:5px 9px;font-size:13px;line-height:1}
+.btn.dn{color:var(--crit);border-color:#f0d4d2}.btn.dn:hover{background:var(--crit-l)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.row{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
 
-.pill{
-  display:inline-block; padding:3px 10px; border-radius:999px;
-  font-size:12px; font-weight:700; white-space:nowrap;
-}
-.p-received{background:#e8eefa;color:#2b4a80}
-.p-inspecting{background:#e6f0fb;color:#1f5f96}
-.p-wait_approve{background:var(--warn-l);color:var(--warn)}
-.p-repairing{background:var(--gold-l);color:#8a6d18}
-.p-wait_parts{background:var(--danger-l);color:var(--danger)}
-.p-testing{background:#efe9fa;color:#5b3fa0}
-.p-ready{background:var(--ok-l);color:var(--ok)}
-.p-delivered{background:#eef1f5;color:var(--ink2)}
-.p-cancelled{background:#f2f2f2;color:#888}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:3px 11px;border-radius:999px;font-size:12px;font-weight:700;white-space:nowrap}
+.pill .d{width:7px;height:7px;border-radius:50%;background:currentColor;flex:0 0 auto}
+.st1{background:#e9f0f9;color:#3c5d8c}.st2{background:#e4eefa;color:#2c5c93}
+.st3{background:var(--warn-l);color:var(--warn)}.st4{background:var(--gold-l);color:#8a6d18}
+.st5{background:#efe9fa;color:#54399b}.st6{background:var(--good-l);color:var(--good)}
+.st0{background:#f0f0f0;color:#8a8a8a}
+.tag-crit{background:var(--crit-l);color:var(--crit)}
+.tag-warn{background:var(--warn-l);color:var(--warn)}
+.tag-good{background:var(--good-l);color:var(--good)}
 
-table{width:100%; border-collapse:collapse; font-size:14px}
-th{
-  text-align:left; font-size:11.5px; letter-spacing:.06em; text-transform:uppercase;
-  color:var(--ink3); padding:10px 12px; border-bottom:1px solid var(--line); white-space:nowrap;
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{
+  border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 14px;
+  font-size:13.5px;font-weight:600;cursor:pointer;display:inline-flex;gap:7px;align-items:center;
 }
-td{padding:10px 12px; border-bottom:1px solid var(--line2); vertical-align:middle}
+.chip:hover{background:#f6f9fd}
+.chip.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.chip .c{background:rgba(0,0,0,.07);border-radius:999px;padding:0 7px;font-size:12px;font-variant-numeric:tabular-nums}
+.chip.on .c{background:rgba(255,255,255,.22)}
+
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);padding:11px 13px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:11px 13px;border-bottom:1px solid var(--line2);vertical-align:middle}
 tbody tr:last-child td{border-bottom:0}
-tbody tr.click{cursor:pointer}
-tbody tr.click:hover{background:#f7fafd}
-.num{text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap}
+tbody tr.click{cursor:pointer}tbody tr.click:hover{background:#f7fafd}
+.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .tw{overflow-x:auto}
-.mono{font-family:ui-monospace,"SF Mono",Consolas,monospace; font-size:13px}
+.mono{font-family:ui-monospace,"SF Mono",Consolas,monospace;font-size:13px}
+.sub2{font-size:12px;color:var(--ink3)}
 
-.kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(115px,1fr)); gap:11px; margin-bottom:16px}
-.kpi{background:#fff; border:1px solid var(--line); border-radius:var(--r); padding:13px 15px; box-shadow:var(--sh)}
-.kpi .n{font-size:26px; font-weight:800; line-height:1.15; font-variant-numeric:tabular-nums}
-.kpi .l{font-size:12px; color:var(--ink2); font-weight:600}
-.kpi.a .n{color:var(--blue)} .kpi.b .n{color:var(--gold)}
-.kpi.c .n{color:var(--ok)}   .kpi.d .n{color:var(--danger)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:13px;margin-bottom:18px}
+.kpi{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:15px 17px;box-shadow:var(--sh);display:flex;flex-direction:column;gap:3px}
+.kpi .t{display:flex;align-items:flex-start;gap:8px}
+.kpi .l{font-size:12.5px;color:var(--ink2);font-weight:600;flex:1}
+.kpi .e{font-size:15px}
+.kpi .n{font-size:29px;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums}
+.kpi .n small{font-size:13px;font-weight:600;color:var(--ink3);margin-left:3px}
+.kpi.na .n{color:var(--navy)}.kpi.nb .n{color:var(--warn)}
+.kpi.nc .n{color:var(--good)}.kpi.nd .n{color:var(--crit)}
+.kpi.ne .n{color:var(--blue)}
 
-.warnbox{background:var(--warn-l); border:1px solid #edd9a8; border-radius:8px; padding:11px 14px; font-size:14px}
-.okbox{background:var(--ok-l); border:1px solid #b9e0cd; border-radius:8px; padding:11px 14px; font-size:14px}
-.dangerbox{background:var(--danger-l); border:1px solid #f0c9c6; border-radius:8px; padding:11px 14px; font-size:14px}
+/* stepper */
+.steps{display:flex;gap:0;align-items:center;overflow-x:auto;padding:4px 0}
+.stp{display:flex;align-items:center;gap:9px;white-space:nowrap;padding:0 4px}
+.stp .b{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:800;color:#fff;flex:0 0 auto}
+.stp .n{font-size:13.5px;font-weight:600}
+.stp .q{font-weight:800;font-variant-numeric:tabular-nums}
+.stpline{height:2px;background:var(--line);flex:1;min-width:22px}
+
+.stepcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.stepcard{border:1px solid var(--line);border-radius:10px;padding:13px 15px;background:#fbfcfe}
+.stepcard .h{font-size:12.5px;font-weight:700;color:var(--ink2);margin-bottom:4px}
+.stepcard .n{font-size:26px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.15}
+.stepcard .d{font-size:11.5px;color:var(--ink3);line-height:1.45;margin-top:4px}
+
+/* legend */
+.lg{display:flex;flex-direction:column;gap:9px;min-width:190px}
+.lgi{display:flex;align-items:center;gap:9px;font-size:13.5px}
+.lgi .sw{width:11px;height:11px;border-radius:3px;flex:0 0 auto}
+.lgi .nm{flex:1}
+.lgi .v{font-weight:700;font-variant-numeric:tabular-nums}
+.lgi .p{color:var(--ink3);font-size:12.5px;font-variant-numeric:tabular-nums;min-width:42px;text-align:right}
+
+.chartwrap{display:flex;gap:22px;align-items:center;flex-wrap:wrap;justify-content:center}
+svg .gl{stroke:var(--line2);stroke-width:1}
+svg .ax{fill:var(--ink3);font-size:11px;font-family:"Sarabun",sans-serif}
+svg .vl{fill:var(--ink2);font-size:11px;font-weight:700;font-family:"Sarabun",sans-serif;font-variant-numeric:tabular-nums}
+svg .nm{fill:var(--ink);font-size:12.5px;font-family:"Sarabun",sans-serif}
+
+.box-ok{background:var(--good-l);border:1px solid #b6ddca;border-radius:9px;padding:11px 14px;font-size:14px}
+.box-warn{background:var(--warn-l);border:1px solid #ecd6a4;border-radius:9px;padding:11px 14px;font-size:14px}
+.box-crit{background:var(--crit-l);border:1px solid #f0cbc8;border-radius:9px;padding:11px 14px;font-size:14px}
 .muted{color:var(--ink3)}
-.empty{text-align:center; padding:38px 14px; color:var(--ink3)}
+.empty{text-align:center;padding:38px 14px;color:var(--ink3)}
 
-.toast{
-  position:fixed; left:50%; bottom:24px; transform:translateX(-50%);
-  background:var(--navy); color:#fff; padding:12px 20px; border-radius:10px;
-  box-shadow:0 6px 20px rgba(0,0,0,.25); z-index:200; max-width:90vw; font-weight:600;
+/* modal */
+.mask{position:fixed;inset:0;background:rgba(20,30,50,.55);z-index:100;display:none;overflow-y:auto;padding:22px 14px}
+.mask.on{display:block}
+.modal{background:var(--bg);max-width:1050px;margin:0 auto;border-radius:14px;overflow:hidden;box-shadow:0 18px 50px rgba(0,0,0,.3)}
+.mhead{background:#fff;padding:15px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:11px;flex-wrap:wrap;position:sticky;top:0;z-index:5}
+.mbody{padding:18px}
+
+.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--navy);color:#fff;padding:12px 22px;border-radius:11px;box-shadow:0 6px 22px rgba(0,0,0,.28);z-index:300;max-width:90vw;font-weight:600}
+.toast.err{background:var(--crit)}
+
+.setup{background:#fff;border:2px solid var(--gold);border-radius:var(--r);padding:22px;margin-bottom:18px}
+#qrbox{display:flex;justify-content:center;padding:6px}
+
+@media(max-width:820px){
+  aside{position:fixed;left:-246px;z-index:80;transition:left .2s}
+  aside.open{left:0;box-shadow:0 0 40px rgba(0,0,0,.4)}
+  .burger{display:inline-flex !important}
+  .content{padding:16px 13px 60px}
+  .phead{padding:12px 14px}
 }
-.toast.err{background:var(--danger)}
+.burger{display:none;background:none;border:1px solid var(--line);border-radius:8px;padding:6px 10px;cursor:pointer}
 
-.setup{
-  background:#fff; border:2px solid var(--gold); border-radius:var(--r);
-  padding:22px; margin-bottom:18px;
-}
-.setup h3{margin:0 0 10px; color:var(--navy)}
-.setup code{background:#f2f5fa; padding:2px 6px; border-radius:4px; font-size:13px}
-
-#qrbox{display:flex; justify-content:center; padding:6px}
-#qrbox img,#qrbox canvas{display:block}
-
-/* ---------- print ---------- */
 @media print{
-  .topbar,nav,.noprint{display:none !important}
-  body{background:#fff; font-size:12px}
-  main{padding:0; max-width:none}
-  .card{break-inside:avoid; box-shadow:none; border-color:#bbb; margin-bottom:10px}
-  .view{display:none !important}
-  .view.on{display:block !important}
+  aside,.phead,.noprint,nav{display:none !important}
+  body{background:#fff}.mask{position:static;background:none;padding:0}
+  .modal{box-shadow:none;max-width:none}.card{break-inside:avoid;box-shadow:none}
 }
 </style>
 </head>
 <body>
 
-<div class="topbar">
-  <div class="brand">MASARU <span>· รับซ่อม</span></div>
-  <div class="sp"></div>
-  <select class="who" id="whoSel" title="ผู้ใช้งานปัจจุบัน"></select>
+<div class="app">
+  <aside id="side">
+    <div class="logo">
+      <div class="ic">🔧</div>
+      <div><b>TOOL REPAIR</b><small>ระบบรับซ่อมเครื่องมือ · MASARU</small></div>
+    </div>
+    <div class="navlbl">เมนูหลัก</div>
+    <nav>
+      <button data-p="dash"   class="on"><span class="e">📊</span>แดชบอร์ด</button>
+      <button data-p="jobs"><span class="e">📋</span>ใบงานซ่อม</button>
+      <button data-p="intake"><span class="e">➕</span>รับเครื่อง / บันทึกงาน</button>
+      <button data-p="cust"><span class="e">👥</span>ลูกค้า</button>
+      <button data-p="parts"><span class="e">📦</span>คลังอะไหล่</button>
+      <button data-p="report"><span class="e">📈</span>รายงาน</button>
+    </nav>
+    <div class="sidefoot">
+      <div class="k">ผู้ใช้งานปัจจุบัน</div>
+      <select id="whoSel" style="margin-top:6px;background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2);color:#fff"></select>
+      <div class="st" id="connSt">● กำลังเชื่อมต่อ…</div>
+    </div>
+  </aside>
+
+  <div class="mainarea">
+    <div class="phead">
+      <button class="burger" onclick="document.getElementById('side').classList.toggle('open')">☰</button>
+      <div>
+        <h1 id="pgTitle">แดชบอร์ดหัวหน้าช่าง</h1>
+        <div class="sub" id="pgSub">ภาพรวมงานซ่อมทั้งหมด</div>
+      </div>
+      <div class="sp"></div>
+      <div class="search">
+        <span class="mg">🔍</span>
+        <input type="text" id="gSearch" placeholder="ค้นหาเลขที่งาน / ลูกค้า / Serial…">
+      </div>
+      <div class="avatar" id="avatar">—</div>
+    </div>
+
+    <div class="content">
+
+      <div id="setup" class="setup" style="display:none">
+        <h3 style="margin:0 0 8px;color:var(--navy)">⚙️ ยังไม่ได้ตั้งค่าการเชื่อมต่อ</h3>
+        <p style="margin:0">แก้ <code>SUPABASE_URL</code> และ <code>SUPABASE_KEY</code> ที่ต้น <code>&lt;script&gt;</code> ท้ายไฟล์</p>
+      </div>
+
+      <!-- ============ แดชบอร์ด ============ -->
+      <div class="page on" id="p-dash">
+        <div class="card"><div class="cb"><div class="steps" id="stepBar"></div></div></div>
+        <div class="kpis" id="dashKpi"></div>
+        <div class="card">
+          <h3>ติดตามสถานะ 6 ขั้นตอน</h3>
+          <div class="cb"><div class="stepcards" id="stepCards"></div></div>
+        </div>
+        <div class="split">
+          <div class="card">
+            <h3>งานซ่อมแยกตามขั้นตอน</h3>
+            <div class="cb"><div class="chartwrap" id="donutWrap"></div></div>
+          </div>
+          <div class="card">
+            <h3>ผลงานแยกตามช่าง</h3>
+            <div class="cb"><div id="techChart"></div></div>
+          </div>
+        </div>
+        <div class="split">
+          <div class="card">
+            <h3>งานที่เกินกำหนด <span class="sp"></span><span id="odCount" class="pill tag-crit"></span></h3>
+            <div class="cb"><div class="tw"><table id="tblOverdue">
+              <thead><tr><th>เลขที่งาน</th><th>ลูกค้า</th><th>เครื่องมือ</th><th>กำหนดเสร็จ</th><th class="num">เกินกำหนด</th></tr></thead>
+              <tbody></tbody></table></div>
+              <div id="odEmpty" class="empty" style="display:none">🎉 ไม่มีงานเกินกำหนด</div>
+            </div>
+          </div>
+          <div class="card">
+            <h3>อาการเสียที่พบบ่อย (90 วันล่าสุด)</h3>
+            <div class="cb"><div id="symChart"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ ใบงานซ่อม ============ -->
+      <div class="page" id="p-jobs">
+        <div class="kpis" id="jobKpi"></div>
+        <div class="card">
+          <h3>กรองรายการ <span class="sp"></span>
+            <select id="fTech" class="mini" style="width:auto"><option value="">ช่างทั้งหมด</option></select>
+            <button class="btn sm" onclick="reloadAll()">🔄 รีเฟรช</button>
+            <button class="btn sm g" onclick="goPage('intake')">+ รับเครื่องใหม่</button>
+          </h3>
+          <div class="cb">
+            <div class="chips" id="chipsA" style="margin-bottom:10px"></div>
+            <div class="chips" id="chipsB"></div>
+          </div>
+        </div>
+        <div class="card">
+          <h3>รายการใบงาน <span class="sp"></span><span class="muted" id="jobCount"></span></h3>
+          <div class="cb">
+            <div class="tw"><table id="tblJobs">
+              <thead><tr><th>เลขที่งาน</th><th>ลูกค้า</th><th>เครื่องมือ</th><th>อาการ</th><th>ช่าง</th><th>สถานะ</th><th>กำหนดเสร็จ</th><th class="num">รวม</th></tr></thead>
+              <tbody></tbody></table></div>
+            <div id="jobsEmpty" class="empty" style="display:none">ไม่มีใบงานที่ตรงเงื่อนไข</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ รับเครื่อง ============ -->
+      <div class="page" id="p-intake">
+        <div class="card"><div class="cb"><div class="steps" id="stepBar2"></div></div></div>
+        <div class="card" style="max-width:900px;margin:0 auto">
+          <h3>1 · รับเครื่อง — สร้างใบงานซ่อมใหม่</h3>
+          <div class="cb">
+            <div class="split" style="grid-template-columns:1fr 1fr">
+              <div>
+                <div style="font-weight:700;color:var(--navy);margin-bottom:11px">👤 ข้อมูลลูกค้า</div>
+                <div class="grid">
+                  <div>
+                    <label>เบอร์โทร</label>
+                    <div class="row"><input type="tel" id="nPhone" placeholder="08X-XXX-XXXX" style="flex:1;min-width:110px">
+                      <button class="btn sm" onclick="lookupCustomer()">ค้นลูกค้าเดิม</button></div>
+                  </div>
+                  <div><label>ชื่อลูกค้า <span class="req">*</span></label><input type="text" id="nCustName" placeholder="เช่น ABC Engineering"></div>
+                  <div><label>ประเภทลูกค้า</label>
+                    <select id="nCustType">
+                      <option value="end_user">ลูกค้าทั่วไป</option><option value="dealer">ดีลเลอร์ / ร้านค้า</option>
+                      <option value="shop">หน้าร้าน</option><option value="internal">ภายในบริษัท</option>
+                    </select></div>
+                  <div><label>ที่อยู่</label><textarea id="nAddress" placeholder="ที่อยู่สำหรับติดต่อ / จัดส่ง" style="min-height:60px"></textarea></div>
+                </div>
+                <div id="custHint" class="sub2" style="margin-top:8px"></div>
+              </div>
+              <div>
+                <div style="font-weight:700;color:var(--navy);margin-bottom:11px">🔧 รายละเอียดเครื่องมือ</div>
+                <div class="grid">
+                  <div><label>Serial No.</label>
+                    <div class="row"><input type="text" id="nSerial" placeholder="สแกน / พิมพ์ Serial" style="flex:1;min-width:110px">
+                      <button class="btn sm p" onclick="lookupWarranty()">เช็คประกัน</button></div>
+                  </div>
+                  <div><label>ประเภทเครื่อง</label><input type="text" id="nToolType" placeholder="เช่น Rotary Hammer"></div>
+                  <div class="grid g2" style="gap:11px">
+                    <div><label>แบรนด์</label><input type="text" id="nBrand" placeholder="Bosch / Makita…"></div>
+                    <div><label>รุ่น</label><input type="text" id="nModel" placeholder="เช่น GBH 2-26"></div>
+                  </div>
+                  <div class="grid g2" style="gap:11px">
+                    <div><label>ช่างผู้รับผิดชอบ</label><select id="nTech"><option value="">— ยังไม่มอบหมาย —</option></select></div>
+                    <div><label>กำหนดเสร็จ</label><input type="date" id="nDue"></div>
+                  </div>
+                </div>
+                <div id="warrBox" style="margin-top:11px"></div>
+              </div>
+            </div>
+
+            <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--line2)">
+              <div class="grid">
+                <div><label>อาการเสียที่ลูกค้าแจ้ง <span class="req">*</span></label>
+                  <textarea id="nSymptom" placeholder="อธิบายอาการเสีย…"></textarea></div>
+                <div class="grid g2" style="gap:13px">
+                  <div><label>หมวดอาการ (ใช้ทำสถิติ)</label><select id="nSymCat"><option value="">— ยังไม่ระบุ —</option></select></div>
+                  <div><label>ของที่นำมาด้วย</label><input type="text" id="nAcc" placeholder="เช่น กล่อง, ดอกสว่าน, สายชาร์จ"></div>
+                </div>
+              </div>
+              <input type="hidden" id="nCustId">
+              <div class="row" style="justify-content:flex-end;margin-top:16px">
+                <button class="btn" onclick="clearIntake()">ยกเลิก</button>
+                <button class="btn g" onclick="saveJob()">สร้างใบงาน &amp; QR Code</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ ลูกค้า ============ -->
+      <div class="page" id="p-cust">
+        <div class="kpis" id="custKpi"></div>
+        <div class="card">
+          <h3>รายชื่อลูกค้า <span class="sp"></span>
+            <input type="text" id="cSearch" placeholder="ค้นชื่อ / เบอร์โทร" style="width:auto;min-width:200px">
+          </h3>
+          <div class="cb"><div class="tw"><table id="tblCust">
+            <thead><tr><th>ชื่อลูกค้า</th><th>เบอร์โทร</th><th>ประเภท</th><th class="num">เคยซ่อม</th><th class="num">ยอดรวม</th><th>ซ่อมล่าสุด</th></tr></thead>
+            <tbody></tbody></table></div>
+            <div id="custEmpty" class="empty" style="display:none">ยังไม่มีลูกค้า</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ คลังอะไหล่ ============ -->
+      <div class="page" id="p-parts">
+        <div class="kpis" id="partKpi"></div>
+        <div class="card">
+          <h3>รับอะไหล่เข้าคลัง</h3>
+          <div class="cb"><div class="grid g4">
+            <div style="grid-column:span 2"><label>อะไหล่</label><select id="rcPart"><option value="">— เลือกอะไหล่ —</option></select></div>
+            <div><label>จำนวน</label><input type="number" id="rcQty" value="1" min="1"></div>
+            <div><label>หมายเหตุ</label><input type="text" id="rcNote" placeholder="นำเข้าจาก JST"></div>
+            <div style="display:flex;align-items:flex-end"><button class="btn p" style="width:100%" onclick="receiveParts()">📥 รับเข้า</button></div>
+          </div></div>
+        </div>
+        <div class="card">
+          <h3>สต็อกและการเบิกใช้ <span class="sp"></span>
+            <input type="text" id="pSearch" placeholder="ค้นหา Part No. / ชื่อ" style="width:auto;min-width:190px">
+          </h3>
+          <div class="cb"><div class="tw"><table id="tblParts">
+            <thead><tr><th>PART NO.</th><th>รายการ</th><th class="num">ราคา/หน่วย</th><th class="num">ใช้ไป 90 วัน</th><th class="num">จุดสั่งซื้อ</th><th class="num">คงเหลือ</th><th>สถานะ</th><th class="noprint"></th></tr></thead>
+            <tbody></tbody></table></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ รายงาน ============ -->
+      <div class="page" id="p-report">
+        <div class="kpis" id="repKpi"></div>
+        <div class="card">
+          <h3>รายได้แยกตามช่าง</h3>
+          <div class="cb"><div id="revChart"></div></div>
+        </div>
+        <div class="card">
+          <h3>อาการเสียแยกตามรุ่น (ซ้ำ 2 ครั้งขึ้นไป · 1 ปี)</h3>
+          <div class="cb"><div class="tw"><table id="tblModel">
+            <thead><tr><th>แบรนด์</th><th>รุ่น</th><th>อาการ</th><th class="num">จำนวนครั้ง</th></tr></thead><tbody></tbody></table></div>
+            <div id="mdEmpty" class="empty" style="display:none">ยังไม่มีรุ่นที่ซ่อมซ้ำ</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
 </div>
 
-<nav>
-  <button data-v="list" class="on">📋 ใบงาน</button>
-  <button data-v="new">➕ รับเครื่อง</button>
-  <button data-v="job" id="navJob" style="display:none">🔧 ใบงานที่เปิด</button>
-  <button data-v="parts">📦 อะไหล่</button>
-</nav>
-
-<main>
-
-  <!-- ===== ยังไม่ตั้งค่า ===== -->
-  <div id="setup" class="setup" style="display:none">
-    <h3>⚙️ ยังไม่ได้ตั้งค่าการเชื่อมต่อ</h3>
-    <p>เปิดไฟล์นี้ด้วย text editor แล้วแก้ 2 บรรทัดบนสุดของ <code>&lt;script&gt;</code> ท้ายไฟล์:</p>
-    <pre style="background:#f2f5fa;padding:12px;border-radius:8px;overflow-x:auto"><code>const SUPABASE_URL = 'https://xxxx.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOi...';</code></pre>
-    <p class="muted">หาได้ที่ Supabase → Project Settings → API → <b>Project URL</b> และ <b>anon public key</b></p>
-  </div>
-
-  <!-- ===== รายการใบงาน ===== -->
-  <div class="view on" id="v-list">
-    <div class="kpis" id="kpis"></div>
-
-    <div class="card">
-      <h3>
-        รายการใบงาน
-        <span class="sp"></span>
-        <button class="btn sm" onclick="loadJobs()">🔄 รีเฟรช</button>
-      </h3>
-      <div class="cb">
-        <div class="grid g3" style="margin-bottom:13px">
-          <div>
-            <label>ค้นหา</label>
-            <input type="text" id="fSearch" placeholder="เลขใบงาน / ลูกค้า / Serial / รุ่น">
-          </div>
-          <div>
-            <label>สถานะ</label>
-            <select id="fStatus"><option value="">— ทั้งหมด (ยังไม่ปิด) —</option></select>
-          </div>
-          <div>
-            <label>ช่าง</label>
-            <select id="fTech"><option value="">— ทุกคน —</option></select>
-          </div>
-        </div>
-        <div class="tw">
-          <table id="tblJobs">
-            <thead><tr>
-              <th>เลขใบงาน</th><th>ลูกค้า</th><th>เครื่อง</th><th>อาการ</th>
-              <th>ช่าง</th><th>กำหนดเสร็จ</th><th>สถานะ</th>
-            </tr></thead>
-            <tbody></tbody>
-          </table>
-        </div>
-        <div id="jobsEmpty" class="empty" style="display:none">ยังไม่มีใบงาน</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ===== รับเครื่อง ===== -->
-  <div class="view" id="v-new">
-    <h2 class="vt">➕ รับเครื่องเข้าซ่อม</h2>
-
-    <div class="card">
-      <h3>1 · ข้อมูลเครื่อง</h3>
-      <div class="cb">
-        <div class="grid g2">
-          <div>
-            <label>Serial No.</label>
-            <div class="row">
-              <input type="text" id="nSerial" placeholder="สแกนหรือพิมพ์ Serial" style="flex:1;min-width:120px">
-              <button class="btn p" onclick="lookupWarranty()">🔍 เช็คประกัน</button>
-            </div>
-          </div>
-          <div>
-            <label>ประเภทเครื่อง</label>
-            <input type="text" id="nToolType" placeholder="เช่น Rotary Hammer, สว่านไร้สาย">
-          </div>
-          <div><label>แบรนด์</label><input type="text" id="nBrand"></div>
-          <div><label>รุ่น</label><input type="text" id="nModel"></div>
-        </div>
-        <div id="warrBox" style="margin-top:13px"></div>
-      </div>
-    </div>
-
-    <div class="card">
-      <h3>2 · ข้อมูลลูกค้า</h3>
-      <div class="cb">
-        <div class="grid g2">
-          <div>
-            <label>เบอร์โทร</label>
-            <div class="row">
-              <input type="tel" id="nPhone" placeholder="08x-xxx-xxxx" style="flex:1;min-width:120px">
-              <button class="btn" onclick="lookupCustomer()">🔍 ค้นลูกค้าเดิม</button>
-            </div>
-          </div>
-          <div><label>ชื่อลูกค้า <span class="req">*</span></label><input type="text" id="nCustName"></div>
-          <div>
-            <label>ประเภท</label>
-            <select id="nCustType">
-              <option value="end_user">ลูกค้าทั่วไป</option>
-              <option value="dealer">ดีลเลอร์ / ร้านค้า</option>
-              <option value="shop">หน้าร้าน</option>
-              <option value="internal">ภายในบริษัท</option>
-            </select>
-          </div>
-          <div><label>ที่อยู่</label><input type="text" id="nAddress"></div>
-        </div>
-        <input type="hidden" id="nCustId">
-        <div id="custHint" class="muted" style="margin-top:8px;font-size:13px"></div>
-      </div>
-    </div>
-
-    <div class="card">
-      <h3>3 · อาการเสีย</h3>
-      <div class="cb">
-        <div class="grid g2">
-          <div style="grid-column:1/-1">
-            <label>อาการที่ลูกค้าแจ้ง <span class="req">*</span></label>
-            <textarea id="nSymptom" placeholder="เช่น เครื่องทำงานแต่ไม่เป็นจังหวะกระแทก"></textarea>
-          </div>
-          <div>
-            <label>หมวดอาการ (ใช้ทำสถิติ)</label>
-            <select id="nSymCat"><option value="">— ยังไม่ระบุ —</option></select>
-          </div>
-          <div><label>อุปกรณ์ที่นำมาด้วย</label><input type="text" id="nAcc" placeholder="กล่อง, ดอกสว่าน, แท่นชาร์จ"></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
-      <h3>4 · มอบหมาย</h3>
-      <div class="cb">
-        <div class="grid g3">
-          <div>
-            <label>ช่างผู้รับผิดชอบ</label>
-            <select id="nTech"><option value="">— ยังไม่มอบหมาย —</option></select>
-          </div>
-          <div><label>กำหนดเสร็จ</label><input type="date" id="nDue"></div>
-          <div style="display:flex;align-items:flex-end">
-            <button class="btn g" style="width:100%" onclick="saveJob()">💾 สร้างใบงาน</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ===== ใบงาน (รายละเอียด + ส่วนช่าง) ===== -->
-  <div class="view" id="v-job"><div id="jobWrap"></div></div>
-
-  <!-- ===== อะไหล่ ===== -->
-  <div class="view" id="v-parts">
-    <h2 class="vt">📦 คลังอะไหล่</h2>
-
-    <div class="card noprint">
-      <h3>รับอะไหล่เข้าคลัง</h3>
-      <div class="cb">
-        <div class="grid g4">
-          <div>
-            <label>อะไหล่</label>
-            <select id="rcPart"><option value="">— เลือก —</option></select>
-          </div>
-          <div><label>จำนวน</label><input type="number" id="rcQty" value="1" min="1"></div>
-          <div><label>หมายเหตุ</label><input type="text" id="rcNote" placeholder="นำเข้าจาก JST"></div>
-          <div style="display:flex;align-items:flex-end">
-            <button class="btn p" style="width:100%" onclick="receiveParts()">📥 รับเข้า</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
-      <h3>ยอดคงเหลือ <span class="sp"></span>
-        <button class="btn sm" onclick="loadParts()">🔄 รีเฟรช</button>
-      </h3>
-      <div class="cb">
-        <div class="tw">
-          <table id="tblParts">
-            <thead><tr>
-              <th>รหัส</th><th>ชื่ออะไหล่</th><th class="num">คงเหลือ</th>
-              <th class="num">จุดสั่งซื้อ</th><th class="num">ใช้ไป 90 วัน</th>
-              <th class="num">ราคาขาย</th><th>สถานะ</th>
-            </tr></thead>
-            <tbody></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </div>
-
-</main>
+<div class="mask" id="mask" onclick="if(event.target===this)closeJob()">
+  <div class="modal"><div id="jobWrap"></div></div>
+</div>
 
 <script>
 /* =====================================================================
-   ⚙️ ตั้งค่าตรงนี้ — เอาค่าจาก Supabase → Project Settings → API
+   ⚙️ ตั้งค่า
    ===================================================================== */
 const SUPABASE_URL = 'https://rmunaewdmlnsiwogmozq.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_m10p5I53UNKTZbUAEiUaCw_OCSR63mq';
 /* ===================================================================== */
 
+/* ---------- ขั้นตอน 6 ขั้น + สี ramp เดียวไล่อ่อน→เข้ม ---------- */
+const STEPS = [
+  { n:1, label:'รับเครื่อง',            hint:'บันทึกลูกค้า เครื่องมือ อาการเสีย',   st:['received'],                 c:'#c3d6ec', ink:'#2b4a7a' },
+  { n:2, label:'ตรวจเช็ค',              hint:'บันทึกอาการที่พบจากการตรวจเช็ค',       st:['inspecting'],               c:'#9cbbdf', ink:'#26456f' },
+  { n:3, label:'มอบหมายงาน',            hint:'เลือกช่างผู้รับผิดชอบและเวลาทำงาน',    st:['assigned','wait_approve'],  c:'#75a0d0', ink:'#1f3c63' },
+  { n:4, label:'ซ่อม / เปลี่ยนอะไหล่',   hint:'ซ่อม เปลี่ยนอะไหล่ หรือรออุปกรณ์',    st:['repairing','wait_parts'],   c:'#4f83bb', ink:'#fff'    },
+  { n:5, label:'ตรวจสอบ',               hint:'ทดสอบเครื่องก่อนส่งมอบ',              st:['testing'],                  c:'#35659c', ink:'#fff'    },
+  { n:6, label:'ส่งมอบลูกค้า',           hint:'นัดรับเครื่องและปิดงาน',              st:['ready','delivered'],        c:'#1F3864', ink:'#fff'    }
+];
 const STATUS = {
-  received:     'ได้รับเครื่อง',
-  inspecting:   'ตรวจเช็ค',
-  wait_approve: 'รออนุมัติ',
-  repairing:    'กำลังซ่อม',
-  wait_parts:   'รออะไหล่',
-  testing:      'ทดสอบ',
-  ready:        'พร้อมส่งมอบ',
-  delivered:    'ส่งมอบแล้ว',
-  cancelled:    'ยกเลิก'
+  received:'ได้รับเครื่อง', inspecting:'ตรวจเช็ค', assigned:'มอบหมายแล้ว', wait_approve:'รออนุมัติ',
+  repairing:'กำลังซ่อม', wait_parts:'รออะไหล่', testing:'ทดสอบ',
+  ready:'พร้อมส่งมอบ', delivered:'ส่งมอบแล้ว', cancelled:'ยกเลิก'
 };
+const STEP_OF = {};
+STEPS.forEach(s => s.st.forEach(k => STEP_OF[k] = s.n));
 const CLOSED = ['delivered','cancelled'];
+const stepOf = st => STEP_OF[st] || 0;
 
 let sb = null;
-const S = { jobs:[], techs:[], cats:[], parts:[], job:null, lines:[] };
+const S = { jobs:[], techs:[], cats:[], parts:[], custs:[], stock:[], job:null, lines:[], filter:'open' };
 
 /* ---------- helpers ---------- */
-const $  = id => document.getElementById(id);
-const esc = s => (s ?? '').toString()
-  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const $ = id => document.getElementById(id);
+const esc = s => (s ?? '').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const val = id => ($(id)?.value ?? '').trim();
-const money = n => (Number(n)||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
+const money = n => (Number(n)||0).toLocaleString('th-TH',{maximumFractionDigits:0});
+const money2 = n => (Number(n)||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
 const dth = d => d ? new Date(d).toLocaleDateString('th-TH',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
 const dtth = d => d ? new Date(d).toLocaleString('th-TH',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
 const who = () => { try { return localStorage.getItem('repair_who') || 'ไม่ระบุ'; } catch(e){ return 'ไม่ระบุ'; } };
 
-function toast(msg, isErr){
+function toast(m, err){
   document.querySelectorAll('.toast').forEach(t => t.remove());
   const d = document.createElement('div');
-  d.className = 'toast' + (isErr ? ' err' : '');
-  d.textContent = msg;
-  document.body.appendChild(d);
-  setTimeout(() => d.remove(), isErr ? 5200 : 2600);
+  d.className = 'toast' + (err ? ' err' : ''); d.textContent = m;
+  document.body.appendChild(d); setTimeout(() => d.remove(), err ? 5200 : 2600);
 }
-function fail(e){ console.error(e); toast('❌ ' + (e?.message || e), true); }
+const fail = e => { console.error(e); toast('❌ ' + (e?.message || e), true); };
 
-/* อ่านทะลุเพดาน 1000 แถวของ Supabase */
 window.__pageAll = async function(build, size = 1000){
   let from = 0, out = [];
   for(;;){
@@ -419,31 +489,127 @@ window.__pageAll = async function(build, size = 1000){
   }
 };
 
-/* ---------- nav ---------- */
-document.querySelectorAll('nav button').forEach(b => {
-  b.onclick = () => go(b.dataset.v);
-});
-function go(v){
-  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
-  document.querySelectorAll('.view').forEach(el => el.classList.toggle('on', el.id === 'v-' + v));
-  window.scrollTo(0,0);
-  if (v === 'parts') loadParts();
-  if (v === 'list')  loadJobs();
+/* =====================================================================
+   กราฟ — วาดเป็น SVG เอง ไม่ต้องโหลดไลบรารี
+   ===================================================================== */
+function donutSVG(items, size = 190, thick = 32){
+  const live = items.filter(i => i.value > 0);
+  const total = live.reduce((s,i) => s + i.value, 0);
+  const cx = size/2, cy = size/2, r = size/2 - thick/2;
+  if (!total) return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" role="img" aria-label="ยังไม่มีข้อมูล">
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#eaeff7" stroke-width="${thick}"/></svg>`;
+
+  const gap = live.length > 1 ? 0.028 : 0;   // เว้นช่องระหว่างชิ้น
+  let a = -Math.PI/2, paths = '';
+  live.forEach(i => {
+    const sweep = (i.value/total) * Math.PI*2;
+    const a1 = a + gap/2, a2 = a + sweep - gap/2;
+    if (a2 > a1){
+      const large = (a2-a1) > Math.PI ? 1 : 0;
+      paths += `<path d="M ${(cx+r*Math.cos(a1)).toFixed(2)} ${(cy+r*Math.sin(a1)).toFixed(2)} `
+             + `A ${r} ${r} 0 ${large} 1 ${(cx+r*Math.cos(a2)).toFixed(2)} ${(cy+r*Math.sin(a2)).toFixed(2)}" `
+             + `fill="none" stroke="${i.color}" stroke-width="${thick}"><title>${esc(i.label)}: ${i.value}</title></path>`;
+    }
+    a += sweep;
+  });
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" role="img"
+      aria-label="สัดส่วนงานซ่อมแยกตามขั้นตอน รวม ${total} งาน">
+    ${paths}
+    <text x="${cx}" y="${cy-4}" text-anchor="middle" style="font:800 27px Sarabun;fill:var(--navy)">${total}</text>
+    <text x="${cx}" y="${cy+16}" text-anchor="middle" style="font:600 12px Sarabun;fill:var(--ink3)">งานค้าง</text>
+  </svg>`;
 }
 
-/* ---------- boot ---------- */
+function groupedBarSVG(cats, series, w = 560, h = 230){
+  const pad = { l:36, r:12, t:26, b:34 };
+  const iw = w - pad.l - pad.r, ih = h - pad.t - pad.b;
+  const max = Math.max(1, ...series.flatMap(s => s.data));
+  const ticks = 4, step = Math.ceil(max/ticks) || 1, top = step*ticks;
+  const gw = iw / (cats.length || 1);
+  const bw = Math.max(7, Math.min(20, (gw - 14) / series.length - 2));
+
+  let g = '', bars = '', lbl = '';
+  for (let t = 0; t <= ticks; t++){
+    const y = pad.t + ih - (t*step/top)*ih;
+    g += `<line class="gl" x1="${pad.l}" y1="${y.toFixed(1)}" x2="${w-pad.r}" y2="${y.toFixed(1)}"/>`
+       + `<text class="ax" x="${pad.l-6}" y="${(y+4).toFixed(1)}" text-anchor="end">${t*step}</text>`;
+  }
+  cats.forEach((c,ci) => {
+    const gx = pad.l + ci*gw;
+    const grpW = series.length*(bw+2) - 2;
+    series.forEach((s,si) => {
+      const v = s.data[ci] || 0;
+      const bh = (v/top)*ih;
+      const x = gx + (gw-grpW)/2 + si*(bw+2);
+      const y = pad.t + ih - bh;
+      if (bh > 0){
+        const rr = Math.min(4, bh);
+        bars += `<path d="M ${x} ${pad.t+ih} V ${y+rr} q 0 -${rr} ${rr} -${rr} h ${bw-2*rr} q ${rr} 0 ${rr} ${rr} V ${pad.t+ih} Z"
+                  fill="${s.color}"><title>${esc(c)} · ${esc(s.name)}: ${v}</title></path>`;
+        if (v > 0) bars += `<text class="vl" x="${(x+bw/2).toFixed(1)}" y="${(y-4).toFixed(1)}" text-anchor="middle">${v}</text>`;
+      }
+    });
+    lbl += `<text class="nm" x="${(gx+gw/2).toFixed(1)}" y="${h-12}" text-anchor="middle">${esc(c)}</text>`;
+  });
+  const legend = series.map(s =>
+    `<span class="lgi" style="display:inline-flex;width:auto;margin-right:16px">
+       <span class="sw" style="background:${s.color}"></span><span>${esc(s.name)}</span></span>`).join('');
+  return `<div style="margin-bottom:8px">${legend}</div>
+    <div class="tw"><svg viewBox="0 0 ${w} ${h}" style="width:100%;min-width:420px;height:auto" role="img"
+      aria-label="กราฟแท่งเปรียบเทียบงานค้าง เสร็จแล้ว และเกินกำหนด ของช่างแต่ละคน">
+      ${g}${bars}${lbl}</svg></div>`;
+}
+
+function hBarsSVG(items, w = 520){
+  if (!items.length) return '<div class="empty">ยังไม่มีข้อมูล</div>';
+  const rowH = 34, lw = 130, h = items.length*rowH + 8;
+  const max = Math.max(1, ...items.map(i => i.value));
+  const bw = w - lw - 52;
+  const rows = items.map((it,i) => {
+    const y = i*rowH + 6, len = Math.max(2, (it.value/max)*bw);
+    return `<text class="nm" x="0" y="${y+17}">${esc(it.label)}</text>
+      <rect x="${lw}" y="${y+5}" width="${bw}" height="15" rx="4" fill="#eef2f8"/>
+      <rect x="${lw}" y="${y+5}" width="${len.toFixed(1)}" height="15" rx="4" fill="${it.color || 'var(--blue)'}">
+        <title>${esc(it.label)}: ${it.value}</title></rect>
+      <text class="vl" x="${w-4}" y="${y+17}" text-anchor="end">${it.sub ?? it.value}</text>`;
+  }).join('');
+  return `<div class="tw"><svg viewBox="0 0 ${w} ${h}" style="width:100%;min-width:380px;height:auto" role="img"
+    aria-label="กราฟแท่งแนวนอน">${rows}</svg></div>`;
+}
+
+/* =====================================================================
+   nav
+   ===================================================================== */
+const PGT = {
+  dash:   ['แดชบอร์ดหัวหน้าช่าง','ภาพรวมงานซ่อมทั้งหมด'],
+  jobs:   ['ใบงานซ่อม','รายการงานทั้งหมดในระบบ'],
+  intake: ['รับเครื่อง / บันทึกงาน','ขั้นตอนที่ 1/6 — สร้างใบงานซ่อมและ QR Code'],
+  cust:   ['ลูกค้า','ประวัติลูกค้าและการซ่อม'],
+  parts:  ['คลังอะไหล่','สต็อกและการเบิกใช้'],
+  report: ['รายงาน','วิเคราะห์ข้อมูลเชิงลึก']
+};
+document.querySelectorAll('aside nav button').forEach(b => b.onclick = () => goPage(b.dataset.p));
+function goPage(p){
+  document.querySelectorAll('aside nav button').forEach(b => b.classList.toggle('on', b.dataset.p === p));
+  document.querySelectorAll('.page').forEach(el => el.classList.toggle('on', el.id === 'p-' + p));
+  $('pgTitle').textContent = PGT[p][0]; $('pgSub').textContent = PGT[p][1];
+  $('side').classList.remove('open');
+  window.scrollTo(0,0);
+  if (p === 'cust')   renderCust();
+  if (p === 'parts')  loadParts();
+  if (p === 'report') loadReport();
+}
+
+/* =====================================================================
+   boot
+   ===================================================================== */
 (async function boot(){
   if (!SUPABASE_URL || !SUPABASE_KEY){
     $('setup').style.display = 'block';
-    document.querySelectorAll('.view').forEach(v => v.classList.remove('on'));
+    document.querySelectorAll('.page').forEach(v => v.classList.remove('on'));
     return;
   }
   sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-  // ตัวเลือกสถานะในฟิลเตอร์
-  Object.entries(STATUS).forEach(([k,v]) => {
-    $('fStatus').insertAdjacentHTML('beforeend', `<option value="${k}">${v}</option>`);
-  });
 
   try {
     const [techs, cats, parts] = await Promise.all([
@@ -452,95 +618,237 @@ function go(v){
       sb.from('parts_master').select('id,part_no,name,sell_price').eq('is_active', true).order('part_no')
     ]);
     if (techs.error) throw techs.error;
-    S.techs = techs.data || [];
-    S.cats  = cats.data  || [];
-    S.parts = parts.data || [];
-  } catch(e){ return fail(e); }
+    S.techs = techs.data || []; S.cats = cats.data || []; S.parts = parts.data || [];
+  } catch(e){ $('connSt').textContent = '● เชื่อมต่อไม่สำเร็จ'; $('connSt').style.color = '#f0928c'; return fail(e); }
 
-  // ผู้ใช้งาน
-  const wsel = $('whoSel');
-  wsel.innerHTML = '<option value="">— เลือกผู้ใช้งาน —</option>' +
-    S.techs.map(t => `<option value="${esc(t.nickname || t.full_name)}">${esc(t.nickname || t.full_name)}</option>`).join('') +
-    '<option value="พนักงานรับเครื่อง">พนักงานรับเครื่อง</option><option value="หัวหน้าช่าง">หัวหน้าช่าง</option>';
-  try { wsel.value = localStorage.getItem('repair_who') || ''; } catch(e){}
-  wsel.onchange = () => { try { localStorage.setItem('repair_who', wsel.value); } catch(e){} };
+  const w = $('whoSel');
+  w.innerHTML = '<option value="">— เลือกผู้ใช้งาน —</option>'
+    + S.techs.map(t => `<option>${esc(t.nickname || t.full_name)}</option>`).join('')
+    + '<option>พนักงานรับเครื่อง</option><option>หัวหน้าช่าง</option>';
+  try { w.value = localStorage.getItem('repair_who') || ''; } catch(e){}
+  setAvatar();
+  w.onchange = () => { try { localStorage.setItem('repair_who', w.value); } catch(e){} setAvatar(); };
 
-  // dropdown ต่าง ๆ
-  const techOpts = S.techs.map(t => `<option value="${t.id}">${esc(t.nickname || t.full_name)}</option>`).join('');
-  $('nTech').insertAdjacentHTML('beforeend', techOpts);
-  $('fTech').insertAdjacentHTML('beforeend', techOpts);
-  $('nSymCat').insertAdjacentHTML('beforeend',
-    S.cats.map(c => `<option value="${c.code}">${esc(c.name_th)}</option>`).join(''));
-  $('rcPart').insertAdjacentHTML('beforeend',
-    S.parts.map(p => `<option value="${esc(p.part_no)}">${esc(p.part_no)} · ${esc(p.name)}</option>`).join(''));
+  const to = S.techs.map(t => `<option value="${t.id}">${esc(t.nickname || t.full_name)}</option>`).join('');
+  $('nTech').insertAdjacentHTML('beforeend', to);
+  $('fTech').insertAdjacentHTML('beforeend', to);
+  $('nSymCat').insertAdjacentHTML('beforeend', S.cats.map(c => `<option value="${c.code}">${esc(c.name_th)}</option>`).join(''));
+  $('rcPart').insertAdjacentHTML('beforeend', S.parts.map(p => `<option value="${esc(p.part_no)}">${esc(p.part_no)} · ${esc(p.name)}</option>`).join(''));
 
-  ['fSearch','fStatus','fTech'].forEach(id => {
-    $(id).addEventListener(id === 'fSearch' ? 'input' : 'change', renderJobs);
-  });
+  $('gSearch').addEventListener('input', () => { if (!$('p-jobs').classList.contains('on')) goPage('jobs'); renderJobs(); });
+  $('fTech').addEventListener('change', renderJobs);
+  $('cSearch').addEventListener('input', renderCust);
+  $('pSearch').addEventListener('input', renderParts);
 
-  await loadJobs();
+  await reloadAll();
 })();
 
-/* =====================================================================
-   รายการใบงาน
-   ===================================================================== */
-async function loadJobs(){
+function setAvatar(){
+  const n = who();
+  $('avatar').textContent = n && n !== 'ไม่ระบุ' ? n.slice(0,2) : '—';
+}
+
+async function reloadAll(){
   try {
-    const [jobs, sum] = await Promise.all([
+    const [jobs, custs] = await Promise.all([
       window.__pageAll(() => sb.from('v_jobs').select('*').order('received_at', { ascending:false })),
-      sb.from('v_dashboard_summary').select('*').single()
+      window.__pageAll(() => sb.from('repair_customers').select('*').order('name'))
     ]);
-    S.jobs = jobs;
-    renderKpis(sum.data || {});
-    renderJobs();
+    S.jobs = jobs; S.custs = custs;
+    $('connSt').textContent = `● เชื่อมต่อแล้ว · ${jobs.length} ใบงาน`;
+    renderDash(); renderChips(); renderJobs(); renderCust();
   } catch(e){ fail(e); }
 }
 
-function renderKpis(k){
+/* =====================================================================
+   แดชบอร์ด
+   ===================================================================== */
+function stepCounts(){
+  const c = {1:0,2:0,3:0,4:0,5:0,6:0};
+  S.jobs.forEach(j => { const s = stepOf(j.status); if (s) c[s]++; });
+  return c;
+}
+function openJobs(){ return S.jobs.filter(j => !CLOSED.includes(j.status)); }
+
+function renderStepBar(el){
+  const c = stepCounts();
+  el.innerHTML = STEPS.map((s,i) =>
+    `${i ? '<div class="stpline"></div>' : ''}
+     <div class="stp"><span class="b" style="background:${s.c};color:${s.ink}">${s.n}</span>
+     <span class="n">${esc(s.label)}</span><span class="q">${c[s.n]}</span></div>`).join('');
+}
+
+function renderDash(){
+  renderStepBar($('stepBar')); renderStepBar($('stepBar2'));
+
+  const open = openJobs();
+  const today = new Date().toISOString().slice(0,10);
+  const doneToday = S.jobs.filter(j => (j.finished_at||'').slice(0,10) === today).length;
+  const overdue = open.filter(j => j.days_overdue > 0);
+  const waitParts = S.jobs.filter(j => j.status === 'wait_parts').length;
+  const dl = S.jobs.filter(j => j.delivered_at && j.received_at);
+  const avg = dl.length
+    ? (dl.reduce((s,j) => s + (new Date(j.delivered_at) - new Date(j.received_at))/864e5, 0) / dl.length).toFixed(1)
+    : '—';
+
   const cards = [
-    ['a', k.jobs_open      ?? 0, 'งานทั้งหมด'],
-    ['b', k.jobs_repairing ?? 0, 'กำลังซ่อม'],
-    ['c', k.finished_today ?? 0, 'เสร็จวันนี้'],
-    ['d', k.jobs_overdue   ?? 0, 'เกินกำหนด'],
-    ['b', k.jobs_wait_parts?? 0, 'รออะไหล่'],
-    ['a', k.avg_days_30d   ?? '—', 'เฉลี่ย (วัน)']
+    ['na','📋','งานทั้งหมด', S.jobs.length, 'ใบ'],
+    ['nb','⏳','งานค้าง',    open.length,   'ใบ'],
+    ['nc','✅','เสร็จวันนี้',  doneToday,     'ใบ'],
+    ['nd','🚨','เกินกำหนด',  overdue.length,'ใบ'],
+    ['ne','📦','รออะไหล่',   waitParts,     'ใบ'],
+    ['na','⏱️','เฉลี่ยเวลาซ่อม', avg,       'วัน']
   ];
-  $('kpis').innerHTML = cards.map(([c,n,l]) =>
-    `<div class="kpi ${c}"><div class="n">${n}</div><div class="l">${l}</div></div>`).join('');
+  $('dashKpi').innerHTML = cards.map(([c,e,l,n,u]) =>
+    `<div class="kpi ${c}"><div class="t"><span class="l">${l}</span><span class="e">${e}</span></div>
+     <div class="n">${n}<small>${u}</small></div></div>`).join('');
+  $('jobKpi').innerHTML = cards.slice(0,5).map(([c,e,l,n,u]) =>
+    `<div class="kpi ${c}"><div class="t"><span class="l">${l}</span><span class="e">${e}</span></div>
+     <div class="n">${n}<small>${u}</small></div></div>`).join('');
+
+  // การ์ด 6 ขั้นตอน
+  const sc = stepCounts();
+  $('stepCards').innerHTML = STEPS.map(s =>
+    `<div class="stepcard" style="border-left:4px solid ${s.c}">
+       <div class="h">${s.n}. ${esc(s.label)}</div>
+       <div class="n" style="color:${s.n>=4?s.c:'var(--navy)'}">${sc[s.n]}</div>
+       <div class="d">${esc(s.hint)}</div></div>`).join('');
+
+  // โดนัท (เฉพาะงานที่ยังไม่ปิด)
+  const oc = {1:0,2:0,3:0,4:0,5:0,6:0};
+  open.forEach(j => { const s = stepOf(j.status); if (s) oc[s]++; });
+  const items = STEPS.map(s => ({ label:s.n + '. ' + s.label, value:oc[s.n], color:s.c }));
+  const tot = items.reduce((a,b) => a + b.value, 0) || 1;
+  $('donutWrap').innerHTML = donutSVG(items) +
+    `<div class="lg">${items.map(i =>
+      `<div class="lgi"><span class="sw" style="background:${i.color}"></span>
+       <span class="nm">${esc(i.label)}</span><span class="v">${i.value}</span>
+       <span class="p">${Math.round(i.value/tot*100)}%</span></div>`).join('')}</div>`;
+
+  // ผลงานแยกตามช่าง
+  const names = [], d1 = [], d2 = [], d3 = [];
+  S.techs.forEach(t => {
+    const mine = S.jobs.filter(j => j.technician_id === t.id);
+    names.push(t.nickname || t.full_name);
+    d1.push(mine.filter(j => !CLOSED.includes(j.status)).length);
+    d2.push(mine.filter(j => CLOSED.includes(j.status)).length);
+    d3.push(mine.filter(j => j.days_overdue > 0).length);
+  });
+  $('techChart').innerHTML = names.length ? groupedBarSVG(names, [
+    { name:'งานค้าง',   data:d1, color:'#C98A12' },
+    { name:'เสร็จแล้ว', data:d2, color:'#12875C' },
+    { name:'เกินกำหนด', data:d3, color:'#BE3A32' }
+  ]) : '<div class="empty">ยังไม่มีช่างในระบบ</div>';
+
+  // เกินกำหนด
+  const od = overdue.slice().sort((a,b) => b.days_overdue - a.days_overdue);
+  $('odCount').textContent = od.length + ' ใบ';
+  $('odEmpty').style.display = od.length ? 'none' : 'block';
+  $('tblOverdue').querySelector('tbody').innerHTML = od.slice(0,12).map(j =>
+    `<tr class="click" onclick="openJob('${j.id}')">
+      <td class="mono"><b>${esc(j.job_no)}</b></td><td>${esc(j.customer_name || '—')}</td>
+      <td>${esc([j.brand,j.model].filter(Boolean).join(' ') || '—')}</td>
+      <td>${dth(j.due_date)}</td>
+      <td class="num"><span class="pill tag-crit">${j.days_overdue} วัน</span></td></tr>`).join('');
+
+  // อาการเสียบ่อย 90 วัน
+  const since = Date.now() - 90*864e5, cnt = {};
+  S.jobs.filter(j => new Date(j.received_at).getTime() >= since)
+        .forEach(j => { const k = j.symptom_name || 'ยังไม่ระบุ'; cnt[k] = (cnt[k]||0) + 1; });
+  const tot2 = Object.values(cnt).reduce((a,b) => a+b, 0) || 1;
+  const top = Object.entries(cnt).sort((a,b) => b[1]-a[1]).slice(0,5)
+    .map(([k,v]) => ({ label:k, value:v, sub:Math.round(v/tot2*100) + '%', color:'#2E75B6' }));
+  $('symChart').innerHTML = hBarsSVG(top);
+}
+
+/* =====================================================================
+   ใบงาน + ชิปกรอง
+   ===================================================================== */
+function filterCounts(){
+  const open = openJobs();
+  const c = {
+    all:        S.jobs.length,
+    open:       open.length,
+    overdue:    open.filter(j => j.days_overdue > 0).length,
+    wait_parts: S.jobs.filter(j => j.status === 'wait_parts').length,
+    unassigned: open.filter(j => !j.technician_id).length,
+    ready:      S.jobs.filter(j => j.status === 'ready').length
+  };
+  const sc = stepCounts();
+  STEPS.forEach(s => c['step' + s.n] = sc[s.n]);
+  return c;
+}
+function renderChips(){
+  const c = filterCounts();
+  const A = [['all','ทั้งหมด'],['open','งานค้าง'],['overdue','เกินกำหนด'],
+             ['wait_parts','รออะไหล่'],['unassigned','ยังไม่มอบหมาย'],['ready','พร้อมส่งมอบ']];
+  $('chipsA').innerHTML = A.map(([k,l]) =>
+    `<button class="chip ${S.filter===k?'on':''}" onclick="setFilter('${k}')">${l}<span class="c">${c[k]}</span></button>`).join('');
+  $('chipsB').innerHTML = STEPS.map(s =>
+    `<button class="chip ${S.filter==='step'+s.n?'on':''}" onclick="setFilter('step${s.n}')">
+       <span class="pill" style="background:${s.c};color:${s.ink};padding:1px 7px">${s.n}</span>${esc(s.label)}
+       <span class="c">${c['step'+s.n]}</span></button>`).join('');
+}
+function setFilter(k){ S.filter = k; renderChips(); renderJobs(); }
+
+function matchFilter(j){
+  const f = S.filter;
+  if (f === 'all')        return true;
+  if (f === 'open')       return !CLOSED.includes(j.status);
+  if (f === 'overdue')    return !CLOSED.includes(j.status) && j.days_overdue > 0;
+  if (f === 'wait_parts') return j.status === 'wait_parts';
+  if (f === 'unassigned') return !CLOSED.includes(j.status) && !j.technician_id;
+  if (f === 'ready')      return j.status === 'ready';
+  if (f.startsWith('step')) return stepOf(j.status) === Number(f.slice(4));
+  return true;
 }
 
 function renderJobs(){
-  const q  = val('fSearch').toLowerCase();
-  const st = val('fStatus');
-  const tc = val('fTech');
-
+  const q = val('gSearch').toLowerCase(), tc = val('fTech');
   const rows = S.jobs.filter(j => {
-    if (st) { if (j.status !== st) return false; }
-    else if (CLOSED.includes(j.status)) return false;
+    if (!matchFilter(j)) return false;
     if (tc && j.technician_id !== tc) return false;
-    if (q){
-      const hay = [j.job_no, j.customer_name, j.serial_no, j.model, j.brand, j.tool_type]
-        .join(' ').toLowerCase();
-      if (!hay.includes(q)) return false;
-    }
+    if (q && ![j.job_no,j.customer_name,j.serial_no,j.model,j.brand,j.tool_type,j.symptom]
+      .join(' ').toLowerCase().includes(q)) return false;
     return true;
   });
-
+  $('jobCount').textContent = rows.length + ' รายการ';
   $('jobsEmpty').style.display = rows.length ? 'none' : 'block';
   $('tblJobs').querySelector('tbody').innerHTML = rows.map(j => {
+    const s = stepOf(j.status), sd = STEPS[s-1];
     const late = j.days_overdue > 0;
-    return `<tr class="click" onclick="openJob('${j.id}')">
-      <td class="mono"><b>${esc(j.job_no)}</b></td>
-      <td>${esc(j.customer_name || '—')}</td>
-      <td>${esc([j.brand, j.model].filter(Boolean).join(' ') || j.tool_type || '—')}</td>
-      <td>${esc((j.symptom || '').slice(0,42))}${(j.symptom||'').length > 42 ? '…' : ''}</td>
-      <td>${esc(j.tech_name || '—')}</td>
-      <td class="num" ${late ? 'style="color:var(--danger);font-weight:700"' : ''}>
-        ${dth(j.due_date)}${late ? ` (เกิน ${j.days_overdue} วัน)` : ''}
-      </td>
-      <td><span class="pill p-${j.status}">${STATUS[j.status] || j.status}</span></td>
+    return `<tr>
+      <td class="click mono" onclick="openJob('${j.id}')"><b>${esc(j.job_no)}</b>
+        <div class="sub2">${dth(j.received_at)}</div></td>
+      <td class="click" onclick="openJob('${j.id}')">${esc(j.customer_name || '—')}
+        <div class="sub2">${esc(j.customer_phone || '')}</div></td>
+      <td class="click" onclick="openJob('${j.id}')">${esc([j.brand,j.model].filter(Boolean).join(' ') || j.tool_type || '—')}
+        <div class="sub2">${esc(j.serial_no || '')}</div></td>
+      <td class="click" onclick="openJob('${j.id}')">${esc((j.symptom||'').slice(0,34))}${(j.symptom||'').length>34?'…':''}</td>
+      <td><select class="mini" onchange="assignTech('${j.id}', this.value)">
+        <option value="">— ไม่ระบุ —</option>
+        ${S.techs.map(t => `<option value="${t.id}" ${t.id===j.technician_id?'selected':''}>${esc(t.nickname||t.full_name)}</option>`).join('')}
+      </select></td>
+      <td class="click" onclick="openJob('${j.id}')">
+        <span class="pill st${s||0}"><span class="d"></span>${STATUS[j.status]||j.status}</span>
+        ${sd ? `<div class="sub2">ขั้น ${s}/6 · ${esc(sd.label)}</div>` : ''}</td>
+      <td class="click" onclick="openJob('${j.id}')" ${late?'style="color:var(--crit);font-weight:700"':''}>
+        ${dth(j.due_date)}${late ? `<div><span class="pill tag-crit">เกิน ${j.days_overdue} วัน</span></div>` : ''}</td>
+      <td class="num click" onclick="openJob('${j.id}')"><b>฿${money(j.total_cost)}</b></td>
     </tr>`;
   }).join('');
+}
+
+async function assignTech(id, tid){
+  try {
+    const patch = { technician_id: tid || null, created_by: who() };
+    const j = S.jobs.find(x => x.id === id);
+    if (tid && j && j.status === 'received') patch.status = 'assigned';
+    const { error } = await sb.from('repair_jobs').update(patch).eq('id', id);
+    if (error) throw error;
+    toast('✅ มอบหมายงานแล้ว');
+    await reloadAll();
+  } catch(e){ fail(e); }
 }
 
 /* =====================================================================
@@ -552,368 +860,314 @@ async function lookupWarranty(){
   try {
     const { data, error } = await sb.rpc('check_warranty', { p_serial: sn });
     if (error) throw error;
-    const w = Array.isArray(data) ? data[0] : data;
-    const box = $('warrBox');
-
-    if (!w || !w.found){
-      box.innerHTML = `<div class="warnbox">⚠️ <b>ไม่พบ Serial นี้ในระบบประกัน</b> — กรอกข้อมูลเครื่องเอง และถือเป็นนอกประกันจนกว่าจะมีหลักฐาน</div>`;
-      box.dataset.status = 'unknown'; box.dataset.expire = ''; box.dataset.purchase = '';
-      return;
+    const wr = Array.isArray(data) ? data[0] : data, box = $('warrBox');
+    if (!wr || !wr.found){
+      box.innerHTML = '<div class="box-warn">⚠️ <b>ไม่พบ Serial นี้ในระบบประกัน</b> — กรอกข้อมูลเครื่องเอง</div>';
+      box.dataset.status = 'unknown'; box.dataset.expire = ''; box.dataset.purchase = ''; return;
     }
-    if (w.brand)  $('nBrand').value = w.brand;
-    if (w.model)  $('nModel').value = w.model;
-    if (w.product_name && !val('nToolType')) $('nToolType').value = w.product_name;
-    if (w.buyer_name  && !val('nCustName'))  $('nCustName').value = w.buyer_name;
-    if (w.buyer_phone && !val('nPhone'))     $('nPhone').value    = w.buyer_phone;
-
-    box.dataset.status   = w.warranty_status;
-    box.dataset.expire   = w.expire_date   || '';
-    box.dataset.purchase = w.purchase_date || '';
-
-    box.innerHTML = w.warranty_status === 'in_warranty'
-      ? `<div class="okbox">✅ <b>อยู่ในประกัน</b> · ซื้อ ${dth(w.purchase_date)} · หมดประกัน ${dth(w.expire_date)}
-         <b>(เหลือ ${w.days_left} วัน)</b>${w.channel ? ' · ช่องทาง ' + esc(w.channel) : ''}</div>`
-      : `<div class="dangerbox">🔴 <b>หมดประกันแล้ว</b> · ซื้อ ${dth(w.purchase_date)} · หมดประกัน ${dth(w.expire_date)} — ต้องแจ้งค่าซ่อมลูกค้า</div>`;
+    if (wr.brand) $('nBrand').value = wr.brand;
+    if (wr.model) $('nModel').value = wr.model;
+    if (wr.product_name && !val('nToolType')) $('nToolType').value = wr.product_name;
+    if (wr.buyer_name && !val('nCustName'))   $('nCustName').value = wr.buyer_name;
+    if (wr.buyer_phone && !val('nPhone'))     $('nPhone').value = wr.buyer_phone;
+    box.dataset.status = wr.warranty_status;
+    box.dataset.expire = wr.expire_date || ''; box.dataset.purchase = wr.purchase_date || '';
+    box.innerHTML = wr.warranty_status === 'in_warranty'
+      ? `<div class="box-ok">✅ <b>อยู่ในประกัน</b> · ซื้อ ${dth(wr.purchase_date)} · หมด ${dth(wr.expire_date)} <b>(เหลือ ${wr.days_left} วัน)</b></div>`
+      : `<div class="box-crit">🔴 <b>หมดประกันแล้ว</b> · หมด ${dth(wr.expire_date)} — ต้องแจ้งค่าซ่อมลูกค้า</div>`;
   } catch(e){ fail(e); }
 }
 
 async function lookupCustomer(){
   const ph = val('nPhone');
   if (!ph) return toast('ใส่เบอร์โทรก่อน', true);
-  try {
-    const { data, error } = await sb.from('repair_customers').select('*').eq('phone', ph).limit(1);
-    if (error) throw error;
-    if (!data.length){
-      $('nCustId').value = '';
-      $('custHint').innerHTML = 'ไม่พบลูกค้าเดิม — ระบบจะสร้างรายการใหม่ให้ตอนบันทึก';
-      return;
-    }
-    const c = data[0];
-    $('nCustId').value   = c.id;
-    $('nCustName').value = c.name || '';
-    $('nAddress').value  = c.address || '';
-    $('nCustType').value = c.customer_type || 'end_user';
+  const c = S.custs.find(x => (x.phone||'') === ph);
+  if (!c){ $('nCustId').value = ''; $('custHint').textContent = 'ไม่พบลูกค้าเดิม — จะสร้างรายการใหม่ให้ตอนบันทึก'; return; }
+  $('nCustId').value = c.id; $('nCustName').value = c.name || '';
+  $('nAddress').value = c.address || ''; $('nCustType').value = c.customer_type || 'end_user';
+  const n = S.jobs.filter(j => j.customer_id === c.id).length;
+  $('custHint').innerHTML = `✅ พบลูกค้าเดิม — <b>เคยซ่อมมาแล้ว ${n} ครั้ง</b>`;
+}
 
-    const { count } = await sb.from('repair_jobs')
-      .select('id', { count:'exact', head:true }).eq('customer_id', c.id);
-    $('custHint').innerHTML = `✅ พบลูกค้าเดิม — <b>เคยซ่อมมาแล้ว ${count ?? 0} ครั้ง</b>`;
-  } catch(e){ fail(e); }
+function clearIntake(){
+  ['nSerial','nToolType','nBrand','nModel','nPhone','nCustName','nAddress','nSymptom','nAcc','nDue','nCustId']
+    .forEach(id => $(id).value = '');
+  $('nSymCat').value = ''; $('nTech').value = '';
+  $('warrBox').innerHTML = ''; $('warrBox').dataset.status = ''; $('custHint').textContent = '';
 }
 
 async function saveJob(){
   if (!val('nCustName')) return toast('กรอกชื่อลูกค้าก่อน', true);
   if (!val('nSymptom'))  return toast('กรอกอาการเสียก่อน', true);
-
   try {
-    let custId = val('nCustId');
-    if (!custId){
+    let cid = val('nCustId');
+    if (!cid){
       const { data, error } = await sb.from('repair_customers').insert({
         name: val('nCustName'), phone: val('nPhone') || null,
         address: val('nAddress') || null, customer_type: val('nCustType')
       }).select('id').single();
       if (error) throw error;
-      custId = data.id;
+      cid = data.id;
     }
-
     const box = $('warrBox');
     const { data: job, error } = await sb.from('repair_jobs').insert({
-      customer_id: custId,
-      tool_type: val('nToolType') || null,
-      brand:     val('nBrand')    || null,
-      model:     val('nModel')    || null,
-      serial_no: val('nSerial')   || null,
-      warranty_status:  box.dataset.status   || 'unknown',
-      purchase_date:    box.dataset.purchase || null,
-      warranty_expire:  box.dataset.expire   || null,
-      symptom:          val('nSymptom'),
-      symptom_category: val('nSymCat') || null,
-      accessories:      val('nAcc') || null,
-      technician_id:    val('nTech') || null,
-      due_date:         val('nDue')  || null,
-      created_by:       who()
+      customer_id: cid,
+      tool_type: val('nToolType') || null, brand: val('nBrand') || null,
+      model: val('nModel') || null, serial_no: val('nSerial') || null,
+      warranty_status: box.dataset.status || 'unknown',
+      purchase_date: box.dataset.purchase || null, warranty_expire: box.dataset.expire || null,
+      symptom: val('nSymptom'), symptom_category: val('nSymCat') || null,
+      accessories: val('nAcc') || null,
+      technician_id: val('nTech') || null,
+      status: val('nTech') ? 'assigned' : 'received',
+      due_date: val('nDue') || null, created_by: who()
     }).select('id, job_no').single();
     if (error) throw error;
-
     toast('✅ สร้างใบงาน ' + job.job_no + ' แล้ว');
-    ['nSerial','nToolType','nBrand','nModel','nPhone','nCustName','nAddress',
-     'nSymptom','nAcc','nDue','nCustId'].forEach(id => $(id).value = '');
-    $('nSymCat').value = ''; $('nTech').value = '';
-    $('warrBox').innerHTML = ''; $('warrBox').dataset.status = '';
-    $('custHint').innerHTML = '';
-
-    await loadJobs();
+    clearIntake();
+    await reloadAll();
     openJob(job.id);
   } catch(e){ fail(e); }
 }
 
 /* =====================================================================
-   ใบงาน + ส่วนช่าง
+   ใบงาน (modal)
    ===================================================================== */
+function closeJob(){ $('mask').classList.remove('on'); document.body.style.overflow = ''; }
+
 async function openJob(id){
   try {
     const [j, lines] = await Promise.all([
       sb.from('v_jobs').select('*').eq('id', id).single(),
-      sb.from('repair_parts_used')
-        .select('*, parts_master(part_no,name)').eq('job_id', id).order('created_at')
+      sb.from('repair_parts_used').select('*, parts_master(part_no,name)').eq('job_id', id).order('created_at')
     ]);
     if (j.error) throw j.error;
-    S.job = j.data;
-    S.lines = lines.data || [];
-    $('navJob').style.display = '';
-    renderJob();
-    go('job');
+    S.job = j.data; S.lines = lines.data || [];
+    renderJobModal();
+    $('mask').classList.add('on'); document.body.style.overflow = 'hidden';
   } catch(e){ fail(e); }
 }
 
-function renderJob(){
-  const j = S.job;
+function renderJobModal(){
+  const j = S.job, st = stepOf(j.status), sd = STEPS[st-1];
   const late = j.days_overdue > 0;
-
-  const warr = j.warranty_status === 'in_warranty'
-    ? '<span class="pill p-ready">อยู่ในประกัน</span>'
-    : j.warranty_status === 'out_of_warranty'
-      ? '<span class="pill p-wait_parts">หมดประกัน</span>'
-      : '<span class="pill p-delivered">ไม่ทราบประกัน</span>';
-
-  const partsCost = S.lines.reduce((s,l) => s + Number(l.line_total || 0), 0);
+  const pc = S.lines.reduce((s,l) => s + Number(l.line_total||0), 0);
+  const warr = j.warranty_status === 'in_warranty' ? '<span class="pill tag-good">อยู่ในประกัน</span>'
+             : j.warranty_status === 'out_of_warranty' ? '<span class="pill tag-crit">หมดประกัน</span>'
+             : '<span class="pill st0">ไม่ทราบประกัน</span>';
 
   $('jobWrap').innerHTML = `
-  <div class="card">
-    <h3>
-      <span class="mono" style="font-size:17px">${esc(j.job_no)}</span>
-      <span class="pill p-${j.status}">${STATUS[j.status] || j.status}</span>
-      ${warr}
-      ${late ? `<span class="pill p-wait_parts">เกินกำหนด ${j.days_overdue} วัน</span>` : ''}
-      <span class="sp"></span>
-      <button class="btn sm noprint" onclick="window.print()">🖨️ พิมพ์</button>
-      <button class="btn sm noprint" onclick="go('list')">← กลับ</button>
-    </h3>
-    <div class="cb">
-      <div class="grid g2">
-        <div>
-          <div style="font-weight:700;color:var(--navy);margin-bottom:8px">ข้อมูลลูกค้า</div>
-          <table>
-            <tr><td class="muted" style="width:110px">ชื่อลูกค้า</td><td><b>${esc(j.customer_name || '—')}</b></td></tr>
-            <tr><td class="muted">เบอร์โทร</td><td>${esc(j.customer_phone || '—')}</td></tr>
-            <tr><td class="muted">วันที่รับ</td><td>${dtth(j.received_at)}</td></tr>
-            <tr><td class="muted">กำหนดเสร็จ</td><td ${late ? 'style="color:var(--danger);font-weight:700"' : ''}>${dth(j.due_date)}</td></tr>
-            <tr><td class="muted">อยู่ในร้าน</td><td>${j.days_in_shop ?? 0} วัน</td></tr>
-          </table>
-        </div>
-        <div>
-          <div style="font-weight:700;color:var(--navy);margin-bottom:8px">รายละเอียดเครื่อง</div>
-          <table>
-            <tr><td class="muted" style="width:110px">ประเภท</td><td>${esc(j.tool_type || '—')}</td></tr>
-            <tr><td class="muted">แบรนด์ / รุ่น</td><td><b>${esc([j.brand,j.model].filter(Boolean).join(' ') || '—')}</b></td></tr>
-            <tr><td class="muted">Serial No.</td><td class="mono">${esc(j.serial_no || '—')}</td></tr>
-            <tr><td class="muted">หมดประกัน</td><td>${dth(j.warranty_expire)}</td></tr>
-            <tr><td class="muted">อุปกรณ์ที่มาด้วย</td><td>${esc(j.accessories || '—')}</td></tr>
-          </table>
-        </div>
-        <div style="grid-column:1/-1">
-          <label>อาการเสียที่ลูกค้าแจ้ง</label>
-          <div style="background:#f7fafd;border:1px solid var(--line2);border-radius:8px;padding:11px">
-            ${esc(j.symptom || '—')}${j.symptom_name ? ` <span class="pill p-received">${esc(j.symptom_name)}</span>` : ''}
-          </div>
-        </div>
-        <div style="grid-column:1/-1" class="noprint">
-          <label>QR Code ใบงาน (สแกนเพื่อเปิดใบงานนี้)</label>
-          <div id="qrbox"></div>
-        </div>
-      </div>
-    </div>
+  <div class="mhead">
+    <span class="mono" style="font-size:18px;font-weight:800;color:var(--navy)">${esc(j.job_no)}</span>
+    <span class="pill st${st||0}"><span class="d"></span>${STATUS[j.status]||j.status}</span>
+    ${sd ? `<span class="pill" style="background:${sd.c};color:${sd.ink}">ขั้น ${st}/6 · ${esc(sd.label)}</span>` : ''}
+    ${warr}
+    ${late ? `<span class="pill tag-crit">เกินกำหนด ${j.days_overdue} วัน</span>` : ''}
+    <span class="sp"></span>
+    <button class="btn sm noprint" onclick="window.print()">🖨️ พิมพ์</button>
+    <button class="btn sm noprint" onclick="closeJob()">✕ ปิด</button>
   </div>
+  <div class="mbody">
+    <div class="card"><h3>ข้อมูลใบงาน</h3><div class="cb">
+      <div class="split" style="grid-template-columns:1fr 1fr">
+        <div><table>
+          <tr><td class="muted" style="width:115px">ลูกค้า</td><td><b>${esc(j.customer_name||'—')}</b></td></tr>
+          <tr><td class="muted">เบอร์โทร</td><td>${esc(j.customer_phone||'—')}</td></tr>
+          <tr><td class="muted">วันที่รับ</td><td>${dtth(j.received_at)}</td></tr>
+          <tr><td class="muted">กำหนดเสร็จ</td><td ${late?'style="color:var(--crit);font-weight:700"':''}>${dth(j.due_date)}</td></tr>
+          <tr><td class="muted">อยู่ในร้าน</td><td>${j.days_in_shop ?? 0} วัน</td></tr>
+        </table></div>
+        <div><table>
+          <tr><td class="muted" style="width:115px">ประเภท</td><td>${esc(j.tool_type||'—')}</td></tr>
+          <tr><td class="muted">แบรนด์ / รุ่น</td><td><b>${esc([j.brand,j.model].filter(Boolean).join(' ')||'—')}</b></td></tr>
+          <tr><td class="muted">Serial No.</td><td class="mono">${esc(j.serial_no||'—')}</td></tr>
+          <tr><td class="muted">หมดประกัน</td><td>${dth(j.warranty_expire)}</td></tr>
+          <tr><td class="muted">ของที่มาด้วย</td><td>${esc(j.accessories||'—')}</td></tr>
+        </table></div>
+      </div>
+      <div style="margin-top:13px"><label>อาการเสียที่ลูกค้าแจ้ง</label>
+        <div style="background:#f7fafd;border:1px solid var(--line2);border-radius:9px;padding:11px">
+          ${esc(j.symptom||'—')} ${j.symptom_name ? `<span class="pill st1">${esc(j.symptom_name)}</span>` : ''}</div></div>
+      <div class="noprint" style="margin-top:13px"><label>QR Code ใบงาน</label><div id="qrbox"></div></div>
+    </div></div>
 
-  <div class="card">
-    <h3>🔧 ส่วนช่าง</h3>
-    <div class="cb">
+    <div class="card"><h3>🔧 ส่วนช่าง</h3><div class="cb">
       <div class="grid g2">
-        <div>
-          <label>ช่างผู้รับผิดชอบ</label>
-          <select id="jTech">
-            <option value="">— ยังไม่มอบหมาย —</option>
-            ${S.techs.map(t => `<option value="${t.id}" ${t.id === j.technician_id ? 'selected' : ''}>${esc(t.nickname || t.full_name)}</option>`).join('')}
-          </select>
-        </div>
-        <div>
-          <label>สถานะงาน</label>
-          <select id="jStatus">
-            ${Object.entries(STATUS).map(([k,v]) => `<option value="${k}" ${k === j.status ? 'selected' : ''}>${v}</option>`).join('')}
-          </select>
-        </div>
-        <div style="grid-column:1/-1">
-          <label>ผลการตรวจเช็ค — อาการที่พบ</label>
-          <textarea id="jInspect">${esc(j.inspect_result || '')}</textarea>
-        </div>
-        <div>
-          <label>สาเหตุ</label>
-          <textarea id="jCause">${esc(j.cause || '')}</textarea>
-        </div>
-        <div>
-          <label>วิธีการซ่อม</label>
-          <textarea id="jMethod">${esc(j.repair_method || '')}</textarea>
-        </div>
+        <div><label>ช่างผู้รับผิดชอบ</label><select id="jTech"><option value="">— ยังไม่มอบหมาย —</option>
+          ${S.techs.map(t => `<option value="${t.id}" ${t.id===j.technician_id?'selected':''}>${esc(t.nickname||t.full_name)}</option>`).join('')}
+        </select></div>
+        <div><label>สถานะงาน</label><select id="jStatus">
+          ${Object.entries(STATUS).map(([k,v]) => `<option value="${k}" ${k===j.status?'selected':''}>${stepOf(k)?stepOf(k)+'. ':''}${v}</option>`).join('')}
+        </select></div>
+        <div style="grid-column:1/-1"><label>ผลการตรวจเช็ค — อาการที่พบ</label><textarea id="jInspect">${esc(j.inspect_result||'')}</textarea></div>
+        <div><label>สาเหตุ</label><textarea id="jCause">${esc(j.cause||'')}</textarea></div>
+        <div><label>วิธีการซ่อม</label><textarea id="jMethod">${esc(j.repair_method||'')}</textarea></div>
       </div>
-    </div>
-  </div>
+    </div></div>
 
-  <div class="card">
-    <h3>อะไหล่ที่ใช้
-      <span class="sp"></span>
-      <span class="muted" style="font-weight:400;font-size:13px">เพิ่มแล้วตัดสต็อกทันที</span>
-    </h3>
-    <div class="cb">
-      <div class="tw">
-        <table>
-          <thead><tr>
-            <th>รหัส</th><th>รายการอะไหล่</th><th class="num">จำนวน</th>
-            <th class="num">ราคา/หน่วย</th><th class="num">รวม</th><th class="noprint"></th>
-          </tr></thead>
-          <tbody>
-            ${S.lines.length ? S.lines.map(l => `
-              <tr>
-                <td class="mono">${esc(l.parts_master?.part_no || '')}</td>
-                <td>${esc(l.parts_master?.name || '')}</td>
-                <td class="num">${l.qty}</td>
-                <td class="num">${money(l.unit_price)}</td>
-                <td class="num"><b>${money(l.line_total)}</b></td>
-                <td class="noprint" style="text-align:right">
-                  <button class="btn sm dn" onclick="removeLine('${l.id}')">ลบ</button>
-                </td>
-              </tr>`).join('')
-            : '<tr><td colspan="6" class="muted" style="text-align:center;padding:18px">ยังไม่มีอะไหล่</td></tr>'}
-          </tbody>
-        </table>
-      </div>
-
-      <div class="grid g4 noprint" style="margin-top:13px;padding-top:13px;border-top:1px solid var(--line2)">
-        <div style="grid-column:span 2">
-          <label>เพิ่มอะไหล่</label>
-          <select id="addPart">
-            <option value="">— เลือกอะไหล่ —</option>
+    <div class="card"><h3>อะไหล่ที่ใช้ <span class="sp"></span>
+      <span class="muted" style="font-weight:400;font-size:13px">เพิ่ม/ลบแล้วตัดคืนสต็อกทันที</span></h3>
+      <div class="cb">
+        <div class="tw"><table>
+          <thead><tr><th>รหัส</th><th>รายการ</th><th class="num">จำนวน</th><th class="num">ราคา/หน่วย</th><th class="num">รวม</th><th class="noprint"></th></tr></thead>
+          <tbody>${S.lines.length ? S.lines.map(l => `<tr>
+            <td class="mono">${esc(l.parts_master?.part_no||'')}</td><td>${esc(l.parts_master?.name||'')}</td>
+            <td class="num">${l.qty}</td><td class="num">${money2(l.unit_price)}</td>
+            <td class="num"><b>${money2(l.line_total)}</b></td>
+            <td class="noprint num"><button class="btn ic dn" onclick="removeLine('${l.id}')">✕</button></td></tr>`).join('')
+            : '<tr><td colspan="6" class="muted" style="text-align:center;padding:18px">ยังไม่มีอะไหล่</td></tr>'}</tbody>
+        </table></div>
+        <div class="grid g4 noprint" style="margin-top:13px;padding-top:13px;border-top:1px solid var(--line2)">
+          <div style="grid-column:span 2"><label>เพิ่มอะไหล่</label><select id="addPart"><option value="">— เลือกอะไหล่ —</option>
             ${S.parts.map(p => `<option value="${p.id}" data-price="${p.sell_price}">${esc(p.part_no)} · ${esc(p.name)}</option>`).join('')}
-          </select>
-        </div>
-        <div><label>จำนวน</label><input type="number" id="addQty" value="1" min="1"></div>
-        <div style="display:flex;align-items:flex-end">
-          <button class="btn p" style="width:100%" onclick="addLine()">➕ เพิ่ม</button>
+          </select></div>
+          <div><label>จำนวน</label><input type="number" id="addQty" value="1" min="1"></div>
+          <div style="display:flex;align-items:flex-end"><button class="btn p" style="width:100%" onclick="addLine()">➕ เพิ่ม</button></div>
         </div>
       </div>
     </div>
-  </div>
 
-  <div class="card">
-    <h3>สรุปค่าใช้จ่าย</h3>
-    <div class="cb">
+    <div class="card"><h3>สรุปค่าใช้จ่าย</h3><div class="cb">
       <div class="grid g4">
-        <div><label>ค่าอะไหล่</label><input type="text" value="${money(partsCost)}" disabled></div>
+        <div><label>ค่าอะไหล่</label><input type="text" value="${money2(pc)}" disabled></div>
         <div><label>ค่าแรง</label><input type="number" id="jLabor" value="${Number(j.labor_cost)||0}" min="0" step="10"></div>
         <div><label>ส่วนลด</label><input type="number" id="jDiscount" value="${Number(j.discount)||0}" min="0" step="10"></div>
-        <div>
-          <label>รวมทั้งหมด</label>
-          <div style="font-size:24px;font-weight:800;color:var(--navy);font-variant-numeric:tabular-nums" id="jTotal">
-            ${money(partsCost + (Number(j.labor_cost)||0) - (Number(j.discount)||0))}
-          </div>
-        </div>
+        <div><label>รวมทั้งหมด</label>
+          <div id="jTotal" style="font-size:25px;font-weight:800;color:var(--navy);font-variant-numeric:tabular-nums">
+            ฿${money2(pc + (Number(j.labor_cost)||0) - (Number(j.discount)||0))}</div></div>
       </div>
       <div class="row noprint" style="margin-top:16px">
         <button class="btn g" onclick="saveWork()">💾 บันทึกงานช่าง</button>
-        <span class="muted" style="font-size:13px">แก้ไขล่าสุด ${dtth(j.updated_at)} · ผู้ใช้งาน: ${esc(who())}</span>
+        <span class="muted" style="font-size:13px">แก้ไขล่าสุด ${dtth(j.updated_at)} · ${esc(who())}</span>
       </div>
-    </div>
+    </div></div>
   </div>`;
 
-  // QR
   const qb = $('qrbox');
   if (qb && window.QRCode){
     qb.innerHTML = '';
-    new QRCode(qb, {
-      text: location.origin + location.pathname + '?job=' + j.id,
-      width: 128, height: 128, correctLevel: QRCode.CorrectLevel.M
-    });
+    new QRCode(qb, { text: location.origin + location.pathname + '?job=' + j.id, width:120, height:120, correctLevel: QRCode.CorrectLevel.M });
   }
-
   ['jLabor','jDiscount'].forEach(id => $(id).addEventListener('input', () => {
-    const t = partsCost + (Number(val('jLabor'))||0) - (Number(val('jDiscount'))||0);
-    $('jTotal').textContent = money(t);
+    $('jTotal').textContent = '฿' + money2(pc + (Number(val('jLabor'))||0) - (Number(val('jDiscount'))||0));
   }));
 }
 
 async function addLine(){
-  const sel = $('addPart');
-  const pid = sel.value;
-  const qty = Number(val('addQty')) || 0;
-  if (!pid)   return toast('เลือกอะไหล่ก่อน', true);
-  if (qty < 1) return toast('จำนวนต้องมากกว่า 0', true);
+  const sel = $('addPart'), pid = sel.value, q = Number(val('addQty'))||0;
+  if (!pid) return toast('เลือกอะไหล่ก่อน', true);
+  if (q < 1) return toast('จำนวนต้องมากกว่า 0', true);
   try {
     const price = Number(sel.selectedOptions[0].dataset.price) || 0;
-    const { error } = await sb.from('repair_parts_used').insert({
-      job_id: S.job.id, part_id: pid, qty, unit_price: price, created_by: who()
-    });
+    const { error } = await sb.from('repair_parts_used')
+      .insert({ job_id:S.job.id, part_id:pid, qty:q, unit_price:price, created_by:who() });
     if (error) throw error;
-    toast('✅ เพิ่มอะไหล่แล้ว — ตัดสต็อกเรียบร้อย');
-    await openJob(S.job.id);
+    toast('✅ เพิ่มอะไหล่ — ตัดสต็อกแล้ว');
+    await openJob(S.job.id); await reloadAll();
   } catch(e){ fail(e); }
 }
 
 async function removeLine(id){
-  if (!confirm('ลบรายการอะไหล่นี้? ระบบจะคืนของเข้าสต็อกให้อัตโนมัติ')) return;
+  if (!confirm('ลบรายการนี้? ระบบจะคืนของเข้าสต็อกอัตโนมัติ')) return;
   try {
     const { error } = await sb.from('repair_parts_used').delete().eq('id', id);
     if (error) throw error;
-    toast('ลบแล้ว — คืนของเข้าสต็อกเรียบร้อย');
-    await openJob(S.job.id);
+    toast('ลบแล้ว — คืนของเข้าสต็อก');
+    await openJob(S.job.id); await reloadAll();
   } catch(e){ fail(e); }
 }
 
 async function saveWork(){
   try {
     const { error } = await sb.from('repair_jobs').update({
-      technician_id:  val('jTech') || null,
-      status:         val('jStatus'),
-      inspect_result: val('jInspect') || null,
-      cause:          val('jCause')   || null,
-      repair_method:  val('jMethod')  || null,
-      labor_cost:     Number(val('jLabor'))    || 0,
-      discount:       Number(val('jDiscount')) || 0,
-      created_by:     who()
+      technician_id: val('jTech') || null, status: val('jStatus'),
+      inspect_result: val('jInspect') || null, cause: val('jCause') || null,
+      repair_method: val('jMethod') || null,
+      labor_cost: Number(val('jLabor'))||0, discount: Number(val('jDiscount'))||0,
+      created_by: who()
     }).eq('id', S.job.id);
     if (error) throw error;
     toast('✅ บันทึกแล้ว');
-    await Promise.all([openJob(S.job.id), loadJobs()]);
+    await openJob(S.job.id); await reloadAll();
   } catch(e){ fail(e); }
 }
 
 /* =====================================================================
-   อะไหล่
+   ลูกค้า
    ===================================================================== */
-async function loadParts(){
-  try {
-    const rows = await window.__pageAll(() => sb.from('v_parts_stock').select('*'));
-    const cls = { 'ติดลบ':'p-wait_parts', 'หมด':'p-wait_parts', 'ต้องสั่ง':'p-repairing', 'ปกติ':'p-ready' };
-    $('tblParts').querySelector('tbody').innerHTML = rows.length ? rows.map(p => `
-      <tr>
-        <td class="mono">${esc(p.part_no)}</td>
-        <td>${esc(p.name)}</td>
-        <td class="num"><b>${p.qty}</b> ${esc(p.unit || '')}</td>
-        <td class="num muted">${p.reorder_point}</td>
-        <td class="num">${p.used_90d}</td>
-        <td class="num">${money(p.sell_price)}</td>
-        <td><span class="pill ${cls[p.stock_state] || 'p-delivered'}">${esc(p.stock_state)}</span></td>
-      </tr>`).join('')
-      : '<tr><td colspan="7" class="muted" style="text-align:center;padding:24px">ยังไม่มีอะไหล่ในทะเบียน</td></tr>';
-  } catch(e){ fail(e); }
+const CT = { end_user:'ลูกค้าทั่วไป', dealer:'ดีลเลอร์ / ร้านค้า', shop:'หน้าร้าน', internal:'ภายในบริษัท' };
+function renderCust(){
+  const q = val('cSearch').toLowerCase();
+  const rows = S.custs.map(c => {
+    const mine = S.jobs.filter(j => j.customer_id === c.id);
+    return { ...c, n:mine.length,
+      sum: mine.reduce((s,j) => s + Number(j.total_cost||0), 0),
+      last: mine.length ? mine[0].received_at : null };
+  }).filter(c => !q || [c.name,c.phone].join(' ').toLowerCase().includes(q))
+    .sort((a,b) => b.n - a.n);
+
+  $('custKpi').innerHTML = [
+    ['na','👥','ลูกค้าทั้งหมด', S.custs.length, 'ราย'],
+    ['ne','🔁','ลูกค้าซ้ำ',     rows.filter(c => c.n > 1).length, 'ราย'],
+    ['nc','🏪','ดีลเลอร์',      S.custs.filter(c => c.customer_type === 'dealer').length, 'ราย'],
+    ['na','💰','ยอดซ่อมรวม',   '฿' + money(rows.reduce((s,c) => s + c.sum, 0)), '']
+  ].map(([cl,e,l,n,u]) => `<div class="kpi ${cl}"><div class="t"><span class="l">${l}</span><span class="e">${e}</span></div>
+    <div class="n">${n}<small>${u}</small></div></div>`).join('');
+
+  $('custEmpty').style.display = rows.length ? 'none' : 'block';
+  $('tblCust').querySelector('tbody').innerHTML = rows.map(c => `<tr>
+    <td><b>${esc(c.name)}</b></td><td>${esc(c.phone||'—')}</td>
+    <td><span class="pill st1">${CT[c.customer_type]||c.customer_type}</span></td>
+    <td class="num">${c.n}</td><td class="num">฿${money(c.sum)}</td><td>${dth(c.last)}</td></tr>`).join('');
 }
 
-async function receiveParts(){
-  const pn  = val('rcPart');
-  const qty = Number(val('rcQty')) || 0;
-  if (!pn)     return toast('เลือกอะไหล่ก่อน', true);
-  if (qty < 1) return toast('จำนวนต้องมากกว่า 0', true);
+/* =====================================================================
+   คลังอะไหล่
+   ===================================================================== */
+async function loadParts(){
+  try { S.stock = await window.__pageAll(() => sb.from('v_parts_stock').select('*')); renderParts(); }
+  catch(e){ fail(e); }
+}
+function renderParts(){
+  const q = val('pSearch').toLowerCase();
+  const rows = S.stock.filter(p => !q || [p.part_no,p.name].join(' ').toLowerCase().includes(q));
+  const low = S.stock.filter(p => p.stock_state !== 'ปกติ').length;
+  const value = S.stock.reduce((s,p) => s + p.qty * Number(p.cost_price||0), 0);
+  const used = S.stock.reduce((s,p) => s + Number(p.used_90d||0), 0);
+
+  $('partKpi').innerHTML = [
+    ['na','📦','รายการอะไหล่', S.stock.length, 'SKU'],
+    ['nd','⚠️','ต้องสั่งเพิ่ม',  low, 'รายการ'],
+    ['nc','💰','มูลค่าคลัง',   '฿' + money(value), ''],
+    ['ne','🔧','เบิกใช้ 90 วัน', used, 'ชิ้น']
+  ].map(([cl,e,l,n,u]) => `<div class="kpi ${cl}"><div class="t"><span class="l">${l}</span><span class="e">${e}</span></div>
+    <div class="n">${n}<small>${u}</small></div></div>`).join('');
+
+  const cls = { 'ติดลบ':'tag-crit', 'หมด':'tag-crit', 'ต้องสั่ง':'tag-warn', 'ปกติ':'tag-good' };
+  $('tblParts').querySelector('tbody').innerHTML = rows.length ? rows.map(p => `<tr>
+    <td class="mono"><b>${esc(p.part_no)}</b></td><td>${esc(p.name)}</td>
+    <td class="num">฿${money(p.sell_price)}</td><td class="num">${p.used_90d}</td>
+    <td class="num muted">${p.reorder_point}</td>
+    <td class="num"><b style="font-size:16px">${p.qty}</b> <span class="sub2">${esc(p.unit||'')}</span></td>
+    <td><span class="pill ${cls[p.stock_state]||'st0'}">${esc(p.stock_state)}</span></td>
+    <td class="num noprint">
+      <button class="btn ic" onclick="adjust('${esc(p.part_no)}',1)">+</button>
+      <button class="btn ic" onclick="adjust('${esc(p.part_no)}',-1)">−</button></td></tr>`).join('')
+    : '<tr><td colspan="8" class="empty">ยังไม่มีอะไหล่ในทะเบียน</td></tr>';
+}
+async function adjust(pn, d){
   try {
-    const { data, error } = await sb.rpc('receive_parts', {
-      p_part_no: pn, p_qty: qty, p_note: val('rcNote') || null, p_by: who()
-    });
+    const { error } = await sb.rpc('receive_parts', { p_part_no:pn, p_qty:d, p_note:'ปรับยอดจากหน้าคลัง', p_by:who() });
+    if (error) throw error;
+    await loadParts();
+  } catch(e){ fail(e); }
+}
+async function receiveParts(){
+  const pn = val('rcPart'), q = Number(val('rcQty'))||0;
+  if (!pn) return toast('เลือกอะไหล่ก่อน', true);
+  if (q < 1) return toast('จำนวนต้องมากกว่า 0', true);
+  try {
+    const { data, error } = await sb.rpc('receive_parts', { p_part_no:pn, p_qty:q, p_note:val('rcNote')||null, p_by:who() });
     if (error) throw error;
     toast(`✅ รับเข้าแล้ว — คงเหลือ ${data} ชิ้น`);
     $('rcQty').value = 1; $('rcNote').value = '';
@@ -921,11 +1175,45 @@ async function receiveParts(){
   } catch(e){ fail(e); }
 }
 
-/* เปิดใบงานจาก QR: repair.html?job=<uuid> */
+/* =====================================================================
+   รายงาน
+   ===================================================================== */
+async function loadReport(){
+  const live = S.jobs.filter(j => j.status !== 'cancelled');
+  const parts = live.reduce((s,j) => s + Number(j.parts_cost||0), 0);
+  const labor = live.reduce((s,j) => s + Number(j.labor_cost||0), 0);
+  const total = live.reduce((s,j) => s + Number(j.total_cost||0), 0);
+
+  $('repKpi').innerHTML = [
+    ['nc','💵','รายได้รวม',  '฿' + money(total)],
+    ['nb','🛠️','ค่าแรงรวม',  '฿' + money(labor)],
+    ['ne','📦','ค่าอะไหล่รวม','฿' + money(parts)]
+  ].map(([cl,e,l,n]) => `<div class="kpi ${cl}"><div class="t"><span class="l">${l}</span><span class="e">${e}</span></div>
+    <div class="n">${n}</div></div>`).join('');
+
+  const items = S.techs.map(t => {
+    const v = live.filter(j => j.technician_id === t.id).reduce((s,j) => s + Number(j.total_cost||0), 0);
+    return { label: t.nickname || t.full_name, value: Math.round(v), sub: '฿' + money(v), color:'#2E75B6' };
+  }).sort((a,b) => b.value - a.value);
+  $('revChart').innerHTML = items.some(i => i.value > 0) ? hBarsSVG(items) : '<div class="empty">ยังไม่มีรายได้บันทึกไว้</div>';
+
+  try {
+    const { data } = await sb.from('v_symptoms_by_model').select('*').limit(40);
+    const rows = data || [];
+    $('mdEmpty').style.display = rows.length ? 'none' : 'block';
+    $('tblModel').querySelector('tbody').innerHTML = rows.map(r => `<tr>
+      <td>${esc(r.brand||'—')}</td><td><b>${esc(r.model||'—')}</b></td>
+      <td>${esc(r.symptom_name)}</td>
+      <td class="num"><span class="pill ${r.job_count>=4?'tag-crit':'tag-warn'}">${r.job_count} ครั้ง</span></td></tr>`).join('');
+  } catch(e){ console.warn(e); }
+}
+
+/* เปิดใบงานจาก QR */
 window.addEventListener('load', () => {
   const id = new URLSearchParams(location.search).get('job');
-  if (id && sb) setTimeout(() => openJob(id), 700);
+  if (id) setTimeout(() => { if (sb) openJob(id); }, 900);
 });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeJob(); });
 </script>
 </body>
 </html>
