@@ -359,24 +359,26 @@
         <div id="rt-work">
           <div class="kpis" id="workKpi"></div>
           <div class="card">
-            <h3>เคสที่รับไป แยกตามระดับความยาก</h3>
-            <div class="cb"><div id="diffChart"></div></div>
+            <h3>เคสที่รับไป แยกตามระดับความยาก <span class="sp"></span>
+              <span class="muted" style="font-weight:400;font-size:13px">นับเป็นจำนวนเคส ไม่มีตัวเลขเงิน</span></h3>
+            <div class="cb"><div class="rgrid">
+              <div id="diffChart"></div>
+              <div class="rside">
+                <div class="rsttl">สัดส่วนทั้งศูนย์</div>
+                <div id="diffDonut"></div>
+                <div id="diffLegend"></div>
+              </div>
+            </div></div>
           </div>
           <div class="card">
             <h3>ตารางผลงานช่าง <span class="sp"></span>
-              <span class="muted" style="font-weight:400;font-size:13px">นับเป็นจำนวนเคส ไม่มีตัวเลขเงิน</span></h3>
+              <span class="muted" style="font-weight:400;font-size:13px">แถวของคุณไฮไลท์สีทอง</span></h3>
             <div class="cb"><div class="tw"><table id="tblScore">
               <thead><tr><th>ช่าง</th><th class="num">เคสทั้งหมด</th><th class="num">ปิดงานแล้ว</th>
                 <th class="num">ค้างอยู่</th><th class="num">ง่าย</th><th class="num">กลาง</th><th class="num">ยาก</th>
                 <th class="num">ตรงกำหนด</th><th class="num">เกินกำหนด</th><th class="num">วันเฉลี่ย/เคส</th></tr></thead>
               <tbody></tbody></table></div>
               <div id="scEmpty" class="empty" style="display:none">ยังไม่มีงานที่มอบหมายให้ช่าง</div>
-            </div>
-          </div>
-          <div class="card">
-            <h3>สัดส่วนระดับความยากทั้งศูนย์</h3>
-            <div class="cb" style="display:flex;gap:22px;align-items:center;flex-wrap:wrap">
-              <div id="diffDonut"></div><div id="diffLegend" style="flex:1;min-width:200px"></div>
             </div>
           </div>
         </div>
@@ -1016,7 +1018,7 @@ function renderDash(){
     { name:'งานค้าง',   data:d1, color:'#C98A12' },
     { name:'เสร็จแล้ว', data:d2, color:'#12875C' },
     { name:'เกินกำหนด', data:d3, color:'#BE3A32' }
-  ]) : '<div class="empty">ยังไม่มีช่างในระบบ</div>';
+  ], boxW('techChart'), 220) : '<div class="empty">ยังไม่มีช่างในระบบ</div>';
 
   // เกินกำหนด
   const od = overdue.slice().sort((a,b) => b.days_overdue - a.days_overdue);
@@ -1037,7 +1039,7 @@ function renderDash(){
   const tot2 = Object.values(cnt).reduce((a,b) => a+b, 0) || 1;
   const top = Object.entries(cnt).sort((a,b) => b[1]-a[1]).slice(0,5)
     .map(([k,v]) => ({ label:k, value:v, sub:Math.round(v/tot2*100) + '%', color:'#2E75B6' }));
-  $('symChart').innerHTML = hBarsSVG(top);
+  $('symChart').innerHTML = hBarsSVG(top, boxW('symChart'));
 }
 
 /* =====================================================================
@@ -2307,6 +2309,14 @@ function setRepTab(k){
   S.repTab = k;
   REP_TABS.forEach(t => { const el = $('rt-' + t.k); if (el) el.hidden = (t.k !== k); });
   renderRepTabs();
+  /* กล่องที่ซ่อนอยู่ วัดความกว้างได้ 0 → ต้องวาดซ้ำหลังโผล่มาแล้ว */
+  requestAnimationFrame(() => { try { redrawRepTab(); } catch(e){ console.warn(e); } });
+}
+
+function redrawRepTab(){
+  if (S.repTab === 'work')    drawDiffChart();
+  if (S.repTab === 'money')   drawRevChart();
+  if (S.repTab === 'quality') drawTopParts();
 }
 function renderRepTabs(){
   const show = REP_TABS.filter(t => !t.boss || isBoss());
@@ -2329,6 +2339,21 @@ async function loadReport(){
 /* =====================================================================
    แท็บ 1 · ผลงานช่าง — จำนวนเคส ไม่มีตัวเลขเงิน ช่างเปิดดูได้
    ===================================================================== */
+/* กราฟแท่งกลุ่ม — ช่างละ 3 แท่ง ง่าย/กลาง/ยาก · แยกออกมาเพื่อวาดซ้ำได้ */
+function drawDiffChart(){
+  if (!$('diffChart')) return;
+  const has = (S.score || []).filter(r => r.jobs_total > 0);
+  $('diffChart').innerHTML = has.length
+    ? groupedBarSVG(
+        has.map(r => r.tech_name),
+        [{ name:'ง่าย',  color:DIFF_COLOR.light,  data:has.map(r => Number(r.lv_light)) },
+         { name:'กลาง', color:DIFF_COLOR.medium, data:has.map(r => Number(r.lv_medium)) },
+         { name:'ยาก',  color:DIFF_COLOR.heavy,  data:has.map(r => Number(r.lv_heavy)) }],
+        /* ช่างน้อย = กราฟแคบลงตาม ไม่ยืดแท่งให้บาน */
+        Math.min(boxW('diffChart'), Math.max(300, has.length * 108 + 60)), 220)
+    : '<div class="empty">ยังไม่มีเคสที่มอบหมายให้ช่าง</div>';
+}
+
 async function loadWorkReport(){
   let rows = [];
   try {
@@ -2371,17 +2396,7 @@ async function loadWorkReport(){
     `<div class="kpi ${cl}"><div class="t"><span class="l">${l}</span><span class="e">${e}</span></div>
       <div class="n">${nv}<small>${u}</small></div></div>`).join('');
 
-  /* กราฟแท่งกลุ่ม — ช่างละ 3 แท่ง ง่าย/กลาง/ยาก */
-  const has = rows.filter(r => r.jobs_total > 0);
-  $('diffChart').innerHTML = has.length
-    ? groupedBarSVG(
-        has.map(r => r.tech_name),
-        [{ name:'ง่าย',  color:DIFF_COLOR.light,  data:has.map(r => Number(r.lv_light)) },
-         { name:'กลาง', color:DIFF_COLOR.medium, data:has.map(r => Number(r.lv_medium)) },
-         { name:'ยาก',  color:DIFF_COLOR.heavy,  data:has.map(r => Number(r.lv_heavy)) }],
-        Math.max(560, has.length * 96))
-    : '<div class="empty">ยังไม่มีเคสที่มอบหมายให้ช่าง</div>';
-
+  drawDiffChart();
   /* ตาราง */
   $('scEmpty').style.display = rows.length ? 'none' : 'block';
   $('tblScore').querySelector('tbody').innerHTML = rows.map(r => {
@@ -2409,13 +2424,13 @@ async function loadWorkReport(){
     { key:'none',   label:'ยังไม่ระบุระดับ',                        value:sum('lv_none'),   color:DIFF_COLOR.none }
   ];
   const all = tot.reduce((s,i) => s + i.value, 0);
-  $('diffDonut').innerHTML = donutSVG(tot, 180, 30);
+  $('diffDonut').innerHTML = donutSVG(tot, 168, 28, 'เคสที่มอบหมาย');
   $('diffLegend').innerHTML = tot.map(i => `
-    <div style="display:flex;align-items:center;gap:9px;padding:6px 0;border-bottom:1px solid var(--line2)">
-      <span class="sw" style="background:${i.color};width:13px;height:13px;border-radius:3px;flex:0 0 13px"></span>
-      <span style="flex:1">${esc(i.label)}</span>
-      <b>${i.value}</b>
-      <span class="muted" style="width:46px;text-align:right">${all ? Math.round(i.value/all*100) : 0}%</span>
+    <div class="lgi" style="padding:5px 0;border-bottom:1px solid var(--line2)">
+      <span class="sw" style="background:${i.color}"></span>
+      <span class="nm">${esc(i.label)}</span>
+      <span class="v">${i.value}</span>
+      <span class="p">${all ? Math.round(i.value/all*100) : 0}%</span>
     </div>`).join('');
 }
 
@@ -2423,6 +2438,29 @@ async function loadWorkReport(){
 /* =====================================================================
    แท็บ 2 · การเงินและรางวัล — เฉพาะ head / admin
    ===================================================================== */
+/** รายได้แยกตามช่าง — แยกออกมาเพื่อวาดซ้ำได้ตอนสลับแท็บ / ย่อขยายจอ */
+function drawRevChart(){
+  if (!$('revChart')) return;
+  const live = S.jobs.filter(j => j.status !== 'cancelled');
+  const items = S.techs.map(t => {
+    const v = live.filter(j => j.technician_id === t.id).reduce((s,j) => s + Number(j.total_cost||0), 0);
+    return { label: t.nickname || t.full_name, value: Math.round(v), sub: '฿' + money(v), color:'#2E75B6' };
+  }).sort((a,b) => b.value - a.value);
+  $('revChart').innerHTML = items.some(i => i.value > 0)
+    ? hBarsSVG(items, boxW('revChart')) : '<div class="empty">ยังไม่มีรายได้บันทึกไว้</div>';
+}
+
+/** อะไหล่ที่ใช้บ่อย 90 วัน */
+function drawTopParts(){
+  if (!$('topParts')) return;
+  const top = (S.stock || []).filter(p => Number(p.used_90d) > 0)
+    .sort((a,b) => Number(b.used_90d) - Number(a.used_90d)).slice(0,12)
+    .map(p => ({ label:p.part_no + ' · ' + (p.name||''), value:Number(p.used_90d),
+                 sub:p.used_90d + ' ' + (p.unit||'ชิ้น'), color:'#4f83bb' }));
+  $('topParts').innerHTML = top.length
+    ? hBarsSVG(top, boxW('topParts')) : '<div class="empty">ยังไม่มีการเบิกอะไหล่</div>';
+}
+
 async function loadMoneyReport(){
   const live  = S.jobs.filter(j => j.status !== 'cancelled');
   const parts = live.reduce((s,j) => s + Number(j.parts_cost||0), 0);
@@ -2438,11 +2476,7 @@ async function loadMoneyReport(){
   ].map(([cl,e,l,nv]) => `<div class="kpi ${cl}"><div class="t"><span class="l">${l}</span><span class="e">${e}</span></div>
     <div class="n">${nv}</div></div>`).join('');
 
-  const items = S.techs.map(t => {
-    const v = live.filter(j => j.technician_id === t.id).reduce((s,j) => s + Number(j.total_cost||0), 0);
-    return { label: t.nickname || t.full_name, value: Math.round(v), sub: '฿' + money(v), color:'#2E75B6' };
-  }).sort((a,b) => b.value - a.value);
-  $('revChart').innerHTML = items.some(i => i.value > 0) ? hBarsSVG(items) : '<div class="empty">ยังไม่มีรายได้บันทึกไว้</div>';
+  drawRevChart();
 
   /* รางวัลช่าง — คิดจากเรทในหน้าตั้งค่า */
   const rows = S.score || [];
@@ -2496,11 +2530,7 @@ async function loadQualityReport(){
       <td class="num"><span class="pill ${r.job_count>=4?'tag-crit':'tag-warn'}">${r.job_count} ครั้ง</span></td></tr>`).join('');
   } catch(e){ console.warn(e); }
 
-  const top = (S.stock || []).filter(p => Number(p.used_90d) > 0)
-    .sort((a,b) => Number(b.used_90d) - Number(a.used_90d)).slice(0,12)
-    .map(p => ({ label:p.part_no + ' · ' + (p.name||''), value:Number(p.used_90d),
-                 sub:p.used_90d + ' ' + (p.unit||'ชิ้น'), color:'#4f83bb' }));
-  $('topParts').innerHTML = top.length ? hBarsSVG(top, 560) : '<div class="empty">ยังไม่มีการเบิกอะไหล่</div>';
+  drawTopParts();
 }
 
 
@@ -2924,6 +2954,22 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeBell();
 
 
 
+
+/* ---------------------------------------------------------------------
+   ย่อ-ขยายหน้าต่าง → วาดกราฟใหม่ให้พอดีกล่อง
+   ใช้ข้อมูลที่โหลดไว้แล้วใน S ไม่ยิง query ใหม่
+   ------------------------------------------------------------------ */
+let _rszT = null;
+window.addEventListener('resize', () => {
+  clearTimeout(_rszT);
+  _rszT = setTimeout(() => {
+    try {
+      if ($('p-dash')?.classList.contains('on')) { renderDash(); return; }
+      if (!$('p-report')?.classList.contains('on')) return;
+      redrawRepTab();
+    } catch(e){ console.warn('redraw', e); }
+  }, 220);
+});
 
 /* เปิดใบงานจาก QR */
 window.addEventListener('load', () => {
