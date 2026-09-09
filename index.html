@@ -386,8 +386,22 @@
         <!-- ---------- แท็บการเงิน (เฉพาะหัวหน้า) ---------- -->
         <div id="rt-money" hidden>
           <div class="kpis" id="repKpi"></div>
+
           <div class="card">
-            <h3>รายได้แยกตามช่าง</h3>
+            <h3>💰 แยกตามเงื่อนไขประกัน — ใครจ่ายอะไร <span class="sp"></span>
+              <span class="muted" style="font-weight:400;font-size:13px">ตัวเลขที่เอาไปคุยกับผู้บริหารได้</span></h3>
+            <div class="cb"><div class="tw"><table id="tblWar">
+              <thead><tr><th>เงื่อนไขประกัน</th><th class="num">เคส</th>
+                <th class="num">🟢 เก็บจากลูกค้า</th><th class="num">ต้นทุนอะไหล่ที่ขายได้</th>
+                <th class="num">🔴 ต้นทุนอะไหล่เคลม</th><th class="num">กำไรขั้นต้น</th></tr></thead>
+              <tbody></tbody></table></div>
+              <div class="box-info" style="margin-top:11px" id="warHint"></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>รายได้จริงแยกตามช่าง <span class="sp"></span>
+              <span class="muted" style="font-weight:400;font-size:13px">เฉพาะเคสที่ลูกค้าจ่าย</span></h3>
             <div class="cb"><div id="revChart"></div></div>
           </div>
           <div class="card">
@@ -400,11 +414,24 @@
             </div>
           </div>
           <div class="card">
-            <h3>แยกตามช่องทางที่ลูกค้าซื้อ (1 ปี)</h3>
+            <h3>แยกตามช่องทางที่ลูกค้าซื้อ <span class="sp"></span>
+              <span class="muted" style="font-weight:400;font-size:13px">เรียงจากช่องทางที่เคลมกินเงินมากสุด</span></h3>
             <div class="cb"><div class="tw"><table id="tblPlat">
-              <thead><tr><th>ช่องทาง</th><th class="num">เคสทั้งหมด</th><th class="num">ค้างอยู่</th>
-                <th class="num">ใน 7 วัน</th><th class="num">ในประกัน</th><th class="num">นอกประกัน</th>
-                <th class="num">ยอดรวม</th></tr></thead><tbody></tbody></table></div></div>
+              <thead><tr><th>ช่องทาง</th><th class="num">เคสทั้งหมด</th>
+                <th class="num">เคลม</th><th class="num">ลูกค้าจ่าย</th>
+                <th class="num">🟢 รายได้</th><th class="num">🔴 ต้นทุนเคลม</th>
+                <th class="num">สุทธิ</th></tr></thead><tbody></tbody></table></div></div>
+          </div>
+
+          <div class="card">
+            <h3>🔴 ต้นทุนเคลมแยกตามรุ่น <span class="sp"></span>
+              <span class="muted" style="font-weight:400;font-size:13px">ส่งให้จัดซื้อ / โรงงาน แก้ที่ต้นทาง</span></h3>
+            <div class="cb"><div class="tw"><table id="tblClaimModel">
+              <thead><tr><th>แบรนด์</th><th>รุ่น</th><th class="num">เคสเคลม</th>
+                <th class="num">ต้นทุนอะไหล่รวม</th><th class="num">เฉลี่ย/เคส</th></tr></thead>
+              <tbody></tbody></table></div>
+              <div id="cmEmpty" class="empty" style="display:none">ยังไม่มีต้นทุนเคลมบันทึกไว้</div>
+            </div>
           </div>
         </div>
 
@@ -602,6 +629,12 @@ const SEVERITY = { light:'เคสเบา (ง่าย)', medium:'เคส�
 let DIFF_DAYS   = { light:1, medium:2, heavy:3 };
 let REWARD_RATE = { light:0, medium:0, heavy:0 };
 const diffDays = sv => Number(DIFF_DAYS[sv || 'medium']) || 2;
+
+/* ใครจ่ายอะไหล่ในเคสนี้ — อ่านจากตาราง warranty_rules ผ่าน v_jobs
+   'ลูกค้า' = คิดราคาขาย (รายได้)  ·  'บริษัท' = คิดราคาทุน (ต้นทุนเคลม) */
+const partsByCustomer = j => (j?.parts_by || WARRANTY[j?.warranty_case]?.parts) === 'ลูกค้า';
+const laborByCustomer = j => (j?.labor_by || WARRANTY[j?.warranty_case]?.labor) === 'ลูกค้า';
+const priceBasis = j => partsByCustomer(j) ? 'sell' : 'cost';
 const addDays  = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n);
   return x.getFullYear() + '-' + String(x.getMonth()+1).padStart(2,'0') + '-' + String(x.getDate()).padStart(2,'0'); };
 const DISPOSITION = {
@@ -810,7 +843,7 @@ async function startApp(session){
       sb.from('app_users').select('full_name, role, technician_id').eq('id', ME.id).maybeSingle(),
       sb.from('technicians').select('*').eq('is_active', true).order('code'),
       sb.from('symptom_categories').select('*').eq('is_active', true).order('sort_order'),
-      sb.from('parts_master').select('id,part_no,name,sell_price').eq('is_active', true).order('part_no'),
+      sb.from('parts_master').select('id,part_no,name,sell_price,cost_price').eq('is_active', true).order('part_no'),
       sb.from('sys_config').select('key,value')
     ]);
     /* sys_config มาจาก 13_update.sql — ถ้ายังไม่ได้รัน ระบบใช้ค่าสำรองต่อไปได้ */
@@ -1558,9 +1591,11 @@ function stepForm(nStep, j, pc){
     <div><label>วิธีการซ่อม <span class="req">*</span></label>
       <textarea id="sMethod" placeholder="เปลี่ยนลูกปืน, ทำความสะอาด Gear Housing, เติม Grease">${esc(j.repair_method||'')}</textarea></div>
 
-    <div style="margin-top:16px"><label>อะไหล่ที่ใช้ <span class="muted" style="font-weight:400">(ตัดสต็อกอัตโนมัติ)</span></label>
+    <div style="margin-top:16px"><label>อะไหล่ที่ใช้
+      <span class="muted" style="font-weight:400">(ตัดสต็อกอัตโนมัติ · ระบบใส่${partsByCustomer(j) ? 'ราคาขาย' : 'ราคาทุน'}ให้เอง)</span></label>
       <div class="tw"><table>
-        <thead><tr><th>PART NO.</th><th>รายการ</th><th class="num">จำนวน</th><th class="num">ราคา</th><th class="num noprint"></th></tr></thead>
+        <thead><tr><th>PART NO.</th><th>รายการ</th><th class="num">จำนวน</th>
+          <th class="num">${partsByCustomer(j) ? 'ราคาขาย' : 'ราคาทุน'}</th><th class="num noprint"></th></tr></thead>
         <tbody>${S.lines.length ? S.lines.map(l => `<tr>
           <td class="mono"><b>${esc(l.parts_master?.part_no||'')}</b></td>
           <td>${esc(l.parts_master?.name||'')}</td><td class="num">${l.qty}</td>
@@ -1584,10 +1619,19 @@ function stepForm(nStep, j, pc){
     </div>
 
     <div style="margin-top:16px">
-      <div class="sumrow"><span>รวมค่าอะไหล่</span><b>฿${money2(pc)}</b></div>
-      <div class="sumrow"><span>ค่าแรง</span><input type="number" id="sLabor" value="${Number(j.labor_cost)||0}" min="0" step="10"></div>
+      <div class="sumrow"><span>รวมค่าอะไหล่ ${partsByCustomer(j)
+        ? '<span class="pill tag-good">ลูกค้าจ่าย</span>'
+        : '<span class="pill tag-crit">บริษัทแบก · ราคาทุน</span>'}</span><b>฿${money2(pc)}</b></div>
+      <div class="sumrow"><span>ค่าแรง ${laborByCustomer(j)
+        ? '<span class="pill tag-good">ลูกค้าจ่าย</span>'
+        : '<span class="pill st0">เคลม ไม่คิดเงิน</span>'}</span>
+        <input type="number" id="sLabor" value="${Number(j.labor_cost)||0}" min="0" step="10"></div>
       <div class="sumrow"><span>ส่วนลด</span><input type="number" id="sDiscount" value="${Number(j.discount)||0}" min="0" step="10"></div>
-      <div class="sumrow total"><span>รวมทั้งหมด</span><span id="sTotal">฿${money2(pc + (Number(j.labor_cost)||0) - (Number(j.discount)||0))}</span></div>
+      <div class="sumrow total"><span>${partsByCustomer(j) ? 'เก็บจากลูกค้ารวม' : 'มูลค่างานรวม (ไม่เรียกเก็บ)'}</span>
+        <span id="sTotal">฿${money2(pc + (Number(j.labor_cost)||0) - (Number(j.discount)||0))}</span></div>
+      ${partsByCustomer(j) ? '' : `<div class="box-info" style="margin-top:10px;font-size:13px">
+        🔴 เคสเคลม — ยอดนี้เป็น <b>ต้นทุนที่บริษัทแบก</b> ไม่ใช่รายได้ ·
+        อะไหล่คิดที่ราคาทุน · ค่าแรงไม่ต้องกรอกก็ได้ (เงินเดือนช่างเป็นต้นทุนคงที่อยู่แล้ว)</div>`}
     </div>
     ${adjustBox(j.id)}
     ${shortageBox(j.id)}
@@ -1665,7 +1709,11 @@ function bindStepForm(cur, pc){
     $('aPart')?.addEventListener('input', () => {
       const p = S.parts.find(x => x.part_no.toUpperCase() === val('aPart').toUpperCase());
       $('aName').value = p ? p.name : '';
-      if (p && !val('aPrice')) $('aPrice').value = p.sell_price;
+      if (!p) return;
+      /* ราคาอัตโนมัติตามเงื่อนไขประกัน — แอดมินไม่ต้องคิดเอง */
+      const cust = partsByCustomer(S.job);
+      $('aPrice').value = cust ? (p.sell_price ?? 0) : (p.cost_price ?? 0);
+      $('aPrice').title = cust ? 'ราคาขาย — ลูกค้าจ่าย' : 'ราคาทุน — บริษัทแบก (เคลม)';
     });
   }
 }
@@ -1864,11 +1912,17 @@ async function addLineInline(){
   const q = Number(val('aQty')) || 0;
   if (q < 1) return toast('จำนวนต้องมากกว่า 0', true);
   try {
+    const cust = partsByCustomer(S.job);
+    const auto = cust ? (p.sell_price ?? 0) : (p.cost_price ?? 0);
     const { error } = await sb.from('repair_parts_used').insert({
       job_id:S.job.id, part_id:p.id, qty:q,
-      unit_price: Number(val('aPrice')) || p.sell_price || 0, created_by:who() });
+      unit_price: val('aPrice') === '' ? auto : Number(val('aPrice')),
+      unit_cost:  Number(p.cost_price) || 0,
+      price_basis: cust ? 'sell' : 'cost',
+      created_by:who() });
     if (error) throw error;
-    toast('✅ เพิ่ม ' + p.part_no + ' — ตัดสต็อกแล้ว');
+    toast('✅ เพิ่ม ' + p.part_no + ' — ตัดสต็อกแล้ว · คิด'
+      + (cust ? 'ราคาขาย (ลูกค้าจ่าย)' : 'ราคาทุน (เคลม บริษัทแบก)'));
     await openJob(S.job.id); reloadAll();
   } catch(e){ fail(e); }
 }
@@ -2246,7 +2300,7 @@ async function newPart(){
     const { error } = await sb.from('parts_master').insert(f);
     if (error) throw error;
     toast('✅ เพิ่ม ' + f.part_no + ' แล้ว');
-    const { data } = await sb.from('parts_master').select('id,part_no,name,sell_price').eq('is_active', true).order('part_no');
+    const { data } = await sb.from('parts_master').select('id,part_no,name,sell_price,cost_price').eq('is_active', true).order('part_no');
     S.parts = data || [];
     $('rcPart').innerHTML = '<option value="">— เลือกอะไหล่ —</option>'
       + S.parts.map(p => `<option value="${esc(p.part_no)}">${esc(p.part_no)} · ${esc(p.name)}</option>`).join('');
@@ -2442,12 +2496,19 @@ async function loadWorkReport(){
 function drawRevChart(){
   if (!$('revChart')) return;
   const live = S.jobs.filter(j => j.status !== 'cancelled');
+  /* รายได้จริง = เฉพาะส่วนที่ลูกค้าเป็นคนจ่าย ไม่ใช่ total_cost ทั้งก้อน
+     เคสเคลม total_cost มีค่าแต่ไม่ได้เก็บเงินลูกค้า จึงต้องไม่นับ */
+  const revOf = j => (partsByCustomer(j) ? Number(j.parts_cost||0) : 0)
+                   + (laborByCustomer(j) ? Number(j.labor_cost||0) : 0)
+                   - Number(j.discount||0);
   const items = S.techs.map(t => {
-    const v = live.filter(j => j.technician_id === t.id).reduce((s,j) => s + Number(j.total_cost||0), 0);
-    return { label: t.nickname || t.full_name, value: Math.round(v), sub: '฿' + money(v), color:'#2E75B6' };
+    const v = live.filter(j => j.technician_id === t.id).reduce((s,j) => s + revOf(j), 0);
+    return { label: t.nickname || t.full_name, value: Math.max(0, Math.round(v)),
+             sub: '฿' + money(v), color:'#2E75B6' };
   }).sort((a,b) => b.value - a.value);
   $('revChart').innerHTML = items.some(i => i.value > 0)
-    ? hBarsSVG(items, boxW('revChart')) : '<div class="empty">ยังไม่มีรายได้บันทึกไว้</div>';
+    ? hBarsSVG(items, boxW('revChart'))
+    : '<div class="empty">ยังไม่มีรายได้จากลูกค้า — เคสทั้งหมดเป็นงานเคลม</div>';
 }
 
 /** อะไหล่ที่ใช้บ่อย 90 วัน */
@@ -2462,57 +2523,133 @@ function drawTopParts(){
 }
 
 async function loadMoneyReport(){
-  const live  = S.jobs.filter(j => j.status !== 'cancelled');
-  const parts = live.reduce((s,j) => s + Number(j.parts_cost||0), 0);
-  const labor = live.reduce((s,j) => s + Number(j.labor_cost||0), 0);
-  const total = live.reduce((s,j) => s + Number(j.total_cost||0), 0);
-  const done  = live.filter(j => j.status === 'delivered').length;
+  /* ---------- คิดเงินฝั่งเบราว์เซอร์จาก S.jobs — ตรงกับ v_job_money ----------
+     รายได้      = อะไหล่+ค่าแรง เฉพาะส่วนที่ "ลูกค้า" เป็นคนจ่าย แล้วหักส่วนลด
+     ต้นทุนเคลม  = อะไหล่ตีราคาทุน เฉพาะเคสที่ "บริษัท" เป็นคนจ่าย
+     ค่าแรงเคลม  = ไม่นับ เพราะเงินเดือนช่างเป็นต้นทุนคงที่ ไม่ผูกรายเคส
+                   ต้นทุนแรงรายเคส = รางวัลต่อชิ้นตามระดับความยาก (ตารางล่าง) */
+  const live = S.jobs.filter(j => j.status !== 'cancelled');
+  const rev  = j => (partsByCustomer(j) ? Number(j.parts_cost||0) : 0)
+                  + (laborByCustomer(j) ? Number(j.labor_cost||0) : 0)
+                  - Number(j.discount||0);
+  const atCost    = j => Number(j.parts_cost_real ?? j.parts_cost ?? 0);
+  const claimCost = j => partsByCustomer(j) ? 0 : atCost(j);
+  const cogs      = j => partsByCustomer(j) ? atCost(j) : 0;
+
+  const revenue = live.reduce((s,j) => s + rev(j), 0);
+  const claim   = live.reduce((s,j) => s + claimCost(j), 0);
+  const cogsSum = live.reduce((s,j) => s + cogs(j), 0);
+
+  /* รางวัลช่าง = ต้นทุนแรงงานรายเคสตัวจริง */
+  const rate = REWARD_RATE;
+  const rwOf = j => Number(rate[j.severity || 'medium'] || 0);
+  const rewardTotal = live.filter(j => j.status === 'delivered').reduce((s,j) => s + rwOf(j), 0);
 
   $('repKpi').innerHTML = [
-    ['nc','💵','รายได้รวม',    '฿' + money(total)],
-    ['nb','🛠️','ค่าแรงรวม',    '฿' + money(labor)],
-    ['ne','📦','ค่าอะไหล่รวม',  '฿' + money(parts)],
-    ['na','📈','เฉลี่ยต่อเคสปิด', '฿' + money(done ? total/done : 0)]
-  ].map(([cl,e,l,nv]) => `<div class="kpi ${cl}"><div class="t"><span class="l">${l}</span><span class="e">${e}</span></div>
-    <div class="n">${nv}</div></div>`).join('');
+    ['nc','🟢','รายได้จริง (ลูกค้าจ่าย)', '฿' + money(revenue),
+      live.filter(j => partsByCustomer(j)).length + ' เคส'],
+    ['nd','🔴','ต้นทุนอะไหล่เคลม',        '฿' + money(claim),
+      live.filter(j => !partsByCustomer(j)).length + ' เคส'],
+    ['nb','🏅','รางวัลช่าง (ตามระดับ)',   '฿' + money(rewardTotal), 'เคสที่ปิดแล้ว'],
+    ['na','📊','เหลือสุทธิ',              '฿' + money(revenue - cogsSum - claim - rewardTotal), 'ทั้งศูนย์']
+  ].map(([cl,e,l,nv,u]) => `<div class="kpi ${cl}"><div class="t"><span class="l">${l}</span><span class="e">${e}</span></div>
+    <div class="n">${nv}</div><div class="sub2">${esc(u)}</div></div>`).join('');
+
+  /* ---------- แยกตามเงื่อนไขประกัน ---------- */
+  const wRows = Object.keys(WARRANTY).map(code => {
+    const g = live.filter(j => (j.warranty_case || 'unknown') === code);
+    return { code, label: WARRANTY[code].l, n: g.length,
+      rev:   g.reduce((s,j) => s + rev(j), 0),
+      cogs:  g.reduce((s,j) => s + cogs(j), 0),
+      claim: g.reduce((s,j) => s + claimCost(j), 0) };
+  }).filter(r => r.n > 0);
+
+  $('tblWar').querySelector('tbody').innerHTML = wRows.length ? wRows.map(r => `<tr>
+    <td><span class="pill ${WARRANTY[r.code].cls}">${esc(r.label)}</span></td>
+    <td class="num">${r.n}</td>
+    <td class="num" style="color:var(--good);font-weight:700">${r.rev ? '฿' + money(r.rev) : '—'}</td>
+    <td class="num muted">${r.cogs ? '฿' + money(r.cogs) : '—'}</td>
+    <td class="num" style="color:var(--crit);font-weight:700">${r.claim ? '฿' + money(r.claim) : '—'}</td>
+    <td class="num"><b>฿${money(r.rev - r.cogs)}</b></td></tr>`).join('')
+    + `<tr style="border-top:2px solid var(--navy)">
+        <td><b>รวม</b></td><td class="num"><b>${live.length}</b></td>
+        <td class="num"><b style="color:var(--good)">฿${money(revenue)}</b></td>
+        <td class="num"><b>฿${money(cogsSum)}</b></td>
+        <td class="num"><b style="color:var(--crit)">฿${money(claim)}</b></td>
+        <td class="num"><b>฿${money(revenue - cogsSum)}</b></td></tr>`
+    : '<tr><td colspan="6" class="empty">ยังไม่มีข้อมูล</td></tr>';
+
+  $('warHint').innerHTML =
+    'อ่านตารางนี้: <b>ภายใน 7 วัน</b> และ <b>ในประกัน</b> บริษัทจ่ายอะไหล่+ค่าแรงเอง '
+    + 'ช่องเก็บจากลูกค้าจึงเป็น "—" ถูกต้องแล้ว · เฉพาะ <b>นอกประกัน</b> ที่เป็นรายได้จริง'
+    + '<div class="muted" style="font-size:12.5px;margin-top:5px">'
+    + 'อะไหล่ในเคสเคลมตีที่ <b>ราคาทุน</b> · เงินเดือนช่างไม่รวมในนี้เพราะเป็นต้นทุนคงที่ '
+    + 'ต้นทุนแรงรายเคสดูที่ตารางรางวัลข้างล่าง</div>';
 
   drawRevChart();
 
-  /* รางวัลช่าง — คิดจากเรทในหน้าตั้งค่า */
+  /* ---------- รางวัลช่าง ---------- */
   const rows = S.score || [];
-  const rate = REWARD_RATE;
   $('rewardHint').innerHTML =
     `เรทที่ใช้อยู่: ง่าย <b>฿${money(rate.light)}</b> · กลาง <b>฿${money(rate.medium)}</b> · ยาก <b>฿${money(rate.heavy)}</b> ต่อเคส`
-    + ` · แก้ได้ที่ ตั้งค่า → เรทรางวัลช่าง`
-    + `<div class="muted" style="font-size:12.5px;margin-top:4px">นับจากเคสที่ปิดงานแล้วเท่านั้น · ช่างเห็นได้แค่จำนวนเคสในแท็บผลงาน</div>`;
+    + ' · แก้ได้ที่ ตั้งค่า → เรทรางวัลช่าง'
+    + '<div class="muted" style="font-size:12.5px;margin-top:4px">นับจากใบงานที่ปิดแล้วจริง เคสที่ยังไม่ระบุระดับนับเป็นเคสกลาง · '
+    + 'นี่คือ<b>ต้นทุนแรงงานรายเคส</b>ตัวจริง เพราะค่าแรงในใบงานเป็นเงินที่คิดกับลูกค้า ไม่ใช่เงินที่จ่ายช่าง · '
+    + 'ช่างเห็นได้แค่จำนวนเคสในแท็บผลงาน</div>';
 
-  const rw = rows.map(r => {
-    /* สัดส่วนเคสที่ปิดแล้วในแต่ละระดับ — ประมาณจากอัตราปิดงานของช่างคนนั้น */
-    const f = r.jobs_total ? Number(r.jobs_done) / Number(r.jobs_total) : 0;
-    const l = Math.round(Number(r.lv_light) * f), m = Math.round(Number(r.lv_medium) * f),
-          hv = Math.round(Number(r.lv_heavy) * f);
-    return { ...r, dl:l, dm:m, dh:hv,
-      reward: l*Number(rate.light||0) + m*Number(rate.medium||0) + hv*Number(rate.heavy||0) };
-  }).sort((a,b) => b.reward - a.reward);
+  /* นับจากใบงานที่ปิดแล้วจริง ๆ ไม่ใช่ประมาณจากสัดส่วน — ยอดจะตรงกับ KPI ข้างบน */
+  const done = live.filter(j => j.status === 'delivered');
+  const rw = (S.techs.length ? S.techs : rows.map(r => ({ id:r.technician_id, nickname:r.tech_name })))
+    .map(t => {
+      const mine = done.filter(j => j.technician_id === t.id);
+      const cnt = sv => mine.filter(j => (j.severity || 'medium') === sv).length;
+      const l = cnt('light'), m = cnt('medium'), hv = cnt('heavy');
+      return { tech_name: t.nickname || t.full_name || '—', jobs_done: mine.length,
+        dl:l, dm:m, dh:hv,
+        reward: l*Number(rate.light||0) + m*Number(rate.medium||0) + hv*Number(rate.heavy||0) };
+    }).filter(r => r.jobs_done > 0).sort((a,b) => b.reward - a.reward);
 
   $('tblReward').querySelector('tbody').innerHTML = rw.length ? rw.map(r => `<tr>
     <td><b>${esc(r.tech_name)}</b></td>
     <td class="num">${r.jobs_done}</td>
     <td class="num">${r.dl}</td><td class="num">${r.dm}</td><td class="num">${r.dh}</td>
-    <td class="num"><b style="font-size:16px;color:var(--good)">฿${money(r.reward)}</b></td></tr>`).join('')
+    <td class="num"><b style="font-size:15px;color:var(--good)">฿${money(r.reward)}</b></td></tr>`).join('')
     + `<tr><td colspan="5" style="text-align:right"><b>รวมทั้งศูนย์</b></td>
        <td class="num"><b>฿${money(rw.reduce((s,r) => s + r.reward, 0))}</b></td></tr>`
     : '<tr><td colspan="6" class="empty">ยังไม่มีข้อมูล</td></tr>';
 
-  try {
-    const { data: plat } = await sb.from('v_by_platform').select('*');
-    $('tblPlat').querySelector('tbody').innerHTML = (plat||[]).length ? plat.map(p => `<tr>
-      <td><b>${esc(p.platform)}</b></td><td class="num">${p.job_count}</td>
-      <td class="num">${p.open_count}</td><td class="num">${p.within7}</td>
-      <td class="num">${p.in_warranty}</td><td class="num">${p.out_warranty}</td>
-      <td class="num"><b>฿${money(p.revenue)}</b></td></tr>`).join('')
-      : '<tr><td colspan="7" class="empty">ยังไม่มีข้อมูล</td></tr>';
-  } catch(e){ console.warn(e); }
+  /* ---------- แยกตามช่องทาง ---------- */
+  const pmap = {};
+  live.forEach(j => {
+    const k = j.platform || 'ไม่ระบุ';
+    const o = pmap[k] || (pmap[k] = { n:0, claimN:0, paidN:0, rev:0, claim:0, cogs:0 });
+    o.n++;
+    if (partsByCustomer(j)) o.paidN++; else o.claimN++;
+    o.rev += rev(j); o.claim += claimCost(j); o.cogs += cogs(j);
+  });
+  const pRows = Object.entries(pmap).sort((a,b) => b[1].claim - a[1].claim);
+  $('tblPlat').querySelector('tbody').innerHTML = pRows.length ? pRows.map(([k,o]) => `<tr>
+    <td><b>${esc(k)}</b></td><td class="num">${o.n}</td>
+    <td class="num">${o.claimN}</td><td class="num">${o.paidN}</td>
+    <td class="num" style="color:var(--good)">${o.rev ? '฿' + money(o.rev) : '—'}</td>
+    <td class="num" style="color:var(--crit)">${o.claim ? '฿' + money(o.claim) : '—'}</td>
+    <td class="num"><b>฿${money(o.rev - o.cogs - o.claim)}</b></td></tr>`).join('')
+    : '<tr><td colspan="7" class="empty">ยังไม่มีข้อมูล</td></tr>';
+
+  /* ---------- ต้นทุนเคลมแยกตามรุ่น ---------- */
+  const mmap = {};
+  live.filter(j => !partsByCustomer(j) && claimCost(j) > 0).forEach(j => {
+    const k = (j.brand || '-') + ' ' + (j.model || '-');
+    const o = mmap[k] || (mmap[k] = { brand:j.brand || '—', model:j.model || '—', n:0, c:0 });
+    o.n++; o.c += claimCost(j);
+  });
+  const mRows = Object.values(mmap).sort((a,b) => b.c - a.c).slice(0,40);
+  $('cmEmpty').style.display = mRows.length ? 'none' : 'block';
+  $('tblClaimModel').querySelector('tbody').innerHTML = mRows.map(r => `<tr>
+    <td>${esc(r.brand)}</td><td><b>${esc(r.model)}</b></td>
+    <td class="num">${r.n}</td>
+    <td class="num"><b style="color:var(--crit)">฿${money(r.c)}</b></td>
+    <td class="num muted">฿${money(r.c / r.n)}</td></tr>`).join('');
 }
 
 
