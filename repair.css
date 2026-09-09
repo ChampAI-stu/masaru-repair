@@ -118,6 +118,14 @@ input[type=number],input[type=tel],input[type=search],select,textarea{
   font-size:15px;line-height:1.4;display:block}
 input:focus,select:focus,textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px var(--blue-l)}
 textarea{resize:vertical;min-height:74px}
+
+/* ช่องตัวเลข — ถอดลูกศรขึ้น/ลงออกทั้งระบบ กันมือลั่นกดโดนแล้วค่าเปลี่ยน
+   ใช้ตัวเลือกหลายชั้นเพราะแต่ละเบราว์เซอร์วาดปุ่มนี้คนละที่ */
+input[type=number]{-moz-appearance:textfield;appearance:textfield}
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;appearance:none;margin:0;display:none}
+/* Safari/iOS วาดปุ่มผ่าน ::-webkit-textfield-decoration-container */
+input[type=number]::-webkit-textfield-decoration-container{margin-right:0}
 select.mini{padding:5px 8px;font-size:13px;border-radius:7px}
 
 .btn{border:1px solid var(--line);background:#fff;padding:9px 16px;border-radius:9px;font-weight:600;cursor:pointer;white-space:nowrap}
