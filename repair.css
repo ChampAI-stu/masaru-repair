@@ -280,6 +280,13 @@ svg .nm{fill:var(--ink);font-size:12.5px;font-family:"Sarabun",sans-serif}
 .box-warn{background:var(--warn-l);border:1px solid #ecd6a4;border-radius:9px;padding:11px 14px;font-size:14px}
 .box-crit{background:var(--crit-l);border:1px solid #f0cbc8;border-radius:9px;padding:11px 14px;font-size:14px}
 .dlink2{background:none;border:0;color:var(--blue);font:600 12px Sarabun,sans-serif;cursor:pointer;text-decoration:underline;padding:0}
+/* แถบแจ้งสถานะการเชื่อมต่อ / เซสชัน — ค้างบนสุดของเนื้อหา */
+.awarn{border-radius:9px;padding:11px 15px;font-size:14px;margin-bottom:15px;
+  border:1px solid #ecd6a4;background:var(--warn-l);color:var(--ink)}
+.awarn.crit{border-color:#f0cbc8;background:var(--crit-l)}
+.awarn[hidden]{display:none}
+#bootErrBox[hidden]{display:none}
+
 .box-info{background:#f2f6fc;border:1px solid #d3e0f0;border-radius:9px;padding:11px 14px;font-size:14px;color:var(--ink2)}
 .muted{color:var(--ink3)}
 .empty{text-align:center;padding:38px 14px;color:var(--ink3)}
