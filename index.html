@@ -1361,6 +1361,9 @@ function authMsg(e){
   if (m.includes('email not confirmed')) return 'อีเมลนี้ยังไม่ได้ยืนยัน — ให้ผู้ดูแลติ๊ก Auto Confirm ให้';
   if (m.includes('rate limit') || m.includes('too many')) return 'ลองบ่อยเกินไป รอสักครู่แล้วลองใหม่';
   if (m.includes('failed to fetch'))     return 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ — ตรวจอินเทอร์เน็ตหรือค่า SUPABASE_URL';
+  if (m.includes('permission denied'))   return 'ฐานข้อมูลไม่ให้สิทธิ์อ่าน — น่าจะลืม grant หลัง drop view · รัน diagnose2.sql';
+  if (m.includes('does not exist') || m.includes('not exist'))
+    return 'ตาราง/view บางตัวหายไป — รัน SQL ไม่ครบตามลำดับ · รัน diagnose2.sql';
   if (m.includes('already registered') || m.includes('already been registered'))
     return 'อีเมลนี้สมัครไว้แล้ว — กดแท็บ "เข้าสู่ระบบ" แทน';
   if (m.includes('signups not allowed') || m.includes('signup is disabled'))
@@ -1493,7 +1496,9 @@ async function startApp(session){
     }
     console.info('[repair] เข้าสู่ระบบเป็น', ME.name, '· สิทธิ์', ME.role, '· เมนู', (ROLE_PAGES[ME.role]||[]).join(', '));
   } catch(e){
-    $('liErr').innerHTML = '⚠️ ' + esc(e.message || e);
+    console.error('[repair] startApp ล้มเหลว', e);
+    $('liErr').innerHTML = '⚠️ ' + esc(authMsg(e)) +
+      '<div style="font-weight:400;font-size:12px;margin-top:6px;opacity:.85">' + esc(e.message || e) + '</div>';
     $('liErr').hidden = false;
     $('gate').hidden = false; $('app').hidden = true;
     try { await sb.auth.signOut(); } catch(_){}
@@ -1532,9 +1537,9 @@ async function startApp(session){
   if (ME.role === 'tech' && ME.techId) $('fTech').value = ME.techId;
 
   $('gate').hidden = true; $('app').hidden = false;
-  clearIntake();
-  goPage(allow[0]);
-  await reloadAll();
+  try { clearIntake(); } catch(e){ console.warn('clearIntake', e); }
+  try { goPage(allow[0]); } catch(e){ console.warn('goPage', e); }
+  try { await reloadAll(); } catch(e){ fail(e); }
 
   // token หมดอายุ → กลับไปหน้าล็อกอิน
   sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_OUT') location.reload(); });
@@ -1550,7 +1555,14 @@ async function reloadAll(){
     S.jobs = jobs; S.custs = custs; S.stock = stock;
     $('connSt').textContent = `● เชื่อมต่อแล้ว · ${jobs.length} ใบงาน`;
     renderDash(); renderChips(); renderJobs(); renderCust(); renderBell();
-  } catch(e){ fail(e); }
+  } catch(e){
+    const m = (e?.message || '') + '';
+    $('connSt').textContent = '● โหลดข้อมูลไม่สำเร็จ';
+    $('connSt').style.color = '#f0928c';
+    if (/permission denied|not exist|does not exist/i.test(m)){
+      toast('❌ ฐานข้อมูลยังไม่พร้อม — ' + m + ' · รัน diagnose2.sql เพื่อดูสาเหตุ', true);
+    } else fail(e);
+  }
 }
 
 /* =====================================================================
