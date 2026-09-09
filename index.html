@@ -258,6 +258,8 @@ svg .nm{fill:var(--ink);font-size:12.5px;font-family:"Sarabun",sans-serif}
 .box-ok{background:var(--good-l);border:1px solid #b6ddca;border-radius:9px;padding:11px 14px;font-size:14px}
 .box-warn{background:var(--warn-l);border:1px solid #ecd6a4;border-radius:9px;padding:11px 14px;font-size:14px}
 .box-crit{background:var(--crit-l);border:1px solid #f0cbc8;border-radius:9px;padding:11px 14px;font-size:14px}
+.dlink2{background:none;border:0;color:var(--blue);font:600 12px Sarabun,sans-serif;cursor:pointer;text-decoration:underline;padding:0}
+.box-info{background:#f2f6fc;border:1px solid #d3e0f0;border-radius:9px;padding:11px 14px;font-size:14px;color:var(--ink2)}
 .muted{color:var(--ink3)}
 .empty{text-align:center;padding:38px 14px;color:var(--ink3)}
 
@@ -694,7 +696,9 @@ table.ptab td.n{text-align:right;font-variant-numeric:tabular-nums}
                   </div>
                   <div class="grid g2" style="gap:11px">
                     <div><label>วันที่รับ</label><input type="date" id="nRecv"></div>
-                    <div><label>กำหนดเสร็จ</label><input type="date" id="nDue"></div>
+                    <div><label>กำหนดเสร็จ (ประมาณการ)
+                      <span class="muted" style="font-weight:400">· ระบบคิดจริงตอนมอบหมายช่าง</span></label>
+                      <input type="date" id="nDue"></div>
                   </div>
                 </div>
               </div>
@@ -770,6 +774,38 @@ table.ptab td.n{text-align:right;font-variant-numeric:tabular-nums}
             <div style="display:flex;align-items:flex-end"><button class="btn p" style="width:100%" onclick="receiveParts()">📥 รับเข้า</button></div>
           </div></div>
         </div>
+        <div class="card" id="cardAdjust" hidden>
+          <h3>⏳ คำขอแก้ / คืนอะไหล่ ที่รออนุมัติ <span class="sp"></span>
+            <span class="pill tag-warn" id="adjCount">0</span></h3>
+          <div class="cb"><div class="tw"><table id="tblAdjust">
+            <thead><tr><th>ใบงาน</th><th>อะไหล่</th><th>คำขอ</th><th class="num">เดิม</th><th class="num">ใหม่</th>
+              <th>เหตุผล</th><th>ผู้ขอ</th><th class="num noprint"></th></tr></thead>
+            <tbody></tbody></table></div></div>
+        </div>
+
+        <div class="card" id="cardShort">
+          <h3>🧾 อะไหล่ที่ขาด — สรุปรายวัน <span class="sp"></span>
+            <span class="muted" style="font-weight:400;font-size:13px">กดปุ่มท้ายแถววันไหน = ออกใบขอจัดซื้อของวันนั้น</span></h3>
+          <div class="cb"><div class="tw"><table id="tblShort">
+            <thead><tr><th>วันที่</th><th>PART NO.</th><th>รายการ</th><th class="num">ขาด</th>
+              <th class="num">เคสที่รอ</th><th>ใบงาน</th><th class="num">มูลค่าทุน</th>
+              <th>สถานะ</th><th class="num noprint"></th></tr></thead>
+            <tbody></tbody></table></div>
+            <div id="shEmpty" class="empty" style="display:none">ยังไม่มีอะไหล่ที่ขาด 👍</div>
+          </div>
+        </div>
+
+        <div class="card" id="cardPR">
+          <h3>📄 ใบขอจัดซื้ออะไหล่ <span class="sp"></span>
+            <span class="muted" style="font-weight:400;font-size:13px">SOP A11b.1 · เสนอหัวหน้าศูนย์ → CEO</span></h3>
+          <div class="cb"><div class="tw"><table id="tblPR">
+            <thead><tr><th>เลขที่</th><th>วันที่</th><th class="num">รายการ</th><th class="num">มูลค่ารวม</th>
+              <th>สถานะ</th><th>ผู้ขอ</th><th class="num noprint"></th></tr></thead>
+            <tbody></tbody></table></div>
+            <div id="prEmpty" class="empty" style="display:none">ยังไม่มีใบขอจัดซื้อ</div>
+          </div>
+        </div>
+
         <div class="card">
           <h3>สต็อกและการเบิกใช้ <span class="sp"></span>
             <input type="text" id="pSearch" placeholder="ค้นหา Part No. / ชื่อ" style="width:auto;min-width:180px">
@@ -785,24 +821,76 @@ table.ptab td.n{text-align:right;font-variant-numeric:tabular-nums}
 
       <!-- ============ รายงาน ============ -->
       <div class="page" id="p-report">
-        <div class="kpis" id="repKpi"></div>
-        <div class="card">
-          <h3>รายได้แยกตามช่าง</h3>
-          <div class="cb"><div id="revChart"></div></div>
-        </div>
-        <div class="card">
-          <h3>แยกตามช่องทางที่ลูกค้าซื้อ (1 ปี)</h3>
-          <div class="cb"><div class="tw"><table id="tblPlat">
-            <thead><tr><th>ช่องทาง</th><th class="num">เคสทั้งหมด</th><th class="num">ค้างอยู่</th>
-              <th class="num">ใน 7 วัน</th><th class="num">ในประกัน</th><th class="num">นอกประกัน</th>
-              <th class="num">ยอดรวม</th></tr></thead><tbody></tbody></table></div></div>
+
+        <!-- แท็บ: ผลงาน (ทุกคนดูได้) / การเงิน (หัวหน้า) / คุณภาพสินค้า -->
+        <div class="card noprint"><div class="cb" style="padding:11px 14px">
+          <div class="chips" id="repTabs"></div>
+        </div></div>
+
+        <!-- ---------- แท็บผลงานช่าง ---------- -->
+        <div id="rt-work">
+          <div class="kpis" id="workKpi"></div>
+          <div class="card">
+            <h3>เคสที่รับไป แยกตามระดับความยาก</h3>
+            <div class="cb"><div id="diffChart"></div></div>
+          </div>
+          <div class="card">
+            <h3>ตารางผลงานช่าง <span class="sp"></span>
+              <span class="muted" style="font-weight:400;font-size:13px">นับเป็นจำนวนเคส ไม่มีตัวเลขเงิน</span></h3>
+            <div class="cb"><div class="tw"><table id="tblScore">
+              <thead><tr><th>ช่าง</th><th class="num">เคสทั้งหมด</th><th class="num">ปิดงานแล้ว</th>
+                <th class="num">ค้างอยู่</th><th class="num">ง่าย</th><th class="num">กลาง</th><th class="num">ยาก</th>
+                <th class="num">ตรงกำหนด</th><th class="num">เกินกำหนด</th><th class="num">วันเฉลี่ย/เคส</th></tr></thead>
+              <tbody></tbody></table></div>
+              <div id="scEmpty" class="empty" style="display:none">ยังไม่มีงานที่มอบหมายให้ช่าง</div>
+            </div>
+          </div>
+          <div class="card">
+            <h3>สัดส่วนระดับความยากทั้งศูนย์</h3>
+            <div class="cb" style="display:flex;gap:22px;align-items:center;flex-wrap:wrap">
+              <div id="diffDonut"></div><div id="diffLegend" style="flex:1;min-width:200px"></div>
+            </div>
+          </div>
         </div>
 
-        <div class="card">
-          <h3>อาการเสียแยกตามรุ่น (ซ้ำ 2 ครั้งขึ้นไป · 1 ปี)</h3>
-          <div class="cb"><div class="tw"><table id="tblModel">
-            <thead><tr><th>แบรนด์</th><th>รุ่น</th><th>อาการ</th><th class="num">จำนวนครั้ง</th></tr></thead><tbody></tbody></table></div>
-            <div id="mdEmpty" class="empty" style="display:none">ยังไม่มีรุ่นที่ซ่อมซ้ำ</div>
+        <!-- ---------- แท็บการเงิน (เฉพาะหัวหน้า) ---------- -->
+        <div id="rt-money" hidden>
+          <div class="kpis" id="repKpi"></div>
+          <div class="card">
+            <h3>รายได้แยกตามช่าง</h3>
+            <div class="cb"><div id="revChart"></div></div>
+          </div>
+          <div class="card">
+            <h3>🏅 สรุปรางวัลช่างตามระดับความยาก <span class="sp"></span>
+              <span class="pill tag-crit">ช่างไม่เห็นหน้านี้</span></h3>
+            <div class="cb"><div class="tw"><table id="tblReward">
+              <thead><tr><th>ช่าง</th><th class="num">ปิดงาน</th><th class="num">ง่าย</th><th class="num">กลาง</th>
+                <th class="num">ยาก</th><th class="num">รางวัลรวม</th></tr></thead><tbody></tbody></table></div>
+              <div class="box-info" style="margin-top:11px" id="rewardHint"></div>
+            </div>
+          </div>
+          <div class="card">
+            <h3>แยกตามช่องทางที่ลูกค้าซื้อ (1 ปี)</h3>
+            <div class="cb"><div class="tw"><table id="tblPlat">
+              <thead><tr><th>ช่องทาง</th><th class="num">เคสทั้งหมด</th><th class="num">ค้างอยู่</th>
+                <th class="num">ใน 7 วัน</th><th class="num">ในประกัน</th><th class="num">นอกประกัน</th>
+                <th class="num">ยอดรวม</th></tr></thead><tbody></tbody></table></div></div>
+          </div>
+        </div>
+
+        <!-- ---------- แท็บคุณภาพสินค้า ---------- -->
+        <div id="rt-quality" hidden>
+          <div class="card">
+            <h3>อาการเสียแยกตามรุ่น (ซ้ำ 2 ครั้งขึ้นไป · 1 ปี) <span class="sp"></span>
+              <span class="muted" style="font-weight:400;font-size:13px">ส่งให้ทีมจัดซื้อ / QC ใช้ต่อได้</span></h3>
+            <div class="cb"><div class="tw"><table id="tblModel">
+              <thead><tr><th>แบรนด์</th><th>รุ่น</th><th>อาการ</th><th class="num">จำนวนครั้ง</th></tr></thead><tbody></tbody></table></div>
+              <div id="mdEmpty" class="empty" style="display:none">ยังไม่มีรุ่นที่ซ่อมซ้ำ</div>
+            </div>
+          </div>
+          <div class="card">
+            <h3>อะไหล่ที่ใช้บ่อยที่สุด (90 วัน)</h3>
+            <div class="cb"><div id="topParts"></div></div>
           </div>
         </div>
       </div>
@@ -812,6 +900,42 @@ table.ptab td.n{text-align:right;font-variant-numeric:tabular-nums}
 
       <!-- ============ ตั้งค่า ============ -->
       <div class="page" id="p-setting">
+        <div class="card">
+          <h3>⏱️ สเกลความยาก → จำนวนวันที่ให้ซ่อม <span class="sp"></span>
+            <span class="muted" style="font-weight:400;font-size:13px">กำหนดเสร็จ = วันที่มอบหมาย + วันตามระดับนี้</span></h3>
+          <div class="cb">
+            <div class="grid g3">
+              <div><label>เคสเบา (ง่าย)</label><input type="number" id="cfgDLight" min="1" max="60" step="1"></div>
+              <div><label>เคสกลาง</label><input type="number" id="cfgDMedium" min="1" max="60" step="1"></div>
+              <div><label>เคสหนัก (ยาก)</label><input type="number" id="cfgDHeavy" min="1" max="60" step="1"></div>
+            </div>
+            <div class="box-info" style="margin-top:12px">
+              เปลี่ยนค่านี้แล้ว <b>ใบงานที่ยังไม่ปิด</b> จะคิดกำหนดเสร็จใหม่ตอนแก้ระดับความยากครั้งถัดไป ·
+              ใบงานที่ปิดแล้วไม่ถูกแตะ
+            </div>
+            <div style="margin-top:13px;display:flex;gap:9px;flex-wrap:wrap">
+              <button class="btn p" onclick="saveDiffDays()">💾 บันทึกสเกลความยาก</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" id="cardReward">
+          <h3>🏅 เรทรางวัลช่างต่อชิ้น <span class="sp"></span>
+            <span class="pill tag-crit">ช่างไม่เห็นตัวเลขนี้</span></h3>
+          <div class="cb">
+            <div class="grid g3">
+              <div><label>เคสเบา (บาท/เคส)</label><input type="number" id="cfgRLight" min="0" step="5"></div>
+              <div><label>เคสกลาง (บาท/เคส)</label><input type="number" id="cfgRMedium" min="0" step="5"></div>
+              <div><label>เคสหนัก (บาท/เคส)</label><input type="number" id="cfgRHeavy" min="0" step="5"></div>
+            </div>
+            <div class="box-warn" style="margin-top:12px">
+              ⚠️ หน้ารายงานของช่างแสดงเฉพาะ <b>จำนวนเคสและจำนวนชิ้น</b> ไม่มีตัวเลขเงินทุกกรณี ·
+              ยอดรางวัลดูได้ที่ รายงาน → สรุปรางวัลช่าง (เฉพาะหัวหน้า)
+            </div>
+            <div style="margin-top:13px"><button class="btn p" onclick="saveReward()">💾 บันทึกเรทรางวัล</button></div>
+          </div>
+        </div>
+
         <div class="card">
           <h3>🔧 ช่างซ่อม <span class="sp"></span>
             <button class="btn sm g" onclick="addTech()">+ เพิ่มช่าง</button></h3>
@@ -936,7 +1060,13 @@ const WARRANTY = {
   out_warranty: { l:'นอกประกัน / ประกันขาด',       ship:'ลูกค้า', parts:'ลูกค้า', labor:'ลูกค้า', cls:'tag-crit' },
   unknown:      { l:'ยังไม่ระบุ',                 ship:'—',      parts:'—',      labor:'—',      cls:'st0' }
 };
-const SEVERITY = { light:'เคสเบา', heavy:'เคสหนัก' };
+const SEVERITY = { light:'เคสเบา (ง่าย)', medium:'เคสกลาง', heavy:'เคสหนัก (ยาก)' };
+/* จำนวนวันต่อระดับ — โหลดจริงจาก sys_config ตอนเปิดระบบ ค่านี้เป็นค่าสำรอง */
+let DIFF_DAYS   = { light:1, medium:2, heavy:3 };
+let REWARD_RATE = { light:0, medium:0, heavy:0 };
+const diffDays = sv => Number(DIFF_DAYS[sv || 'medium']) || 2;
+const addDays  = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n);
+  return x.getFullYear() + '-' + String(x.getMonth()+1).padStart(2,'0') + '-' + String(x.getDate()).padStart(2,'0'); };
 const DISPOSITION = {
   repair_resell:'ซ่อมต่อ เก็บเข้าคลังขายต่อ',
   spare_parts:  'เก็บเป็นอะไหล่สำรอง',
@@ -958,7 +1088,8 @@ const CLOSED = ['delivered','cancelled','rejected'];
 const stepOf = st => STEP_OF[st] || 0;
 
 let sb = null;
-const S = { jobs:[], techs:[], cats:[], parts:[], custs:[], stock:[], job:null, lines:[], photos:[], slog:[], filter:'open', range:'all', seen:null, peek:null, custView:null, pg:{jobs:1,cust:1,parts:1}, per:30 };
+const S = { jobs:[], techs:[], cats:[], parts:[], custs:[], stock:[], job:null, lines:[], photos:[], slog:[], filter:'open', range:'all', seen:null, peek:null, custView:null, pg:{jobs:1,cust:1,parts:1}, per:30,
+  adjust:[], shortage:[], shortDaily:[], prs:[], score:[], repTab:'work' };
 
 /* ---------- helpers ---------- */
 const $ = id => document.getElementById(id);
@@ -975,7 +1106,7 @@ const isBoss = () => ME.role === 'head' || ME.role === 'admin';
 const ROLE_LABEL = { staff:'พนักงานรับเครื่อง', tech:'ช่างซ่อม', head:'หัวหน้าช่าง', admin:'ผู้ดูแลระบบ' };
 const ROLE_PAGES = {
   staff: ['dash','jobs','intake','cust','job'],
-  tech:  ['dash','jobs','parts','job'],
+  tech:  ['dash','jobs','parts','report','job'],
   head:  ['dash','jobs','intake','cust','parts','report','setting','job'],
   admin: ['dash','jobs','intake','cust','parts','report','setting','job']
 };
@@ -1015,7 +1146,7 @@ $('fmCancel').onclick = () => closeForm(null);
 $('fmask').onclick = e => { if (e.target === $('fmask')) closeForm(null); };
 
 /**
- * fields: [{ k, label, type, value, placeholder, hint, options, required, half, min }]
+ * fields: [{ k, label, type, value, placeholder, hint, options, list, required, half, min, upper }]
  * คืน object ค่าที่กรอก หรือ null ถ้ายกเลิก
  */
 function formModal({ title, subtitle = '', fields = [], ok = 'บันทึก', danger = false }){
@@ -1035,7 +1166,9 @@ function formModal({ title, subtitle = '', fields = [], ok = 'บันทึก
         ? `<textarea id="${id}" placeholder="${esc(f.placeholder||'')}">${esc(f.value??'')}</textarea>`
         : `<input type="${f.type||'text'}" id="${id}" value="${esc(f.value??'')}"
              placeholder="${esc(f.placeholder||'')}" ${f.min!==undefined?`min="${f.min}"`:''}
-             ${f.upper?'style="text-transform:uppercase"':''}>`;
+             ${f.list?`list="${id}_dl" autocomplete="off"`:''}
+             ${f.upper?'style="text-transform:uppercase"':''}>`
+          + (f.list ? `<datalist id="${id}_dl">${f.list.map(v => `<option value="${esc(v)}"></option>`).join('')}</datalist>` : '');
     return `<div class="f ${f.half?'half':''}" data-k="${f.k}">
       <label for="${id}">${esc(f.label)}${f.required?' <span class="req">*</span>':''}</label>
       ${inner}${f.hint?`<span class="hint">${esc(f.hint)}</span>`:''}
@@ -1164,6 +1297,33 @@ async function deletePhoto(id, key){
     if (uploadOn()) { try { await driveCall({ action:'delete', fileId:key }); } catch(e){ console.warn(e); } }
     toast('ลบรูปแล้ว');
     await openJob(S.job.id);
+  } catch(e){ fail(e); }
+}
+
+/** เคลียร์รูปทั้งเคสที่ปิดงานแล้ว — ลบทั้งในฐานข้อมูลและใน Google Drive */
+async function clearPhotos(){
+  const j = S.job;
+  if (!j) return;
+  if (!CLOSED.includes(j.status)) return toast('เคลียร์รูปได้เฉพาะเคสที่ปิดงานแล้ว', true);
+
+  const nPh = S.photos.length;
+  if (!nPh) return toast('เคสนี้ไม่มีรูปแล้ว');
+  if (!await confirmModal(`เคลียร์รูปทั้งหมด ${nPh} รูปของ ${j.job_no}?`,
+      'ไฟล์จะถูกย้ายไปถังขยะใน Google Drive (กู้คืนได้ 30 วัน) และหายจากใบงานทันที\n'
+    + 'ข้อมูลใบงาน อะไหล่ และยอดเงิน ยังอยู่ครบ ไม่ถูกลบ', { ok:'เคลียร์รูป' })) return;
+
+  try {
+    const { data: keys, error } = await sb.rpc('clear_job_photos', { p_job_id: j.id });
+    if (error) throw error;
+    let gone = 0;
+    if (uploadOn()){
+      for (const k of (keys || [])){
+        try { await driveCall({ action:'delete', fileId:k }); gone++; }
+        catch(e){ console.warn('ลบไฟล์ Drive ไม่สำเร็จ', k, e); }
+      }
+    }
+    toast(`✅ เคลียร์แล้ว ${nPh} รูป · ลบไฟล์ใน Drive ${gone} ไฟล์`);
+    await openJob(j.id); reloadAll();
   } catch(e){ fail(e); }
 }
 
@@ -1340,7 +1500,7 @@ const PGT = {
   intake: ['รับเครื่อง / บันทึกงาน','ขั้นตอนที่ 1/6 — สร้างใบงานซ่อมและ QR Code'],
   cust:   ['ลูกค้า','ประวัติลูกค้าและการซ่อม'],
   parts:  ['คลังอะไหล่','สต็อกและการเบิกใช้'],
-  report: ['รายงาน','วิเคราะห์ข้อมูลเชิงลึก'],
+  report: ['รายงาน','ผลงานช่าง · การเงิน · คุณภาพสินค้า'],
   setting:['ตั้งค่าระบบ','ช่างซ่อม · ผู้ใช้งาน · โค้ดเชิญ · หมวดอาการ'],
   job:    ['ใบงานซ่อม','รายละเอียดและบันทึกงานตามขั้นตอน']
 };
@@ -1496,12 +1656,19 @@ async function startApp(session){
   ME.name = ME.email.split('@')[0];
 
   try {
-    const [prof, techs, cats, parts] = await Promise.all([
+    const [prof, techs, cats, parts, cfg] = await Promise.all([
       sb.from('app_users').select('full_name, role, technician_id').eq('id', ME.id).maybeSingle(),
       sb.from('technicians').select('*').eq('is_active', true).order('code'),
       sb.from('symptom_categories').select('*').eq('is_active', true).order('sort_order'),
-      sb.from('parts_master').select('id,part_no,name,sell_price').eq('is_active', true).order('part_no')
+      sb.from('parts_master').select('id,part_no,name,sell_price').eq('is_active', true).order('part_no'),
+      sb.from('sys_config').select('key,value')
     ]);
+    /* sys_config มาจาก 13_update.sql — ถ้ายังไม่ได้รัน ระบบใช้ค่าสำรองต่อไปได้ */
+    if (cfg.error) console.warn('อ่าน sys_config ไม่ได้ — ใช้ค่าสำรอง', cfg.error.message);
+    (cfg.data || []).forEach(r => {
+      if (r.key === 'difficulty_days') DIFF_DAYS   = { ...DIFF_DAYS,   ...(r.value || {}) };
+      if (r.key === 'reward_rate')     REWARD_RATE = { ...REWARD_RATE, ...(r.value || {}) };
+    });
     if (techs.error) throw techs.error;
 
     // โปรไฟล์คือแหล่งความจริงของสิทธิ์ — ถ้าอ่านไม่ได้ ต้องบอกให้ชัด ไม่ใช่เงียบแล้วลดสิทธิ์
@@ -1575,14 +1742,20 @@ async function startApp(session){
 
 async function reloadAll(){
   try {
-    const [jobs, custs, stock] = await Promise.all([
+    const [jobs, custs, stock, adj, sho] = await Promise.all([
       window.__pageAll(() => sb.from('v_jobs').select('*').order('received_at', { ascending:false })),
       window.__pageAll(() => sb.from('repair_customers').select('*').order('name')),
-      window.__pageAll(() => sb.from('v_parts_stock').select('*'))
+      window.__pageAll(() => sb.from('v_parts_stock').select('*')),
+      sb.from('v_adjust_requests').select('*').eq('status','pending'),
+      sb.from('v_shortage_open').select('*')
     ]);
     S.jobs = jobs; S.custs = custs; S.stock = stock;
+    /* สองอันนี้มาจาก 13_update.sql — ยังไม่รันก็ใช้ระบบต่อได้ */
+    S.adjust   = adj.error ? [] : (adj.data || []);
+    S.shortage = sho.error ? [] : (sho.data || []);
+    if (adj.error) console.warn('v_adjust_requests', adj.error.message);
     $('connSt').textContent = `● เชื่อมต่อแล้ว · ${jobs.length} ใบงาน`;
-    renderDash(); renderChips(); renderJobs(); renderCust(); renderBell();
+    renderDash(); renderChips(); renderJobs(); renderCust(); renderAdjust(); renderBell();
   } catch(e){
     const m = (e?.message || '') + '';
     $('connSt').textContent = '● โหลดข้อมูลไม่สำเร็จ';
@@ -1812,7 +1985,11 @@ function renderJobs(){
           ? `<div style="margin-top:3px"><span class="pill ${WARRANTY[j.warranty_case].cls}">${esc(WARRANTY[j.warranty_case].l)}</span></div>` : ''}
         ${sd ? `<div class="sub2">ขั้น ${s}/6 · ${esc(sd.label)}</div>` : ''}</td>
       <td ${late?'style="color:var(--crit);font-weight:700"':''}>${dth(j.due_date)}
-        ${late ? `<div><span class="pill tag-crit">เกิน ${j.days_overdue} วัน</span></div>` : ''}</td>
+        ${late ? `<div><span class="pill tag-crit">เกิน ${j.days_overdue} วัน</span></div>` : ''}
+        ${j.severity ? `<div class="sub2">${esc(SEVERITY[j.severity])}</div>`
+                     : (j.assigned_at ? '' : '<div class="sub2">ประมาณการ</div>')}
+        ${Number(j.adjust_pending) > 0 ? '<div><span class="pill tag-warn">รออนุมัติอะไหล่</span></div>' : ''}
+        ${Number(j.shortage_count) > 0 ? '<div><span class="pill tag-crit">อะไหล่ขาด</span></div>' : ''}</td>
       <td class="num"><b>฿${money(j.total_cost)}</b></td>
     </tr>`;
   }).join('');
@@ -2020,6 +2197,9 @@ function renderJobPage(){
     ${j.status === 'rejected' && j.reject_reason
       ? `<span class="pill tag-crit" title="${esc(j.reject_reason)}">ไม่รับเคลม</span>` : ''}
     <span class="sp" style="flex:1"></span>
+    ${CLOSED.includes(j.status) && isBoss() && (j.photo_count > 0)
+      ? `<button class="btn sm dn noprint" onclick="clearPhotos()"
+           title="ลบรูปทั้งหมดของเคสนี้เพื่อประหยัดพื้นที่ Drive">🧹 เคลียร์รูป (${j.photo_count})</button>` : ''}
     <div style="display:flex;align-items:center;gap:9px">
       <div class="avatar" style="width:32px;height:32px;font-size:12px">${esc((j.tech_name||'—').slice(0,2))}</div>
       <div style="line-height:1.3"><div class="sub2">ช่างผู้รับผิดชอบ</div>
@@ -2047,8 +2227,15 @@ function renderJobPage(){
         <div class="kv"><span class="k">แบรนด์ / รุ่น</span><span class="v">${esc([j.brand,j.model].filter(Boolean).join(' ')||'—')}</span></div>
         <div class="kv"><span class="k">Serial No.</span><span class="v mono">${esc(j.serial_no||'—')}</span></div>
         <div class="kv"><span class="k">วันที่รับ</span><span class="v">${dth(j.received_at)}</span></div>
+        <div class="kv"><span class="k">ระดับความยาก</span><span class="v">
+          ${j.severity
+            ? `<span class="pill st${j.severity === 'heavy' ? 6 : j.severity === 'medium' ? 4 : 2}">${esc(SEVERITY[j.severity])} · ${diffDays(j.severity)} วัน</span>`
+            : '<span class="muted">ยังไม่ระบุ</span>'}</span></div>
+        <div class="kv"><span class="k">วันที่มอบหมาย</span>
+          <span class="v">${j.assigned_at ? dth(j.assigned_at) : '<span class="muted">ยังไม่มอบหมาย</span>'}</span></div>
         <div class="kv"><span class="k">กำหนดเสร็จ</span>
-          <span class="v" ${late?'style="color:var(--crit)"':''}>${dth(j.due_date)}</span></div>
+          <span class="v" ${late?'style="color:var(--crit)"':''}>${dth(j.due_date)}
+            ${j.assigned_at ? '' : '<span class="sub2">(ประมาณการ)</span>'}</span></div>
 
         <div style="margin-top:13px">
           <label>อาการเสียที่ลูกค้าแจ้ง</label>
@@ -2088,13 +2275,22 @@ function renderJobPage(){
 /* ---------- ฟอร์มของแต่ละขั้น ----------
    ขั้นที่ผ่านมาแล้ว "แก้ไขได้" เหมือนต้นฉบับ ไม่ได้ล็อกอ่านอย่างเดียว
    ------------------------------------------------------------------ */
-const tHM  = iso => iso ? new Date(iso).toTimeString().slice(0,5) : '';
-const hmTs = (t, base) => {
-  if (!t) return null;
-  const d = base ? new Date(base) : new Date();
-  const [H,M] = t.split(':'); d.setHours(+H, +M, 0, 0);
-  return d.toISOString();
-};
+/** ขั้น 3 — โชว์กำหนดเสร็จที่ระบบจะคำนวณให้ทันทีที่เลือกระดับความยาก */
+function previewDue(){
+  if (!$('sDueShow')) return;
+  const j  = S.job || {};
+  const sv = val('sDiff') || 'medium';
+  const d  = diffDays(sv);
+  /* มอบหมายแล้ว = ยึดวันเดิม · ยังไม่มอบหมาย = ยึดวันนี้ */
+  const base = j.assigned_at ? new Date(j.assigned_at) : new Date();
+  const due  = addDays(base, d);
+  $('sDueShow').value = dth(due);
+  if ($('dueHint')) $('dueHint').innerHTML =
+    `📅 <b>${esc(SEVERITY[sv] || 'เคสกลาง')}</b> = ${d} วัน · `
+    + `${esc(dth(base))} + ${d} วัน = <b>${esc(dth(due))}</b>`
+    + (val('sDiff') ? '' : ' <span class="muted">(ยังไม่เลือกระดับ ระบบใช้เคสกลางไปก่อน)</span>')
+    + '<div class="muted" style="font-size:12.5px;margin-top:4px">แก้จำนวนวันต่อระดับได้ที่ ตั้งค่า → สเกลความยาก</div>';
+}
 
 function stepForm(nStep, j, pc){
   const cur  = stepOf(j.status) || 1;
@@ -2148,8 +2344,10 @@ function stepForm(nStep, j, pc){
     <div id="wBox" style="margin-top:13px">${warrantyBox(j.warranty_case)}</div>
 
     <div class="grid g2" style="margin-top:14px">
-      <div><label>วันที่รับ</label><input type="date" id="sRecv" value="${(j.received_at||'').slice(0,10)}"></div>
-      <div><label>กำหนดเสร็จ</label><input type="date" id="sDue" value="${(j.due_date||'').slice(0,10)}"></div>
+      <div><label>วันที่รับ <span class="muted" style="font-weight:400">(ล็อกไว้ แก้ไม่ได้)</span></label>
+        <input type="text" value="${dth(j.received_at)}" disabled></div>
+      <div><label>กำหนดเสร็จ</label>
+        <input type="text" value="${j.assigned_at ? dth(j.due_date) : 'กำหนดที่ขั้น 3 มอบหมายงาน'}" disabled></div>
     </div>
     <div style="margin-top:14px"><label>อาการเสียที่ลูกค้าแจ้ง <span class="req">*</span></label>
       <textarea id="sSymptom">${esc(j.symptom||'')}</textarea></div>
@@ -2192,10 +2390,16 @@ function stepForm(nStep, j, pc){
       <option value="">— เลือกช่าง —</option>
       ${S.techs.map(t => `<option value="${t.id}" ${t.id===j.technician_id?'selected':''}>${esc(t.nickname||t.full_name)} — งานค้าง ${S.jobs.filter(x => x.technician_id===t.id && !CLOSED.includes(x.status)).length}</option>`).join('')}
     </select></div>
-    <div class="grid g2" style="margin-top:14px">
-      <div><label>เวลาเริ่มงาน</label><input type="time" id="sStart" value="${tHM(j.started_at)}"></div>
-      <div><label>เวลาที่คาดว่าเสร็จ</label><input type="time" id="sExpect" value="${tHM(j.expect_at)}"></div>
+    <div class="grid g3" style="margin-top:14px">
+      <div><label>ระดับความยาก <span class="req">*</span></label>
+        <select id="sDiff" onchange="previewDue()">
+          <option value="">— ยังไม่ระบุ (ใช้เคสกลาง) —</option>${opts(SEVERITY, j.severity)}</select></div>
+      <div><label>วันที่มอบหมาย <span class="muted" style="font-weight:400">(ล็อก)</span></label>
+        <input type="text" value="${j.assigned_at ? dth(j.assigned_at) : dth(new Date())}" disabled></div>
+      <div><label>กำหนดเสร็จ <span class="muted" style="font-weight:400">(ระบบคำนวณ)</span></label>
+        <input type="text" id="sDueShow" value="—" disabled></div>
     </div>
+    <div class="box-info" id="dueHint" style="margin-top:12px"></div>
     ${recap('ผลตรวจเช็ค: ' + esc(j.inspect_result || '—'))}
     ` + foot(`<button class="btn g" onclick="moveStep(4)">เริ่มซ่อม →</button>`);
 
@@ -2211,7 +2415,12 @@ function stepForm(nStep, j, pc){
           <td class="mono"><b>${esc(l.parts_master?.part_no||'')}</b></td>
           <td>${esc(l.parts_master?.name||'')}</td><td class="num">${l.qty}</td>
           <td class="num">฿${money2(l.line_total)}</td>
-          <td class="num noprint"><button class="btn ic dn" onclick="removeLine('${l.id}')">✕</button></td></tr>`).join('')
+          <td class="num noprint">${isBoss()
+            ? `<button class="btn ic" onclick="requestAdjust('${l.id}','edit')" title="แก้จำนวน">✏️</button>
+               <button class="btn ic dn" onclick="removeLine('${l.id}')" title="เอาออก คืนของเข้าสต็อก">✕</button>`
+            : `<button class="btn ic" onclick="requestAdjust('${l.id}','edit')" title="ขอแก้จำนวน">✏️</button>
+               <button class="btn ic dn" onclick="requestAdjust('${l.id}','return')" title="ขอคืนของ ต้องหัวหน้าอนุมัติ">↩</button>`}
+          </td></tr>`).join('')
           : '<tr><td colspan="5" class="muted" style="text-align:center;padding:16px">ยังไม่มีอะไหล่</td></tr>'}</tbody>
       </table></div>
       <div class="addrow noprint">
@@ -2230,28 +2439,44 @@ function stepForm(nStep, j, pc){
       <div class="sumrow"><span>ส่วนลด</span><input type="number" id="sDiscount" value="${Number(j.discount)||0}" min="0" step="10"></div>
       <div class="sumrow total"><span>รวมทั้งหมด</span><span id="sTotal">฿${money2(pc + (Number(j.labor_cost)||0) - (Number(j.discount)||0))}</span></div>
     </div>
+    ${adjustBox(j.id)}
+    ${shortageBox(j.id)}
     <div style="margin-top:16px">${photoBox('during','รูประหว่างซ่อม',6)}</div>
     <div style="margin-top:16px">${warrantyBox(j.warranty_case)}</div>
     ${recap('ผลตรวจเช็ค: ' + esc(j.inspect_result || '—')
       + (j.severity ? '\nความรุนแรง: ' + esc(SEVERITY[j.severity]) : ''))}
     ` + foot(
-      (j.status !== 'wait_parts'
+      `<button class="btn" onclick="reportShortage()">🧾 แจ้งอะไหล่ขาด</button>`
+      + (j.status !== 'wait_parts'
         ? `<button class="btn" onclick="setStatus('wait_parts')">📦 รออะไหล่</button>`
         : `<button class="btn p" onclick="setStatus('repairing')">▶️ อะไหล่มาแล้ว</button>`)
-      + `<button class="btn dn" onclick="replaceUnit()">🔄 ซ่อมไม่ได้ ส่งใหม่แทน</button>`
+      + `<button class="btn dn" onclick="replaceUnit()">🔄 ซ่อมไม่ได้ เปลี่ยนสินค้า</button>`
       + `<button class="btn g" onclick="moveStep(5)">ไปตรวจสอบ →</button>`);
 
-  /* ---- 5 ตรวจสอบ ---- */
+  /* ---- 5 ตรวจสอบ — เฉพาะหัวหน้างานเท่านั้นที่ตรวจผ่านได้ ---- */
   if (nStep === 5){
     const partTxt = S.lines.length
       ? S.lines.map(l => `${l.parts_master?.name || l.parts_master?.part_no} ×${l.qty}`).join(', ')
       : 'ไม่ได้ใช้อะไหล่';
+    const body = recap('วิธีซ่อม: ' + esc(j.repair_method || '—') + '\nอะไหล่: ' + esc(partTxt))
+      + `<div style="margin-top:16px">${photoBox('after','รูปหลังซ่อม',4)}</div>`;
+
+    /* ช่างเห็นทุกอย่าง แต่กดผ่านไม่ได้ */
+    if (!isBoss()) return hint + `
+      <div class="box-warn">🔒 <b>ขั้นตรวจสอบเป็นหน้าที่ของหัวหน้างาน</b>
+        <div class="muted" style="font-size:13px;margin-top:4px">
+          ช่างซ่อมเสร็จแล้วให้แจ้งหัวหน้ามาตรวจ · ช่างดูข้อมูลและอัปโหลดรูปหลังซ่อมได้ แต่กดผ่านขั้นนี้ไม่ได้</div></div>
+      <div style="margin-top:14px"><label>สรุปผลการทดสอบ (หัวหน้ากรอก)</label>
+        <textarea disabled>${esc(j.note||'')}</textarea></div>
+      ${body}
+      <div class="jfoot">${back}${past ? toCur : ''}</div>`;
+
     return hint + `
-    <div><label>สรุปผลการทดสอบ <span class="req">*</span></label>
+    <div class="box-info">👤 ผู้ตรวจสอบ: <b>${esc(who())}</b> · ${esc(ROLE_LABEL[ME.role]||ME.role)}</div>
+    <div style="margin-top:14px"><label>สรุปผลการทดสอบ <span class="req">*</span></label>
       <textarea id="sNote" placeholder="ทดสอบเดินเครื่อง 10 นาที ทำงานปกติ ไม่มีเสียงผิดปกติ">${esc(j.note||'')}</textarea></div>
-    ${recap('วิธีซ่อม: ' + esc(j.repair_method || '—') + '\nอะไหล่: ' + esc(partTxt))}
-    <div style="margin-top:16px">${photoBox('after','รูปหลังซ่อม',4)}</div>
-    ` + foot(`<button class="btn dn" onclick="replaceUnit()">🔄 ส่งใหม่แทน</button>`
+    ${body}
+    ` + foot(`<button class="btn dn" onclick="replaceUnit()">🔄 เปลี่ยนสินค้า</button>`
       + `<button class="btn g" onclick="moveStep(6)">พร้อมส่งมอบ →</button>`);
   }
 
@@ -2272,7 +2497,7 @@ function stepForm(nStep, j, pc){
         <input type="text" value="${esc(j.order_no||'—')}" disabled></div>
     </div>
     ${j.case_type === 'replace' ? `<div class="box-warn" style="margin-top:14px">
-      🔄 <b>เคสส่งสินค้าใหม่แทน</b> — ปลายทางเครื่องเดิม:
+      🔄 <b>เคสเปลี่ยนสินค้า</b> — ปลายทางเครื่องเดิม:
       <b>${esc(DISPOSITION[j.old_unit_disposition] || 'ยังไม่ระบุ')}</b></div>` : ''}
     <div style="margin-top:14px">${warrantyBox(j.warranty_case)}</div>
     <p style="margin:16px 0 0;color:var(--ink2)">
@@ -2283,6 +2508,7 @@ function stepForm(nStep, j, pc){
 }
 
 function bindStepForm(cur, pc){
+  if (cur === 3) previewDue();
   if (cur === 4){
     const upd = () => $('sTotal').textContent = '฿' + money2(pc + (Number(val('sLabor'))||0) - (Number(val('sDiscount'))||0));
     ['sLabor','sDiscount'].forEach(id => $(id)?.addEventListener('input', upd));
@@ -2298,9 +2524,6 @@ function bindStepForm(cur, pc){
 function collectStep(){
   const p = { created_by: who() };
   const g = id => $(id) ? val(id) : undefined;
-  const base = S.job.received_at;
-  if ($('sRecv'))     p.received_at     = g('sRecv') ? new Date(g('sRecv') + 'T09:00:00').toISOString() : undefined;
-  if ($('sDue'))      p.due_date        = g('sDue') || null;
   if ($('sSymptom'))  p.symptom         = g('sSymptom') || null;
   if ($('sAcc'))      p.accessories     = g('sAcc') || null;
   if ($('sCat'))      p.symptom_category= g('sCat') || null;
@@ -2319,8 +2542,7 @@ function collectStep(){
                                          : g('sRepairable') === 'no' ? false : null;
   if ($('sInspect'))  p.inspect_result  = g('sInspect') || null;
   if ($('sTech'))     p.technician_id   = g('sTech') || null;
-  if ($('sStart'))    p.started_at      = hmTs(g('sStart'), base);
-  if ($('sExpect'))   p.expect_at       = hmTs(g('sExpect'), base);
+  if ($('sDiff'))     p.severity        = g('sDiff') || null;
   if ($('sMethod'))   p.repair_method   = g('sMethod') || null;
   if ($('sNote'))     p.note            = g('sNote') || null;
   if ($('sLabor'))    p.labor_cost      = Number(g('sLabor')) || 0;
@@ -2422,8 +2644,8 @@ async function claimOwner(){
 /** A12b — ซ่อมไม่ได้ / ใช้เวลานาน → ส่งสินค้าใหม่ให้ลูกค้าทันที */
 async function replaceUnit(){
   const f = await formModal({
-    title:'ส่งสินค้าใหม่แทน', subtitle:'SOP A12b — ซ่อมไม่ได้ หรือใช้เวลานานเกินไป',
-    ok:'ยืนยันส่งใหม่', danger:true,
+    title:'เปลี่ยนสินค้า', subtitle:'SOP A12b — ซ่อมไม่ได้ หรือใช้เวลานานเกินไป จึงส่งสินค้าใหม่ให้ลูกค้า',
+    ok:'ยืนยันเปลี่ยนสินค้า', danger:true,
     fields:[
       { k:'tracking_out', label:'เลขพัสดุขาออก (สินค้าใหม่)', required:true,
         value:S.job.tracking_out, hint:'เลขนี้จะเป็นเลขบิลใหม่ที่ผูกกับใบงานนี้' },
@@ -2439,7 +2661,7 @@ async function replaceUnit(){
     old_unit_disposition:f.old_unit_disposition, note:f.note || null,
     status:'ready'
   });
-  toast('✅ บันทึกเป็นเคสส่งสินค้าใหม่แล้ว — ไปขั้นส่งมอบเพื่อปิดงาน');
+  toast('✅ บันทึกเป็นเคสเปลี่ยนสินค้าแล้ว — ไปขั้นส่งมอบเพื่อปิดงาน');
 }
 
 /** A3.1 — ไม่รับเคลม ปิดเรื่อง */
@@ -2476,6 +2698,7 @@ async function moveStep(to){
     if (from === 2 && !val('sInspect')) return toast('กรอกอาการที่พบจากการตรวจเช็คก่อน', true);
     if (from === 3 && !val('sTech'))    return toast('เลือกช่างผู้รับผิดชอบก่อน', true);
     if (from === 4 && !val('sMethod'))  return toast('กรอกวิธีการซ่อมก่อน', true);
+    if (from === 5 && !isBoss())        return toast('ขั้นตรวจสอบต้องให้หัวหน้างานกดผ่าน', true);
     if (from === 5 && !val('sNote'))    return toast('กรอกสรุปผลการทดสอบก่อน', true);
   }
   S.peek = null;
@@ -2511,6 +2734,208 @@ async function removeLine(id){
   } catch(e){ fail(e); }
 }
 
+
+
+/* =====================================================================
+   คำขอแก้ / คืนอะไหล่ — ต้องหัวหน้าอนุมัติ แล้วระบบคิดยอดใหม่เอง
+   ===================================================================== */
+const ADJ_KIND = { edit:'ขอแก้จำนวน', return:'ขอคืนของ / ไม่ได้ใช้' };
+
+/** กล่องคำขอของใบงานนี้ — โชว์ในขั้น 4 */
+function adjustBox(jobId){
+  const rows = (S.adjust || []).filter(a => a.job_id === jobId);
+  if (!rows.length) return '';
+  return `<div style="margin-top:16px" class="box-warn">
+    ⏳ <b>คำขอแก้อะไหล่ที่รอหัวหน้าอนุมัติ ${rows.length} รายการ</b>
+    <div class="tw" style="margin-top:9px"><table>
+      <thead><tr><th>รายการ</th><th>คำขอ</th><th class="num">เดิม</th><th class="num">ใหม่</th>
+        <th>เหตุผล</th><th>ผู้ขอ</th><th class="num noprint"></th></tr></thead>
+      <tbody>${rows.map(a => `<tr>
+        <td class="mono"><b>${esc(a.part_no||'—')}</b><div class="sub2">${esc(a.part_name||'')}</div></td>
+        <td><span class="pill st1">${esc(ADJ_KIND[a.kind]||a.kind)}</span></td>
+        <td class="num">${a.qty_now ?? '—'}</td>
+        <td class="num"><b>${a.kind === 'return' ? '0' : (a.qty_new ?? '—')}</b></td>
+        <td class="sub2">${esc(a.reason||'')}</td>
+        <td class="sub2">${esc(a.requested_by||'—')}<div class="sub2">${esc(dth(a.created_at))}</div></td>
+        <td class="num noprint">${isBoss()
+          ? `<button class="btn ic" onclick="decideAdjust('${a.id}',true)" title="อนุมัติ">✓</button>
+             <button class="btn ic dn" onclick="decideAdjust('${a.id}',false)" title="ไม่อนุมัติ">✕</button>`
+          : '<span class="muted">รออนุมัติ</span>'}</td></tr>`).join('')}</tbody>
+    </table></div></div>`;
+}
+
+/** กล่องอะไหล่ที่ขาดของใบงานนี้ */
+function shortageBox(jobId){
+  const rows = (S.shortage || []).filter(s => s.job_id === jobId);
+  if (!rows.length) return '';
+  return `<div style="margin-top:16px" class="box-crit">
+    🧾 <b>อะไหล่ที่ขาด ${rows.length} รายการ</b> — เข้าใบขอจัดซื้อรายวันแล้ว
+    <div style="margin-top:7px">${rows.map(s =>
+      `<div>• <b class="mono">${esc(s.part_no)}</b> ${esc(s.part_name)} ×${s.qty_short} ${esc(s.unit||'')}
+        <span class="muted">· ค้าง ${s.days_waiting} วัน${s.note ? ' · ' + esc(s.note) : ''}</span></div>`).join('')}</div>
+    <div class="muted" style="font-size:12.5px;margin-top:6px">
+      หัวหน้าออกใบขอจัดซื้อได้ที่ คลังอะไหล่ → อะไหล่ที่ขาด</div></div>`;
+}
+
+async function requestAdjust(usedId, kind){
+  const l = S.lines.find(x => x.id === usedId);
+  if (!l) return toast('ไม่พบรายการนี้', true);
+  const pn = l.parts_master?.part_no || '';
+
+  const f = await formModal({
+    title: ADJ_KIND[kind], subtitle: pn + ' · ' + (l.parts_master?.name || '') + ' · ใช้อยู่ ' + l.qty,
+    ok: isBoss() ? 'บันทึกและอนุมัติเลย' : 'ส่งให้หัวหน้าอนุมัติ', danger: kind === 'return',
+    fields: [
+      ...(kind === 'edit'
+        ? [{ k:'qty_new', label:'จำนวนที่ใช้จริง', type:'number', required:true, min:1, value:l.qty }]
+        : []),
+      { k:'reason', label:'เหตุผล', type:'textarea', required:true,
+        placeholder: kind === 'return' ? 'เช่น เบิกมาเกิน ไม่ได้ใช้ คืนเข้าคลัง' : 'เช่น ใช้จริง 1 ชิ้น ไม่ใช่ 2' }
+    ]});
+  if (!f) return;
+
+  try {
+    const { data, error } = await sb.rpc('request_parts_adjust', {
+      p_used_id: usedId, p_kind: kind,
+      p_qty_new: kind === 'edit' ? Number(f.qty_new) : null,
+      p_reason: f.reason, p_by: who() });
+    if (error) throw error;
+
+    /* หัวหน้าทำเอง = อนุมัติในจังหวะเดียว ไม่ต้องรอใคร */
+    if (isBoss()){
+      const r = await sb.rpc('decide_parts_adjust',
+        { p_id: data, p_approve: true, p_note: 'หัวหน้าดำเนินการเอง', p_by: who() });
+      if (r.error) throw r.error;
+      toast('✅ แก้แล้ว — ระบบคิดยอดรวมใหม่และปรับสต็อกให้เรียบร้อย');
+    } else {
+      toast('📨 ส่งคำขอให้หัวหน้าแล้ว — ยอดรวมจะเปลี่ยนหลังอนุมัติ');
+    }
+    await openJob(S.job.id); reloadAll();
+  } catch(e){ fail(e); }
+}
+
+async function decideAdjust(id, ok){
+  const a = (S.adjust || []).find(x => x.id === id);
+  const f = await formModal({
+    title: ok ? 'อนุมัติคำขอ' : 'ไม่อนุมัติคำขอ',
+    subtitle: a ? `${a.part_no} · ${ADJ_KIND[a.kind]} · ผู้ขอ ${a.requested_by || '—'}` : '',
+    ok: ok ? 'อนุมัติ — คิดยอดใหม่' : 'ไม่อนุมัติ', danger: !ok,
+    fields: [{ k:'note', label:'หมายเหตุของหัวหน้า', type:'textarea',
+      placeholder: ok ? 'เช่น ตรวจของคืนแล้วครบ' : 'เช่น อะไหล่ตัวนี้ใช้จริงตามที่เบิก' }]
+  });
+  if (!f) return;
+  try {
+    const { error } = await sb.rpc('decide_parts_adjust',
+      { p_id:id, p_approve:ok, p_note:f.note || null, p_by:who() });
+    if (error) throw error;
+    toast(ok ? '✅ อนุมัติแล้ว — ยอดรวมและสต็อกอัปเดตแล้ว' : 'ไม่อนุมัติคำขอนี้');
+    if (S.job) await openJob(S.job.id);
+    reloadAll();
+  } catch(e){ fail(e); }
+}
+
+
+/* =====================================================================
+   อะไหล่ขาด → ใบขอจัดซื้อรายวัน (SOP A11b.1)
+   ===================================================================== */
+async function reportShortage(){
+  const f = await formModal({
+    title:'แจ้งอะไหล่ขาด', subtitle:'เข้าสรุปรายวัน แล้วหัวหน้าออกใบขอจัดซื้อได้ทันที',
+    ok:'บันทึกอะไหล่ขาด', danger:true,
+    fields:[
+      { k:'part_no', label:'รหัสอะไหล่ที่ขาด', required:true, upper:true, half:true,
+        list:S.parts.map(p => p.part_no), placeholder:'BR-00124' },
+      { k:'qty', label:'จำนวนที่ต้องใช้', type:'number', required:true, min:1, value:1, half:true },
+      { k:'note', label:'หมายเหตุ', placeholder:'เช่น ในคลังเหลือ 0 ต้องสั่งเข้า' }
+    ]});
+  if (!f) return;
+  try {
+    const { error } = await sb.rpc('report_shortage', {
+      p_job_id:S.job.id, p_part_no:f.part_no, p_qty:Number(f.qty),
+      p_note:f.note || null, p_by:who() });
+    if (error) throw error;
+    toast('✅ บันทึกแล้ว — ใบงานเปลี่ยนเป็น "รออะไหล่"');
+    await openJob(S.job.id); reloadAll();
+  } catch(e){ fail(e); }
+}
+
+async function makePR(d){
+  const f = await formModal({
+    title:'ออกใบขอจัดซื้ออะไหล่', subtitle:'รวมอะไหล่ที่ขาดของวันที่ ' + dth(d) + ' ทุกเคสเป็นใบเดียว',
+    ok:'ออกใบขอจัดซื้อ',
+    fields:[{ k:'note', label:'หมายเหตุถึงจัดซื้อ / ผู้อนุมัติ', type:'textarea',
+      placeholder:'เช่น ขออนุมัติสั่งด่วน มีเคสลูกค้ารออยู่ 3 เคส' }]
+  });
+  if (!f) return;
+  try {
+    const { data, error } = await sb.rpc('make_purchase_request',
+      { p_date:d, p_note:f.note || null, p_by:who() });
+    if (error) throw error;
+    toast('✅ ออกใบ ' + data + ' แล้ว');
+    await loadParts();
+    printPR(data);
+  } catch(e){ fail(e); }
+}
+
+async function receivePR(no){
+  if (!await confirmModal('รับอะไหล่ตามใบ ' + no + '?',
+      'ระบบจะรับเข้าสต็อกทุกบรรทัดในใบนี้ และปิดรายการอะไหล่ที่ขาดให้อัตโนมัติ', { ok:'รับเข้าคลัง', danger:false })) return;
+  try {
+    const { data, error } = await sb.rpc('receive_purchase_request', { p_pr_no:no, p_by:who() });
+    if (error) throw error;
+    toast(`✅ รับเข้าแล้ว ${data} รายการ`);
+    await loadParts(); reloadAll();
+  } catch(e){ fail(e); }
+}
+
+/* ---------- ใบขอจัดซื้อสำหรับพิมพ์ (SOP แบบฟอร์ม A11b.1) ---------- */
+async function printPR(no){
+  try {
+    const [pr, lines] = await Promise.all([
+      sb.from('v_purchase_requests').select('*').eq('pr_no', no).maybeSingle(),
+      sb.from('v_pr_lines').select('*').eq('pr_no', no)
+    ]);
+    if (pr.error) throw pr.error;
+    const p = pr.data, ls = lines.data || [];
+    if (!p) return toast('ไม่พบใบขอจัดซื้อ ' + no, true);
+
+    $('printArea').innerHTML = `
+    <div class="pdoc">
+      <div class="phdr">
+        <div class="co"><b>${esc(COMPANY.brand)}</b>
+          <div class="s">${esc(COMPANY.name)}</div>
+          <div class="s">${esc(COMPANY.sub)}</div>
+          <div class="a">${esc(COMPANY.addr)}<br>โทร ${esc(COMPANY.phone)}</div></div>
+        <div class="rt"><div class="t">ใบขอจัดซื้ออะไหล่</div>
+          <div class="no">${esc(p.pr_no)}</div>
+          <div class="d">วันที่ ${esc(dth(p.pr_date))}</div>
+          <div class="d">ผู้ขอ: ${esc(p.requested_by || '—')}</div></div>
+      </div>
+      <div class="pwar">อะไหล่ที่ขาดจากงานซ่อมของวันที่ <b>${esc(dth(p.pr_date))}</b>
+        รวม <b>${ls.length}</b> รายการ · ขออนุมัติสั่งซื้อเพื่อให้งานซ่อมเดินต่อได้</div>
+      <table class="ptab"><thead><tr>
+        <th>PART NO.</th><th>รายการ</th><th class="n">จำนวน</th><th>หน่วย</th>
+        <th class="n">ราคาทุน/หน่วย</th><th class="n">รวม</th><th>ใบงานที่รออยู่</th>
+      </tr></thead><tbody>
+        ${ls.map(l => `<tr><td>${esc(l.part_no)}</td><td>${esc(l.part_name)}</td>
+          <td class="n">${l.qty}</td><td>${esc(l.unit||'')}</td>
+          <td class="n">฿${money2(l.unit_cost)}</td><td class="n">฿${money2(l.line_total)}</td>
+          <td style="font-size:10px">${esc(l.job_refs||'—')}</td></tr>`).join('')}
+        <tr><td colspan="5" style="text-align:right"><b>รวมทั้งใบ</b></td>
+          <td class="n"><b>฿${money2(p.total_cost)}</b></td><td></td></tr>
+      </tbody></table>
+      ${p.note ? `<div class="pbox" style="margin-top:9px"><div class="h">หมายเหตุ</div>
+        <div class="b" style="white-space:pre-wrap;font-size:12px">${esc(p.note)}</div></div>` : ''}
+      <div class="psign" style="grid-template-columns:1fr 1fr 1fr;gap:18px">
+        <div class="s"><div class="l"></div><div class="c">ผู้ขอซื้อ · ศูนย์บริการ<br>${esc(p.requested_by||'')}</div></div>
+        <div class="s"><div class="l"></div><div class="c">หัวหน้าศูนย์บริการ<br>วันที่ ______________</div></div>
+        <div class="s"><div class="l"></div><div class="c">ผู้อนุมัติ · CEO<br>วันที่ ______________</div></div>
+      </div>
+      <div class="pnote">${esc(COMPANY.note)}</div>
+    </div>`;
+    window.print();
+  } catch(e){ fail(e); }
+}
 
 /* =====================================================================
    ลูกค้า
@@ -2594,8 +3019,82 @@ function closeCust(){
    คลังอะไหล่
    ===================================================================== */
 async function loadParts(){
-  try { S.stock = await window.__pageAll(() => sb.from('v_parts_stock').select('*')); renderParts(); renderBell(); }
-  catch(e){ fail(e); }
+  try {
+    const [stock, sh, pr] = await Promise.all([
+      window.__pageAll(() => sb.from('v_parts_stock').select('*')),
+      sb.from('v_shortage_daily').select('*').limit(200),
+      sb.from('v_purchase_requests').select('*').limit(100)
+    ]);
+    S.stock = stock;
+    S.shortDaily = sh.error ? [] : (sh.data || []);
+    S.prs        = pr.error ? [] : (pr.data || []);
+    if (sh.error) console.warn('v_shortage_daily', sh.error.message);
+    renderParts(); renderShortage(); renderPR(); renderAdjust(); renderBell();
+  } catch(e){ fail(e); }
+}
+
+/* ---------- อะไหล่ที่ขาด สรุปรายวัน ---------- */
+function renderShortage(){
+  const rows = S.shortDaily || [];
+  $('shEmpty').style.display = rows.length ? 'none' : 'block';
+  const ST = { open:['tag-crit','ยังไม่ได้สั่ง'], requested:['tag-warn','ออกใบแล้ว'],
+               received:['tag-good','รับเข้าแล้ว'], cancelled:['st0','ยกเลิก'] };
+  $('tblShort').querySelector('tbody').innerHTML = rows.map(r => {
+    const s = ST[r.status] || ['st0', r.status];
+    return `<tr>
+      <td><b>${esc(dth(r.short_date))}</b></td>
+      <td class="mono"><b>${esc(r.part_no)}</b></td><td>${esc(r.part_name)}</td>
+      <td class="num"><b style="font-size:16px;color:var(--crit)">${r.qty_short}</b>
+        <span class="sub2">${esc(r.unit||'')}</span></td>
+      <td class="num">${r.job_count}</td>
+      <td class="sub2 mono" style="font-size:11.5px">${esc(r.job_refs||'—')}</td>
+      <td class="num">฿${money(Number(r.cost_price||0) * r.qty_short)}</td>
+      <td><span class="pill ${s[0]}">${esc(s[1])}</span></td>
+      <td class="num noprint">${r.status === 'open' && isBoss()
+        ? `<button class="btn sm p" onclick="makePR('${r.short_date}')">ออกใบขอซื้อ</button>` : ''}</td></tr>`;
+  }).join('');
+}
+
+/* ---------- ใบขอจัดซื้อ ---------- */
+function renderPR(){
+  const rows = S.prs || [];
+  $('prEmpty').style.display = rows.length ? 'none' : 'block';
+  const ST = { draft:['tag-warn','รออนุมัติ'], approved:['st1','อนุมัติแล้ว'],
+               ordered:['st2','สั่งซื้อแล้ว'], received:['tag-good','รับเข้าแล้ว'],
+               cancelled:['st0','ยกเลิก'] };
+  $('tblPR').querySelector('tbody').innerHTML = rows.map(r => {
+    const s = ST[r.status] || ['st0', r.status];
+    return `<tr>
+      <td class="mono"><b>${esc(r.pr_no)}</b></td><td>${esc(dth(r.pr_date))}</td>
+      <td class="num">${r.line_count}</td><td class="num"><b>฿${money(r.total_cost)}</b></td>
+      <td><span class="pill ${s[0]}">${esc(s[1])}</span></td>
+      <td class="sub2">${esc(r.requested_by||'—')}</td>
+      <td class="num noprint">
+        <button class="btn ic" onclick="printPR('${esc(r.pr_no)}')" title="พิมพ์ใบขอจัดซื้อ">🖨️</button>
+        ${r.status !== 'received' && isBoss()
+          ? `<button class="btn sm g" onclick="receivePR('${esc(r.pr_no)}')">รับเข้าคลัง</button>` : ''}</td></tr>`;
+  }).join('');
+}
+
+/* ---------- คำขอแก้อะไหล่ที่รออนุมัติ ---------- */
+function renderAdjust(){
+  const rows = (S.adjust || []);
+  $('cardAdjust').hidden = !rows.length;
+  $('adjCount').textContent = rows.length;
+  if (!rows.length) return;
+  $('tblAdjust').querySelector('tbody').innerHTML = rows.map(a => `<tr>
+    <td class="mono"><b>${esc(a.job_no||'—')}</b>
+      <div class="sub2"><button class="dlink2" onclick="openJob('${a.job_id}')">เปิดใบงาน</button></div></td>
+    <td class="mono"><b>${esc(a.part_no||'—')}</b><div class="sub2">${esc(a.part_name||'')}</div></td>
+    <td><span class="pill st1">${esc(ADJ_KIND[a.kind]||a.kind)}</span></td>
+    <td class="num">${a.qty_now ?? '—'}</td>
+    <td class="num"><b>${a.kind === 'return' ? '0' : (a.qty_new ?? '—')}</b></td>
+    <td class="sub2">${esc(a.reason||'')}</td>
+    <td class="sub2">${esc(a.requested_by||'—')}<div class="sub2">${esc(dth(a.created_at))}</div></td>
+    <td class="num noprint">${isBoss()
+      ? `<button class="btn ic" onclick="decideAdjust('${a.id}',true)" title="อนุมัติ">✓</button>
+         <button class="btn ic dn" onclick="decideAdjust('${a.id}',false)" title="ไม่อนุมัติ">✕</button>`
+      : '<span class="muted">รอหัวหน้า</span>'}</td></tr>`).join('');
 }
 function renderParts(){
   const q = val('pSearch').toLowerCase();
@@ -2696,24 +3195,180 @@ async function receiveParts(){
 /* =====================================================================
    รายงาน
    ===================================================================== */
+/* ---------- แท็บ ---------- */
+const REP_TABS = [
+  { k:'work',    t:'📊 ผลงานช่าง',    boss:false },
+  { k:'money',   t:'💵 การเงินและรางวัล', boss:true  },
+  { k:'quality', t:'🔍 คุณภาพสินค้า',  boss:false }
+];
+const DIFF_COLOR = { light:'#9cbbdf', medium:'#4f83bb', heavy:'#1F3864', none:'#d8e0ec' };
+
+function setRepTab(k){
+  S.repTab = k;
+  REP_TABS.forEach(t => { const el = $('rt-' + t.k); if (el) el.hidden = (t.k !== k); });
+  renderRepTabs();
+}
+function renderRepTabs(){
+  const show = REP_TABS.filter(t => !t.boss || isBoss());
+  $('repTabs').innerHTML = show.map(t =>
+    `<button class="chip ${S.repTab === t.k ? 'on' : ''}" onclick="setRepTab('${t.k}')">${t.t}</button>`).join('');
+}
+
 async function loadReport(){
-  const live = S.jobs.filter(j => j.status !== 'cancelled');
+  if (!S.repTab || (!isBoss() && S.repTab === 'money')) S.repTab = 'work';
+  setRepTab(S.repTab);
+
+  /* ช่างไม่ต้องมีตัวเลขเงินอยู่ในหน้าเลย — ถอดออกจาก DOM ทิ้ง */
+  if (!isBoss()){ const m = $('rt-money'); if (m) m.innerHTML = ''; }
+
+  await loadWorkReport();                     // ต้องมาก่อน — ตารางรางวัลใช้ S.score
+  await Promise.all([loadQualityReport(), isBoss() ? loadMoneyReport() : Promise.resolve()]);
+}
+
+
+/* =====================================================================
+   แท็บ 1 · ผลงานช่าง — จำนวนเคส ไม่มีตัวเลขเงิน ช่างเปิดดูได้
+   ===================================================================== */
+async function loadWorkReport(){
+  let rows = [];
+  try {
+    const { data, error } = await sb.from('v_tech_scorecard').select('*');
+    if (error) throw error;
+    rows = data || [];
+  } catch(e){
+    console.warn('v_tech_scorecard — ยังไม่ได้รัน 13_update.sql?', e.message);
+    /* คิดจากข้อมูลที่มีในเครื่องแทน ให้หน้าไม่ว่าง */
+    rows = S.techs.map(t => {
+      const mine = S.jobs.filter(j => j.technician_id === t.id);
+      const cnt = sv => mine.filter(j => j.severity === sv).length;
+      return { technician_id:t.id, code:t.code, tech_name:t.nickname || t.full_name,
+        jobs_total:mine.length,
+        jobs_done: mine.filter(j => j.status === 'delivered').length,
+        jobs_open: mine.filter(j => !CLOSED.includes(j.status)).length,
+        lv_light:cnt('light'), lv_medium:cnt('medium'), lv_heavy:cnt('heavy'),
+        lv_none: mine.filter(j => !j.severity).length,
+        on_time:null, overdue_now: mine.filter(j => !CLOSED.includes(j.status) && j.days_overdue > 0).length,
+        avg_days:null };
+    }).sort((a,b) => b.jobs_total - a.jobs_total);
+  }
+  S.score = rows;
+
+  /* ช่างเห็นแถวตัวเองเด่นขึ้นมา แต่ยังเทียบกับเพื่อนได้ */
+  const meRow = rows.find(r => r.technician_id === ME.techId);
+  const sum = k => rows.reduce((s,r) => s + Number(r[k]||0), 0);
+
+  const kpi = ME.role === 'tech' && meRow
+    ? [['na','🧰','เคสของคุณ',        meRow.jobs_total,  'เคส'],
+       ['nb','✅','ปิดงานแล้ว',        meRow.jobs_done,   'เคส'],
+       ['nd','⏳','ค้างอยู่',          meRow.jobs_open,   'เคส'],
+       ['nc','🔥','เคสหนักที่รับไป',    meRow.lv_heavy,    'เคส']]
+    : [['na','🧰','เคสที่มอบหมายแล้ว', sum('jobs_total'), 'เคส'],
+       ['nb','✅','ปิดงานแล้ว',        sum('jobs_done'),  'เคส'],
+       ['nd','⏳','ค้างอยู่',          sum('jobs_open'),  'เคส'],
+       ['ne','👷','ช่างที่มีงาน',       rows.filter(r => r.jobs_total > 0).length, 'คน']];
+
+  $('workKpi').innerHTML = kpi.map(([cl,e,l,nv,u]) =>
+    `<div class="kpi ${cl}"><div class="t"><span class="l">${l}</span><span class="e">${e}</span></div>
+      <div class="n">${nv}<small>${u}</small></div></div>`).join('');
+
+  /* กราฟแท่งกลุ่ม — ช่างละ 3 แท่ง ง่าย/กลาง/ยาก */
+  const has = rows.filter(r => r.jobs_total > 0);
+  $('diffChart').innerHTML = has.length
+    ? groupedBarSVG(
+        has.map(r => r.tech_name),
+        [{ name:'ง่าย',  color:DIFF_COLOR.light,  data:has.map(r => Number(r.lv_light)) },
+         { name:'กลาง', color:DIFF_COLOR.medium, data:has.map(r => Number(r.lv_medium)) },
+         { name:'ยาก',  color:DIFF_COLOR.heavy,  data:has.map(r => Number(r.lv_heavy)) }],
+        Math.max(560, has.length * 96))
+    : '<div class="empty">ยังไม่มีเคสที่มอบหมายให้ช่าง</div>';
+
+  /* ตาราง */
+  $('scEmpty').style.display = rows.length ? 'none' : 'block';
+  $('tblScore').querySelector('tbody').innerHTML = rows.map(r => {
+    const mine = r.technician_id === ME.techId;
+    return `<tr ${mine ? 'style="background:var(--gold-l)"' : ''}>
+      <td><b>${esc(r.tech_name)}</b>${mine ? ' <span class="pill st1">คุณ</span>' : ''}
+        <div class="sub2 mono">${esc(r.code||'')}</div></td>
+      <td class="num"><b style="font-size:16px">${r.jobs_total}</b></td>
+      <td class="num">${r.jobs_done}</td>
+      <td class="num">${r.jobs_open}</td>
+      <td class="num" style="color:${DIFF_COLOR.light}">${r.lv_light}</td>
+      <td class="num" style="color:${DIFF_COLOR.medium}"><b>${r.lv_medium}</b></td>
+      <td class="num" style="color:${DIFF_COLOR.heavy}"><b>${r.lv_heavy}</b></td>
+      <td class="num">${r.on_time ?? '—'}</td>
+      <td class="num">${Number(r.overdue_now) > 0
+        ? `<span class="pill tag-crit">${r.overdue_now}</span>` : '0'}</td>
+      <td class="num muted">${r.avg_days ?? '—'}</td></tr>`;
+  }).join('');
+
+  /* โดนัทสัดส่วนทั้งศูนย์ */
+  const tot = [
+    { key:'light',  label:'ง่าย (' + diffDays('light') + ' วัน)',   value:sum('lv_light'),  color:DIFF_COLOR.light },
+    { key:'medium', label:'กลาง (' + diffDays('medium') + ' วัน)',  value:sum('lv_medium'), color:DIFF_COLOR.medium },
+    { key:'heavy',  label:'ยาก (' + diffDays('heavy') + ' วัน)',    value:sum('lv_heavy'),  color:DIFF_COLOR.heavy },
+    { key:'none',   label:'ยังไม่ระบุระดับ',                        value:sum('lv_none'),   color:DIFF_COLOR.none }
+  ];
+  const all = tot.reduce((s,i) => s + i.value, 0);
+  $('diffDonut').innerHTML = donutSVG(tot, 180, 30);
+  $('diffLegend').innerHTML = tot.map(i => `
+    <div style="display:flex;align-items:center;gap:9px;padding:6px 0;border-bottom:1px solid var(--line2)">
+      <span class="sw" style="background:${i.color};width:13px;height:13px;border-radius:3px;flex:0 0 13px"></span>
+      <span style="flex:1">${esc(i.label)}</span>
+      <b>${i.value}</b>
+      <span class="muted" style="width:46px;text-align:right">${all ? Math.round(i.value/all*100) : 0}%</span>
+    </div>`).join('');
+}
+
+
+/* =====================================================================
+   แท็บ 2 · การเงินและรางวัล — เฉพาะ head / admin
+   ===================================================================== */
+async function loadMoneyReport(){
+  const live  = S.jobs.filter(j => j.status !== 'cancelled');
   const parts = live.reduce((s,j) => s + Number(j.parts_cost||0), 0);
   const labor = live.reduce((s,j) => s + Number(j.labor_cost||0), 0);
   const total = live.reduce((s,j) => s + Number(j.total_cost||0), 0);
+  const done  = live.filter(j => j.status === 'delivered').length;
 
   $('repKpi').innerHTML = [
-    ['nc','💵','รายได้รวม',  '฿' + money(total)],
-    ['nb','🛠️','ค่าแรงรวม',  '฿' + money(labor)],
-    ['ne','📦','ค่าอะไหล่รวม','฿' + money(parts)]
-  ].map(([cl,e,l,n]) => `<div class="kpi ${cl}"><div class="t"><span class="l">${l}</span><span class="e">${e}</span></div>
-    <div class="n">${n}</div></div>`).join('');
+    ['nc','💵','รายได้รวม',    '฿' + money(total)],
+    ['nb','🛠️','ค่าแรงรวม',    '฿' + money(labor)],
+    ['ne','📦','ค่าอะไหล่รวม',  '฿' + money(parts)],
+    ['na','📈','เฉลี่ยต่อเคสปิด', '฿' + money(done ? total/done : 0)]
+  ].map(([cl,e,l,nv]) => `<div class="kpi ${cl}"><div class="t"><span class="l">${l}</span><span class="e">${e}</span></div>
+    <div class="n">${nv}</div></div>`).join('');
 
   const items = S.techs.map(t => {
     const v = live.filter(j => j.technician_id === t.id).reduce((s,j) => s + Number(j.total_cost||0), 0);
     return { label: t.nickname || t.full_name, value: Math.round(v), sub: '฿' + money(v), color:'#2E75B6' };
   }).sort((a,b) => b.value - a.value);
   $('revChart').innerHTML = items.some(i => i.value > 0) ? hBarsSVG(items) : '<div class="empty">ยังไม่มีรายได้บันทึกไว้</div>';
+
+  /* รางวัลช่าง — คิดจากเรทในหน้าตั้งค่า */
+  const rows = S.score || [];
+  const rate = REWARD_RATE;
+  $('rewardHint').innerHTML =
+    `เรทที่ใช้อยู่: ง่าย <b>฿${money(rate.light)}</b> · กลาง <b>฿${money(rate.medium)}</b> · ยาก <b>฿${money(rate.heavy)}</b> ต่อเคส`
+    + ` · แก้ได้ที่ ตั้งค่า → เรทรางวัลช่าง`
+    + `<div class="muted" style="font-size:12.5px;margin-top:4px">นับจากเคสที่ปิดงานแล้วเท่านั้น · ช่างเห็นได้แค่จำนวนเคสในแท็บผลงาน</div>`;
+
+  const rw = rows.map(r => {
+    /* สัดส่วนเคสที่ปิดแล้วในแต่ละระดับ — ประมาณจากอัตราปิดงานของช่างคนนั้น */
+    const f = r.jobs_total ? Number(r.jobs_done) / Number(r.jobs_total) : 0;
+    const l = Math.round(Number(r.lv_light) * f), m = Math.round(Number(r.lv_medium) * f),
+          hv = Math.round(Number(r.lv_heavy) * f);
+    return { ...r, dl:l, dm:m, dh:hv,
+      reward: l*Number(rate.light||0) + m*Number(rate.medium||0) + hv*Number(rate.heavy||0) };
+  }).sort((a,b) => b.reward - a.reward);
+
+  $('tblReward').querySelector('tbody').innerHTML = rw.length ? rw.map(r => `<tr>
+    <td><b>${esc(r.tech_name)}</b></td>
+    <td class="num">${r.jobs_done}</td>
+    <td class="num">${r.dl}</td><td class="num">${r.dm}</td><td class="num">${r.dh}</td>
+    <td class="num"><b style="font-size:16px;color:var(--good)">฿${money(r.reward)}</b></td></tr>`).join('')
+    + `<tr><td colspan="5" style="text-align:right"><b>รวมทั้งศูนย์</b></td>
+       <td class="num"><b>฿${money(rw.reduce((s,r) => s + r.reward, 0))}</b></td></tr>`
+    : '<tr><td colspan="6" class="empty">ยังไม่มีข้อมูล</td></tr>';
 
   try {
     const { data: plat } = await sb.from('v_by_platform').select('*');
@@ -2724,7 +3379,13 @@ async function loadReport(){
       <td class="num"><b>฿${money(p.revenue)}</b></td></tr>`).join('')
       : '<tr><td colspan="7" class="empty">ยังไม่มีข้อมูล</td></tr>';
   } catch(e){ console.warn(e); }
+}
 
+
+/* =====================================================================
+   แท็บ 3 · คุณภาพสินค้า
+   ===================================================================== */
+async function loadQualityReport(){
   try {
     const { data } = await sb.from('v_symptoms_by_model').select('*').limit(40);
     const rows = data || [];
@@ -2734,6 +3395,12 @@ async function loadReport(){
       <td>${esc(r.symptom_name)}</td>
       <td class="num"><span class="pill ${r.job_count>=4?'tag-crit':'tag-warn'}">${r.job_count} ครั้ง</span></td></tr>`).join('');
   } catch(e){ console.warn(e); }
+
+  const top = (S.stock || []).filter(p => Number(p.used_90d) > 0)
+    .sort((a,b) => Number(b.used_90d) - Number(a.used_90d)).slice(0,12)
+    .map(p => ({ label:p.part_no + ' · ' + (p.name||''), value:Number(p.used_90d),
+                 sub:p.used_90d + ' ' + (p.unit||'ชิ้น'), color:'#4f83bb' }));
+  $('topParts').innerHTML = top.length ? hBarsSVG(top, 560) : '<div class="empty">ยังไม่มีการเบิกอะไหล่</div>';
 }
 
 
@@ -2761,6 +3428,15 @@ async function loadSettings(){
 }
 
 function renderSettings(){
+  /* ---- สเกลความยาก + เรทรางวัล ---- */
+  const set = (id, v) => { if ($(id)) $(id).value = v; };
+  set('cfgDLight',  DIFF_DAYS.light);
+  set('cfgDMedium', DIFF_DAYS.medium);
+  set('cfgDHeavy',  DIFF_DAYS.heavy);
+  set('cfgRLight',  REWARD_RATE.light);
+  set('cfgRMedium', REWARD_RATE.medium);
+  set('cfgRHeavy',  REWARD_RATE.heavy);
+
   /* ---- ช่าง ---- */
   $('tblTech').querySelector('tbody').innerHTML = (SET.techsAll || []).map(t => {
     const load = S.jobs.filter(j => j.technician_id === t.id && !CLOSED.includes(j.status)).length;
@@ -2820,6 +3496,33 @@ function renderSettings(){
         onclick="toggleSym('${esc(s.code)}',${!s.is_active})">${s.is_active ? '🚫' : '✓'}</button></td>
     </tr>`;
   }).join('') || '<tr><td colspan="6" class="empty">ยังไม่มีหมวดอาการ</td></tr>';
+}
+
+/* ---------- ค่าตั้งระบบ ---------- */
+async function saveCfg(key, value, label){
+  const { error } = await sb.from('sys_config')
+    .upsert({ key, value, updated_by: who(), updated_at: new Date().toISOString() },
+            { onConflict: 'key' });
+  if (error) throw error;
+  toast('✅ บันทึก' + label + 'แล้ว');
+}
+
+async function saveDiffDays(){
+  const num = (id, d) => Math.max(1, Math.min(60, Math.round(Number(val(id)) || d)));
+  const v = { light: num('cfgDLight',1), medium: num('cfgDMedium',2), heavy: num('cfgDHeavy',3) };
+  try {
+    await saveCfg('difficulty_days', v, 'สเกลความยาก');
+    DIFF_DAYS = v; renderSettings(); previewDue();
+  } catch(e){ fail(e); }
+}
+
+async function saveReward(){
+  const num = id => Math.max(0, Math.round(Number(val(id)) || 0));
+  const v = { light: num('cfgRLight'), medium: num('cfgRMedium'), heavy: num('cfgRHeavy') };
+  try {
+    await saveCfg('reward_rate', v, 'เรทรางวัล');
+    REWARD_RATE = v; renderSettings();
+  } catch(e){ fail(e); }
 }
 
 /* ---------- ช่าง ---------- */
@@ -2983,6 +3686,22 @@ function buildAlerts(){
   const open = S.jobs.filter(j => !CLOSED.includes(j.status));
   const today = new Date(); today.setHours(0,0,0,0);
   const dayDiff = d => Math.round((new Date(d).setHours(0,0,0,0) - today) / 864e5);
+
+  // คำขอแก้อะไหล่ที่รอหัวหน้าอนุมัติ — ค้างไว้ = ยอดเงินในใบงานยังไม่ถูก
+  (S.adjust || []).forEach(a => A.push({
+    g:'คำขอแก้อะไหล่ รออนุมัติ', lv:(a.days_waiting||0) >= 1 ? 'crit' : 'warn', ic:'✏️',
+    t1:`${a.job_no || '—'} · ${a.part_no || '—'} ${a.part_name || ''}`,
+    t2:`${ADJ_KIND[a.kind] || a.kind} · ${a.qty_now ?? '—'} → ${a.kind === 'return' ? 0 : (a.qty_new ?? '—')} · ผู้ขอ ${a.requested_by || '—'}`,
+    rt:(a.days_waiting||0) > 0 ? `รอ ${a.days_waiting} วัน` : 'วันนี้',
+    go:() => openJob(a.job_id) }));
+
+  // อะไหล่ขาด ยังไม่ได้ออกใบขอจัดซื้อ
+  (S.shortage || []).forEach(s => A.push({
+    g:'อะไหล่ขาด ยังไม่ได้สั่งซื้อ', lv:(s.days_waiting||0) >= 2 ? 'crit' : 'warn', ic:'🧾',
+    t1:`${s.part_no} · ${s.part_name}`,
+    t2:`ขาด ${s.qty_short} ${s.unit || 'ชิ้น'} · ใบงาน ${s.job_no || '—'}`,
+    rt:`ค้าง ${s.days_waiting || 0} วัน`,
+    go:() => goPage('parts') }));
 
   // เกินกำหนด — เร่งด่วนสุด
   open.filter(j => j.days_overdue > 0)
