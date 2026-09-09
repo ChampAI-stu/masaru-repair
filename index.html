@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<link rel="stylesheet" href="repair.css">
+<link rel="stylesheet" href="repair.css" onerror="window.__cssFail = 1">
 </head>
 <body>
 
@@ -390,13 +390,30 @@
         <div id="rt-money" hidden>
           <div class="kpis" id="repKpi"></div>
 
+          <div class="card" id="cardNoWar" hidden>
+            <h3>⚠️ เคสที่ยังไม่ได้เลือกเงื่อนไขประกัน <span class="sp"></span>
+              <span class="pill tag-crit" id="noWarCount">0</span></h3>
+            <div class="cb">
+              <div class="box-warn">เคสพวกนี้ยังไม่รู้ว่าใครจ่าย ระบบจึง<b>นับแบบระวังไว้ก่อนว่าบริษัทแบก</b>
+                (เข้าช่องต้นทุนเคลม) และ<b>ไม่นับเป็นรายได้</b> — ต้นทุนจะไม่หายไปเงียบ ๆ
+                แต่ถ้าจริง ๆ เป็นเคสนอกประกัน ตัวเลขจะติดลบเกินจริง
+                <div class="muted" style="font-size:12.5px;margin-top:4px">
+                  ตัวเลขรายงานจะแม่นเต็มที่เมื่อรายการนี้เป็น 0</div></div>
+              <div class="tw" style="margin-top:11px"><table id="tblNoWar">
+                <thead><tr><th>ใบงาน</th><th>ลูกค้า</th><th>เครื่องมือ</th><th>ช่องทาง</th>
+                  <th class="num">มูลค่าที่บันทึกไว้</th><th>แอดมิน</th><th class="num noprint"></th></tr></thead>
+                <tbody></tbody></table></div>
+            </div>
+          </div>
+
           <div class="card">
             <h3>💰 แยกตามเงื่อนไขประกัน — ใครจ่ายอะไร <span class="sp"></span>
               <span class="muted" style="font-weight:400;font-size:13px">ตัวเลขที่เอาไปคุยกับผู้บริหารได้</span></h3>
             <div class="cb"><div class="tw"><table id="tblWar">
               <thead><tr><th>เงื่อนไขประกัน</th><th class="num">เคส</th>
-                <th class="num">🟢 เก็บจากลูกค้า</th><th class="num">ต้นทุนอะไหล่ที่ขายได้</th>
-                <th class="num">🔴 ต้นทุนอะไหล่เคลม</th><th class="num">กำไรขั้นต้น</th></tr></thead>
+                <th class="num">🟢 รายได้</th><th class="num">ทุนอะไหล่ที่ขายได้</th>
+                <th class="num">🔴 ทุนอะไหล่เคลม</th><th class="num">🚚 ค่าส่งบริษัทออก</th>
+                <th class="num">เหลือสุทธิ</th></tr></thead>
               <tbody></tbody></table></div>
               <div class="box-info" style="margin-top:11px" id="warHint"></div>
             </div>
@@ -422,8 +439,8 @@
             <div class="cb"><div class="tw"><table id="tblPlat">
               <thead><tr><th>ช่องทาง</th><th class="num">เคสทั้งหมด</th>
                 <th class="num">เคลม</th><th class="num">ลูกค้าจ่าย</th>
-                <th class="num">🟢 รายได้</th><th class="num">🔴 ต้นทุนเคลม</th>
-                <th class="num">สุทธิ</th></tr></thead><tbody></tbody></table></div></div>
+                <th class="num">🟢 รายได้</th><th class="num">🔴 ทุนเคลม</th>
+                <th class="num">🚚 ค่าส่งบริษัท</th><th class="num">สุทธิ</th></tr></thead><tbody></tbody></table></div></div>
           </div>
 
           <div class="card">
@@ -569,6 +586,68 @@ function showCrash(msg, src){
     + 'แล้วส่งข้อความสีแดงมาให้ผู้ดูแลระบบ</div>';
 }
 window.addEventListener('error', e => showCrash(e.message, (e.filename||'') + ':' + (e.lineno||'')));
+
+/* ---------------------------------------------------------------------
+   ตรวจว่าไฟล์ประกอบโหลดครบไหม
+     หน้าเว็บแยกเป็น 4 ไฟล์ ถ้าลืมอัปตัวใดตัวหนึ่ง หน้าจะเพี้ยนแบบเงียบ ๆ
+     ตัวนี้เอา class จริงมาลองใช้ ถ้าสไตล์ไม่ติด = ไฟล์ไม่มา
+     ข้อความใช้ inline style ทั้งหมด เพราะตอนนั้นยังไม่มี CSS ให้ใช้
+   ------------------------------------------------------------------ */
+function checkAssets(){
+  const miss = [];
+
+  // repair.css — ลองสร้าง .card แล้วดูว่า border-radius ติดไหม
+  let cssOk = false;
+  try {
+    const t = document.createElement('div');
+    t.className = 'card';
+    t.style.cssText = 'position:absolute;left:-9999px;top:0';
+    document.body.appendChild(t);
+    const cs = getComputedStyle(t);
+    cssOk = cs.borderRadius !== '0px' && cs.borderRadius !== '';
+    t.remove();
+  } catch(e){}
+  if (!cssOk || window.__cssFail) miss.push(['repair.css', 'หน้าเว็บจะไม่มีสไตล์เลย ตัวหนังสือกองกันแบบที่เห็นอยู่นี้']);
+
+  // repair-ui.js — เช็คฟังก์ชันที่อยู่ในไฟล์นั้น
+  if (typeof formModal !== 'function' || typeof donutSVG !== 'function')
+    miss.push(['repair-ui.js', 'หน้าต่างฟอร์ม กราฟ และการอัปโหลดรูปจะใช้ไม่ได้']);
+
+  // repair-print.js
+  if (typeof printJob !== 'function')
+    miss.push(['repair-print.js', 'พิมพ์ใบรับเครื่อง / ใบส่งมอบ / ใบขอจัดซื้อ ไม่ได้']);
+
+  if (!miss.length) return;
+
+  const box = document.createElement('div');
+  box.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#1F3864;color:#fff;'
+    + 'padding:28px 22px;overflow:auto;font:400 15px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif';
+  box.innerHTML =
+      '<div style="max-width:620px;margin:0 auto">'
+    + '<div style="font-size:22px;font-weight:800;margin-bottom:6px">📁 ไฟล์ประกอบยังไม่ครบ</div>'
+    + '<div style="opacity:.85;margin-bottom:20px">ระบบนี้ใช้ 4 ไฟล์ทำงานร่วมกัน '
+    + 'ต้องอยู่<b>โฟลเดอร์เดียวกัน</b>ทั้งหมด — ที่ขาดคือ:</div>'
+    + miss.map(([f, why]) =>
+        '<div style="background:rgba(255,255,255,.1);border-radius:10px;padding:13px 16px;margin-bottom:11px">'
+      + '<div style="font-family:ui-monospace,monospace;font-size:16px;font-weight:700">' + f + '</div>'
+      + '<div style="font-size:13.5px;opacity:.85;margin-top:3px">' + why + '</div></div>').join('')
+    + '<div style="margin-top:22px;font-size:14px;line-height:1.9">'
+    + '<b>เช็ค 4 ข้อนี้ตามลำดับ</b><br>'
+    + '1. ไฟล์อยู่ใน repo แล้วหรือยัง — เปิด '
+    + '<a href="' + miss[0][0] + '" style="color:#ffd966" target="_blank">'
+    + location.origin + location.pathname.replace(/[^/]*$/, '') + miss[0][0] + '</a> '
+    + 'ถ้าขึ้น 404 = ยังไม่มีไฟล์<br>'
+    + '2. ชื่อไฟล์ตรงเป๊ะไหม — เบราว์เซอร์มักเติมชื่อเป็น <code>repair (1).css</code> เวลาดาวน์โหลดซ้ำ '
+    + 'และ GitHub Pages <b>แยกตัวพิมพ์ใหญ่-เล็ก</b><br>'
+    + '3. อยู่โฟลเดอร์เดียวกับ index.html ไหม — ห้ามเอาไปใส่ <code>assets/</code> หรือ <code>css/</code><br>'
+    + '4. เพิ่ง push เสร็จ? GitHub Pages ใช้เวลา build 1–2 นาที รอแล้วกด Ctrl+Shift+R'
+    + '</div>'
+    + '<button onclick="location.reload()" style="margin-top:22px;background:#ffd966;color:#1F3864;'
+    + 'border:0;border-radius:9px;padding:12px 22px;font:700 15px inherit;cursor:pointer">🔄 โหลดใหม่</button>'
+    + '</div>';
+  document.body.appendChild(box);
+}
+window.addEventListener('load', checkAssets);
 window.addEventListener('unhandledrejection', e => showCrash(e.reason?.message || e.reason, 'promise'));
 </script>
 
@@ -638,6 +717,19 @@ const diffDays = sv => Number(DIFF_DAYS[sv || 'medium']) || 2;
 const partsByCustomer = j => (j?.parts_by || WARRANTY[j?.warranty_case]?.parts) === 'ลูกค้า';
 const laborByCustomer = j => (j?.labor_by || WARRANTY[j?.warranty_case]?.labor) === 'ลูกค้า';
 const priceBasis = j => partsByCustomer(j) ? 'sell' : 'cost';
+
+/* ค่าส่ง — ไม่ใช่รายได้ของใคร เป็นต้นทุนของฝ่ายที่รับผิดชอบขานั้น
+   ค่าตั้งต้นว่าใครจ่ายมาจาก warranty_rules แก้รายเคสได้ */
+const SHIP_BY = { 'บริษัท':'บริษัท', 'ลูกค้า':'ลูกค้า' };
+const shipByOpts = cur => ['','บริษัท','ลูกค้า'].map(v =>
+  `<option value="${v}" ${v === (cur || '') ? 'selected' : ''}>${v || '— ยังไม่ระบุ —'}</option>`).join('');
+/* ค่าส่งที่บริษัทออกในใบงานนี้ */
+const shipCompany = j =>
+    (j?.ship_in_by  === 'บริษัท' ? Number(j.ship_in_fee  || 0) : 0)
+  + (j?.ship_out_by === 'บริษัท' ? Number(j.ship_out_fee || 0) : 0);
+const shipCustomer = j =>
+    (j?.ship_in_by  === 'ลูกค้า' ? Number(j.ship_in_fee  || 0) : 0)
+  + (j?.ship_out_by === 'ลูกค้า' ? Number(j.ship_out_fee || 0) : 0);
 const addDays  = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n);
   return x.getFullYear() + '-' + String(x.getMonth()+1).padStart(2,'0') + '-' + String(x.getDate()).padStart(2,'0'); };
 const DISPOSITION = {
@@ -1323,7 +1415,8 @@ function warrantyBox(code){
   if (code === 'unknown') return '<div class="box-warn">⚠️ ยังไม่ระบุเงื่อนไขประกัน — ต้องเลือกก่อนเริ่มซ่อม</div>';
   const cls = code === 'within7' ? 'box-ok' : code === 'in_warranty' ? 'box-warn' : 'box-crit';
   return `<div class="${cls}"><b>${esc(w.l)}</b> — ค่าส่ง: <b>${esc(w.ship)}</b> ·
-    ค่าอะไหล่: <b>${esc(w.parts)}</b> · ค่าแรง: <b>${esc(w.labor)}</b></div>`;
+    ค่าอะไหล่: <b>${esc(w.parts)}</b> · ค่าแรง: <b>${esc(w.labor)}</b>
+    <div class="muted" style="font-size:12px;margin-top:3px">ค่าส่งเป็นต้นทุนของฝ่ายที่รับผิดชอบ ไม่ใช่รายได้ของใคร</div></div>`;
 }
 function showWarrantyBox(){ $('warnBox').innerHTML = warrantyBox(val('nWarranty')); }
 
@@ -1660,6 +1753,20 @@ function stepForm(nStep, j, pc){
       <textarea id="sSymptom">${esc(j.symptom||'')}</textarea></div>
     <div style="margin-top:14px"><label>ของที่นำมาด้วย</label>
       <input type="text" id="sAcc" value="${esc(j.accessories||'')}" placeholder="กล่อง, ดอกสว่าน"></div>
+
+    <div style="margin-top:16px"><label>🚚 ค่าส่งขาเข้า
+      <span class="muted" style="font-weight:400">(ลูกค้าส่งเครื่องมาศูนย์)</span></label>
+      <div class="grid g3">
+        <div><input type="number" id="sShipIn" value="${Number(j.ship_in_fee)||0}" min="0" step="10"
+          placeholder="ค่าส่ง (บาท)"></div>
+        <div><select id="sShipInBy">${shipByOpts(j.ship_in_by)}</select></div>
+        <div><input type="text" id="sShipNote" value="${esc(j.ship_note||'')}"
+          placeholder="ขนส่งเจ้าไหน / เลขใบเสร็จ"></div>
+      </div>
+      <div class="box-info" style="margin-top:9px;font-size:12.5px">
+        ค่าส่ง <b>ไม่นับเป็นรายได้ของใคร</b> — บันทึกไว้เพื่อรู้ว่าฝ่ายไหนแบกเท่าไหร่ ·
+        ระบบเติม "ใครจ่าย" ให้เองตามเงื่อนไขประกัน แก้ได้ถ้าตกลงกับลูกค้าเป็นอย่างอื่น</div>
+    </div>
     ` + foot(
       (unknown
         ? `<button class="btn p" onclick="claimOwner()">✅ พบเจ้าของแล้ว</button>`
@@ -1814,6 +1921,21 @@ function stepForm(nStep, j, pc){
       <div><label>อ้างอิงเลขคำสั่งซื้อเดิม</label>
         <input type="text" value="${esc(j.order_no||'—')}" disabled></div>
     </div>
+
+    <div style="margin-top:16px"><label>🚚 ค่าส่งขาออก
+      <span class="muted" style="font-weight:400">(ศูนย์ส่งเครื่องคืนลูกค้า)</span></label>
+      <div class="grid g2">
+        <div><input type="number" id="sShipOut" value="${Number(j.ship_out_fee)||0}" min="0" step="10"
+          placeholder="ค่าส่ง (บาท)"></div>
+        <div><select id="sShipOutBy">${shipByOpts(j.ship_out_by)}</select></div>
+      </div>
+      <div class="box-info" style="margin-top:9px;font-size:13px">
+        รวมค่าส่งใบงานนี้: บริษัทออก <b>฿${money2(shipCompany(j))}</b> ·
+        ลูกค้าออก <b>฿${money2(shipCustomer(j))}</b>
+        <div class="muted" style="font-size:12.5px;margin-top:3px">
+          ค่าส่งไม่เข้ารายได้ของฝ่ายใด — ฝ่ายที่รับผิดชอบแบกเป็นต้นทุนของตัวเอง</div>
+      </div>
+    </div>
     ${j.case_type === 'replace' ? `<div class="box-warn" style="margin-top:14px">
       🔄 <b>เคสเปลี่ยนสินค้า</b> — ปลายทางเครื่องเดิม:
       <b>${esc(DISPOSITION[j.old_unit_disposition] || 'ยังไม่ระบุ')}</b></div>` : ''}
@@ -1867,6 +1989,11 @@ function collectStep(){
   if ($('sDiff'))     p.severity        = g('sDiff') || null;
   if ($('sMethod'))   p.repair_method   = g('sMethod') || null;
   if ($('sNote'))     p.note            = g('sNote') || null;
+  if ($('sShipIn'))    p.ship_in_fee    = Number(g('sShipIn'))  || 0;
+  if ($('sShipOut'))   p.ship_out_fee   = Number(g('sShipOut')) || 0;
+  if ($('sShipInBy'))  p.ship_in_by     = g('sShipInBy')  || null;
+  if ($('sShipOutBy')) p.ship_out_by    = g('sShipOutBy') || null;
+  if ($('sShipNote'))  p.ship_note      = g('sShipNote')  || null;
   if ($('sLabor'))    p.labor_cost      = Number(g('sLabor')) || 0;
   if ($('sDiscount')) p.discount        = Number(g('sDiscount')) || 0;
   Object.keys(p).forEach(k => p[k] === undefined && delete p[k]);
@@ -2017,6 +2144,8 @@ async function moveStep(to){
   const from = S.peek || stepOf(S.job.status) || 1;
   if (to > from){
     if (from === 1 && !val('sSymptom')) return toast('กรอกอาการเสียที่ลูกค้าแจ้งก่อน', true);
+    if (from === 1 && (!val('sWarranty') || val('sWarranty') === 'unknown'))
+      return toast('เลือกเงื่อนไขประกันก่อน — ถ้าไม่เลือก ตัวเลขในรายงานจะเพี้ยนทั้งหมด', true);
     if (from === 2 && !val('sInspect')) return toast('กรอกอาการที่พบจากการตรวจเช็คก่อน', true);
     if (from === 3 && !val('sTech'))    return toast('เลือกช่างผู้รับผิดชอบก่อน', true);
     if (from === 4 && !val('sMethod'))  return toast('กรอกวิธีการซ่อมก่อน', true);
@@ -2663,6 +2792,9 @@ async function loadMoneyReport(){
   const revenue = live.reduce((s,j) => s + rev(j), 0);
   const claim   = live.reduce((s,j) => s + claimCost(j), 0);
   const cogsSum = live.reduce((s,j) => s + cogs(j), 0);
+  /* 🚚 ค่าส่งไม่ใช่รายได้ของใคร — นับเฉพาะขาที่บริษัทออก เข้าเป็นต้นทุน */
+  const shipCo  = live.reduce((s,j) => s + shipCompany(j), 0);
+  const shipCus = live.reduce((s,j) => s + shipCustomer(j), 0);
 
   /* รางวัลช่าง = ต้นทุนแรงงานรายเคสตัวจริง */
   const rate = REWARD_RATE;
@@ -2670,12 +2802,14 @@ async function loadMoneyReport(){
   const rewardTotal = live.filter(j => j.status === 'delivered').reduce((s,j) => s + rwOf(j), 0);
 
   $('repKpi').innerHTML = [
-    ['nc','🟢','รายได้จริง (ลูกค้าจ่าย)', '฿' + money(revenue),
-      live.filter(j => partsByCustomer(j)).length + ' เคส'],
+    ['nc','🟢','รายได้จริง (ค่าอะไหล่+ค่าแรงที่ลูกค้าจ่าย)', '฿' + money(revenue),
+      live.filter(j => partsByCustomer(j)).length + ' เคสนอกประกัน'],
     ['nd','🔴','ต้นทุนอะไหล่เคลม',        '฿' + money(claim),
-      live.filter(j => !partsByCustomer(j)).length + ' เคส'],
-    ['nb','🏅','รางวัลช่าง (ตามระดับ)',   '฿' + money(rewardTotal), 'เคสที่ปิดแล้ว'],
-    ['na','📊','เหลือสุทธิ',              '฿' + money(revenue - cogsSum - claim - rewardTotal), 'ทั้งศูนย์']
+      live.filter(j => !partsByCustomer(j)).length + ' เคสเคลม'],
+    ['nb','🚚','ค่าส่งที่บริษัทออก',       '฿' + money(shipCo),
+      'ลูกค้าออกอีก ฿' + money(shipCus)],
+    ['na','📊','เหลือสุทธิของบริษัท',      '฿' + money(revenue - cogsSum - claim - shipCo - rewardTotal),
+      'หักรางวัลช่าง ฿' + money(rewardTotal) + ' แล้ว']
   ].map(([cl,e,l,nv,u]) => `<div class="kpi ${cl}"><div class="t"><span class="l">${l}</span><span class="e">${e}</span></div>
     <div class="n">${nv}</div><div class="sub2">${esc(u)}</div></div>`).join('');
 
@@ -2685,30 +2819,52 @@ async function loadMoneyReport(){
     return { code, label: WARRANTY[code].l, n: g.length,
       rev:   g.reduce((s,j) => s + rev(j), 0),
       cogs:  g.reduce((s,j) => s + cogs(j), 0),
-      claim: g.reduce((s,j) => s + claimCost(j), 0) };
+      claim: g.reduce((s,j) => s + claimCost(j), 0),
+      shipCo:  g.reduce((s,j) => s + shipCompany(j), 0),
+      shipCus: g.reduce((s,j) => s + shipCustomer(j), 0) };
   }).filter(r => r.n > 0);
 
   $('tblWar').querySelector('tbody').innerHTML = wRows.length ? wRows.map(r => `<tr>
-    <td><span class="pill ${WARRANTY[r.code].cls}">${esc(r.label)}</span></td>
+    <td><span class="pill ${WARRANTY[r.code].cls}">${esc(r.label)}</span>
+      ${r.code === 'unknown' ? '<div class="sub2" style="color:var(--crit)">ยังไม่เลือก — นับว่าบริษัทแบกไว้ก่อน</div>' : ''}
+      ${r.shipCus ? `<div class="sub2">ลูกค้าออกค่าส่ง ฿${money(r.shipCus)}</div>` : ''}</td>
     <td class="num">${r.n}</td>
     <td class="num" style="color:var(--good);font-weight:700">${r.rev ? '฿' + money(r.rev) : '—'}</td>
     <td class="num muted">${r.cogs ? '฿' + money(r.cogs) : '—'}</td>
     <td class="num" style="color:var(--crit);font-weight:700">${r.claim ? '฿' + money(r.claim) : '—'}</td>
-    <td class="num"><b>฿${money(r.rev - r.cogs)}</b></td></tr>`).join('')
+    <td class="num" style="color:var(--warn);font-weight:700">${r.shipCo ? '฿' + money(r.shipCo) : '—'}</td>
+    <td class="num"><b>฿${money(r.rev - r.cogs - r.claim - r.shipCo)}</b></td></tr>`).join('')
     + `<tr style="border-top:2px solid var(--navy)">
         <td><b>รวม</b></td><td class="num"><b>${live.length}</b></td>
         <td class="num"><b style="color:var(--good)">฿${money(revenue)}</b></td>
         <td class="num"><b>฿${money(cogsSum)}</b></td>
         <td class="num"><b style="color:var(--crit)">฿${money(claim)}</b></td>
-        <td class="num"><b>฿${money(revenue - cogsSum)}</b></td></tr>`
-    : '<tr><td colspan="6" class="empty">ยังไม่มีข้อมูล</td></tr>';
+        <td class="num"><b style="color:var(--warn)">฿${money(shipCo)}</b></td>
+        <td class="num"><b>฿${money(revenue - cogsSum - claim - shipCo)}</b></td></tr>`
+    : '<tr><td colspan="7" class="empty">ยังไม่มีข้อมูล</td></tr>';
 
   $('warHint').innerHTML =
-    'อ่านตารางนี้: <b>ภายใน 7 วัน</b> และ <b>ในประกัน</b> บริษัทจ่ายอะไหล่+ค่าแรงเอง '
-    + 'ช่องเก็บจากลูกค้าจึงเป็น "—" ถูกต้องแล้ว · เฉพาะ <b>นอกประกัน</b> ที่เป็นรายได้จริง'
+    '<b>🚚 ค่าส่งไม่นับเป็นรายได้ของฝ่ายใด</b> — ตารางนี้นับเฉพาะขาที่<b>บริษัทออก</b>เข้าเป็นต้นทุน '
+    + 'ค่าส่งที่ลูกค้าออกโชว์ไว้ใต้ชื่อเงื่อนไข เป็นข้อมูลเท่านั้น ไม่แตะสูตรเงินของบริษัท'
     + '<div class="muted" style="font-size:12.5px;margin-top:5px">'
-    + 'อะไหล่ในเคสเคลมตีที่ <b>ราคาทุน</b> · เงินเดือนช่างไม่รวมในนี้เพราะเป็นต้นทุนคงที่ '
-    + 'ต้นทุนแรงรายเคสดูที่ตารางรางวัลข้างล่าง</div>';
+    + '<b>ภายใน 7 วัน</b> และ <b>ในประกัน</b> บริษัทจ่ายอะไหล่+ค่าแรงเอง ช่องรายได้จึงเป็น "—" ถูกต้องแล้ว · '
+    + 'เฉพาะ <b>นอกประกัน</b> ที่เป็นรายได้จริง · อะไหล่ในเคสเคลมตีที่ <b>ราคาทุน</b> · '
+    + 'เงินเดือนช่างไม่รวมในนี้เพราะเป็นต้นทุนคงที่ ต้นทุนแรงรายเคสดูที่ตารางรางวัลข้างล่าง</div>';
+
+  /* ---------- เคสที่ยังไม่เลือกเงื่อนไขประกัน ---------- */
+  const noWar = live.filter(j => !j.warranty_case || j.warranty_case === 'unknown');
+  $('cardNoWar').hidden = !noWar.length;
+  $('noWarCount').textContent = noWar.length + ' เคส';
+  if (noWar.length){
+    $('tblNoWar').querySelector('tbody').innerHTML = noWar.slice(0,50).map(j => `<tr>
+      <td class="mono"><b>${esc(j.job_no)}</b><div class="sub2">${esc(dth(j.received_at))}</div></td>
+      <td>${esc(j.customer_name || '—')}</td>
+      <td>${esc([j.brand,j.model].filter(Boolean).join(' ') || j.tool_type || '—')}</td>
+      <td>${esc(j.platform || '—')}</td>
+      <td class="num">฿${money(j.total_cost)}</td>
+      <td class="sub2">${esc(j.admin_name || '—')}</td>
+      <td class="num noprint"><button class="btn sm p" onclick="openJob('${j.id}')">แก้ไข</button></td></tr>`).join('');
+  }
 
   drawRevChart();
 
@@ -2746,19 +2902,20 @@ async function loadMoneyReport(){
   const pmap = {};
   live.forEach(j => {
     const k = j.platform || 'ไม่ระบุ';
-    const o = pmap[k] || (pmap[k] = { n:0, claimN:0, paidN:0, rev:0, claim:0, cogs:0 });
+    const o = pmap[k] || (pmap[k] = { n:0, claimN:0, paidN:0, rev:0, claim:0, cogs:0, ship:0 });
     o.n++;
     if (partsByCustomer(j)) o.paidN++; else o.claimN++;
-    o.rev += rev(j); o.claim += claimCost(j); o.cogs += cogs(j);
+    o.rev += rev(j); o.claim += claimCost(j); o.cogs += cogs(j); o.ship += shipCompany(j);
   });
-  const pRows = Object.entries(pmap).sort((a,b) => b[1].claim - a[1].claim);
+  const pRows = Object.entries(pmap).sort((a,b) => (b[1].claim + b[1].ship) - (a[1].claim + a[1].ship));
   $('tblPlat').querySelector('tbody').innerHTML = pRows.length ? pRows.map(([k,o]) => `<tr>
     <td><b>${esc(k)}</b></td><td class="num">${o.n}</td>
     <td class="num">${o.claimN}</td><td class="num">${o.paidN}</td>
     <td class="num" style="color:var(--good)">${o.rev ? '฿' + money(o.rev) : '—'}</td>
     <td class="num" style="color:var(--crit)">${o.claim ? '฿' + money(o.claim) : '—'}</td>
-    <td class="num"><b>฿${money(o.rev - o.cogs - o.claim)}</b></td></tr>`).join('')
-    : '<tr><td colspan="7" class="empty">ยังไม่มีข้อมูล</td></tr>';
+    <td class="num" style="color:var(--warn)">${o.ship ? '฿' + money(o.ship) : '—'}</td>
+    <td class="num"><b>฿${money(o.rev - o.cogs - o.claim - o.ship)}</b></td></tr>`).join('')
+    : '<tr><td colspan="8" class="empty">ยังไม่มีข้อมูล</td></tr>';
 
   /* ---------- ต้นทุนเคลมแยกตามรุ่น ---------- */
   const mmap = {};
