@@ -5,6 +5,17 @@
       (ระบบเรียกฟังก์ชันผ่าน onclick= จึงต้องอยู่ใน global scope)
    ===================================================================== */
 
+/* ---------------------------------------------------------------------
+   กันมือลั่นในช่องตัวเลข
+     1) ลูกศรขึ้น/ลง ถอดออกใน repair.css แล้ว
+     2) สกอร์ลเมาส์ทับช่องที่ถูกโฟกัส = ค่าเปลี่ยนเงียบ ๆ อันตรายสุด
+        → ปล่อยโฟกัสทิ้งทันที ค่าไม่เปลี่ยน และหน้ายังเลื่อนได้ปกติ
+   ------------------------------------------------------------------ */
+document.addEventListener('wheel', e => {
+  const el = document.activeElement;
+  if (el && el.tagName === 'INPUT' && el.type === 'number' && el === e.target) el.blur();
+}, { passive: true });
+
 /* ---------- helper พื้นฐาน ---------- */
 /* ---------- helpers ---------- */
 const $ = id => document.getElementById(id);
@@ -310,7 +321,20 @@ function setPer(v){
 /* =====================================================================
    กราฟ — วาดเป็น SVG เอง ไม่ต้องโหลดไลบรารี
    ===================================================================== */
-function donutSVG(items, size = 190, thick = 32){
+/** ความกว้างจริงของกล่องที่จะใส่กราฟ — ให้ 1 หน่วยใน viewBox = 1 px พอดี
+    ถ้าไม่ใส่ค่านี้ SVG จะยืดเต็มการ์ด แล้วตัวหนังสือในกราฟจะโตตามไป 2-3 เท่า */
+function boxW(id, min = 300, max = 980){
+  const el = typeof id === 'string' ? $(id) : id;
+  const w = el ? Math.floor(el.getBoundingClientRect().width) : 0;
+  return Math.max(min, Math.min(max, w || 640));
+}
+
+/** ครอบ SVG ให้ยืดลงได้ แต่ห้ามยืดขึ้นเกิน 1:1 */
+const svgBox = (w, inner, label, minW) =>
+  `<div class="tw"><svg viewBox="0 0 ${w} ${inner.h}" role="img" aria-label="${esc(label)}"
+     style="display:block;margin:0 auto;width:100%;max-width:${w}px;height:auto${minW ? ';min-width:' + minW + 'px' : ''}">${inner.body}</svg></div>`;
+
+function donutSVG(items, size = 190, thick = 32, centerLabel = 'งานค้าง'){
   const live = items.filter(i => i.value > 0);
   const total = live.reduce((s,i) => s + i.value, 0);
   const cx = size/2, cy = size/2, r = size/2 - thick/2;
@@ -334,7 +358,7 @@ function donutSVG(items, size = 190, thick = 32){
       aria-label="สัดส่วนงานซ่อมแยกตามขั้นตอน รวม ${total} งาน">
     ${paths}
     <text x="${cx}" y="${cy-4}" text-anchor="middle" style="font:800 27px Sarabun;fill:var(--navy)">${total}</text>
-    <text x="${cx}" y="${cy+16}" text-anchor="middle" style="font:600 12px Sarabun;fill:var(--ink3)">งานค้าง</text>
+    <text x="${cx}" y="${cy+16}" text-anchor="middle" style="font:600 12px Sarabun;fill:var(--ink3)">${esc(centerLabel)}</text>
   </svg>`;
 }
 
@@ -372,25 +396,28 @@ function groupedBarSVG(cats, series, w = 560, h = 230){
   const legend = series.map(s =>
     `<span class="lgi" style="display:inline-flex;width:auto;margin-right:16px">
        <span class="sw" style="background:${s.color}"></span><span>${esc(s.name)}</span></span>`).join('');
-  return `<div style="margin-bottom:8px">${legend}</div>
-    <div class="tw"><svg viewBox="0 0 ${w} ${h}" style="width:100%;min-width:420px;height:auto" role="img"
-      aria-label="กราฟแท่งเปรียบเทียบงานค้าง เสร็จแล้ว และเกินกำหนด ของช่างแต่ละคน">
-      ${g}${bars}${lbl}</svg></div>`;
+  return `<div style="margin-bottom:8px">${legend}</div>`
+    + svgBox(w, { h, body: g + bars + lbl },
+        'กราฟแท่งเปรียบเทียบของแต่ละคน', Math.min(w, 380));
 }
 
-function hBarsSVG(items, w = 520){
+function hBarsSVG(items, w = 640){
   if (!items.length) return '<div class="empty">ยังไม่มีข้อมูล</div>';
-  const rowH = 34, lw = 130, h = items.length*rowH + 8;
-  const max = Math.max(1, ...items.map(i => i.value));
-  const bw = w - lw - 52;
+  const rowH = 28;                                  // สูงคงที่ ไม่ผูกกับความกว้าง
+  const lw   = Math.round(Math.min(190, Math.max(96, w * 0.26)));   // คอลัมน์ชื่อ
+  const vw   = 74;                                  // คอลัมน์ตัวเลขขวา
+  const h    = items.length*rowH + 6;
+  const max  = Math.max(1, ...items.map(i => i.value));
+  const bw   = Math.max(40, w - lw - vw);
+  const clip = s => { s = String(s ?? ''); const n = Math.floor(lw / 7);
+                      return s.length > n ? s.slice(0, n-1) + '…' : s; };
   const rows = items.map((it,i) => {
-    const y = i*rowH + 6, len = Math.max(2, (it.value/max)*bw);
-    return `<text class="nm" x="0" y="${y+17}">${esc(it.label)}</text>
-      <rect x="${lw}" y="${y+5}" width="${bw}" height="15" rx="4" fill="#eef2f8"/>
-      <rect x="${lw}" y="${y+5}" width="${len.toFixed(1)}" height="15" rx="4" fill="${it.color || 'var(--blue)'}">
+    const y = i*rowH + 5, len = Math.max(2, (it.value/max)*bw);
+    return `<text class="nm" x="0" y="${y+14}">${esc(clip(it.label))}<title>${esc(it.label)}</title></text>
+      <rect x="${lw}" y="${y+4}" width="${bw}" height="13" rx="4" fill="#eef2f8"/>
+      <rect x="${lw}" y="${y+4}" width="${len.toFixed(1)}" height="13" rx="4" fill="${it.color || 'var(--blue)'}">
         <title>${esc(it.label)}: ${it.value}</title></rect>
-      <text class="vl" x="${w-4}" y="${y+17}" text-anchor="end">${it.sub ?? it.value}</text>`;
+      <text class="vl" x="${w-4}" y="${y+14}" text-anchor="end">${esc(it.sub ?? it.value)}</text>`;
   }).join('');
-  return `<div class="tw"><svg viewBox="0 0 ${w} ${h}" style="width:100%;min-width:380px;height:auto" role="img"
-    aria-label="กราฟแท่งแนวนอน">${rows}</svg></div>`;
+  return svgBox(w, { h, body: rows }, 'กราฟแท่งแนวนอน', Math.min(w, 340));
 }
