@@ -234,6 +234,24 @@ td.nostop{cursor:default}
 /* legend */
 .lg{display:flex;flex-direction:column;gap:9px;min-width:190px}
 .lgi{display:flex;align-items:center;gap:9px;font-size:13.5px}
+
+/* ---------- หน้ารายงาน: คุมขนาดให้สมส่วน ไม่ยืดจนตัวหนังสือบาน ---------- */
+#p-report .kpi{padding:13px 15px}
+#p-report .kpi .n{font-size:24px}
+#p-report .kpi .l{font-size:12px}
+#p-report table{font-size:13px}
+#p-report table th{font-size:12px}
+#p-report .card > h3{font-size:14.5px}
+
+/* กราฟแท่ง | โดนัท+legend อยู่การ์ดเดียวกัน */
+.rgrid{display:grid;grid-template-columns:minmax(0,1fr) 264px;gap:20px;align-items:start}
+.rside{border-left:1px solid var(--line2);padding-left:20px}
+.rsttl{font-size:12.5px;font-weight:700;color:var(--ink2);margin-bottom:9px}
+.rside .lgi{font-size:12.5px}
+@media (max-width:900px){
+  .rgrid{grid-template-columns:1fr;gap:14px}
+  .rside{border-left:0;border-top:1px solid var(--line2);padding:14px 0 0}
+}
 .lgi .sw{width:11px;height:11px;border-radius:3px;flex:0 0 auto}
 .lgi .nm{flex:1}
 .lgi .v{font-weight:700;font-variant-numeric:tabular-nums}
