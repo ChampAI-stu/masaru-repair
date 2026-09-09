@@ -382,6 +382,36 @@ form[hidden]{display:none}
 .setup{background:#fff;border:2px solid var(--gold);border-radius:var(--r);padding:22px;margin-bottom:18px}
 #qrbox{display:flex;justify-content:center;padding:6px}
 
+/* ---------- โมบายล์ ---------- */
+@media(max-width:640px){
+  .btn{padding:11px 16px;min-height:42px}
+  .btn.sm{padding:9px 13px;min-height:38px}
+  .btn.ic{min-height:34px;min-width:34px}
+  .jfoot{gap:8px}
+  .jfoot .btn{flex:1 1 46%}
+  .cb{padding:14px}
+  .card>h3{padding:13px 14px;font-size:15px}
+  .content{padding:14px 11px 80px}
+  .kpis{grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:10px}
+  .kpi{padding:12px 13px}
+  .kpi .n{font-size:24px}
+  input,select,textarea{font-size:16px}   /* กัน iOS ซูมเองตอนโฟกัส */
+  .addrow{grid-template-columns:1fr 1fr;gap:8px}
+  .addrow .btn{grid-column:1/-1}
+  .ph{width:78px;height:78px}
+  .fmodal{max-width:100%}
+  .fbody{grid-template-columns:1fr;padding:16px 16px}
+  .fbody .f.half{grid-column:1/-1}
+  .ffoot{padding:13px 16px}
+  .ffoot .btn{flex:1}
+  .pgbtn{min-width:40px;height:40px}
+  .npanel{right:8px;left:8px;width:auto}
+  .jgrid{gap:14px}
+  .phead h1{font-size:17px}
+  table{font-size:13.5px}
+  th,td{padding:9px 10px}
+}
+
 @media(max-width:820px){
   aside{position:fixed;left:-246px;z-index:80;transition:left .2s}
   aside.open{left:0;box-shadow:0 0 40px rgba(0,0,0,.4)}
@@ -390,6 +420,55 @@ form[hidden]{display:none}
   .phead{padding:12px 14px}
 }
 .burger{display:none;background:none;border:1px solid var(--line);border-radius:8px;padding:6px 10px;cursor:pointer}
+
+/* ---------- เอกสารสำหรับพิมพ์ ---------- */
+#printArea{display:none}
+@media print{
+  body > *{display:none !important}
+  #printArea{display:block !important}
+  @page{size:A4;margin:11mm 12mm}
+}
+#printArea{font-family:"Sarabun",sans-serif;color:#000;font-size:12.5px;line-height:1.5}
+.pdoc{max-width:186mm;margin:0 auto}
+.phdr{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;
+  border-bottom:2.5px solid #1F3864;padding-bottom:10px;margin-bottom:12px}
+.phdr .co b{font-size:17px;color:#1F3864;letter-spacing:.3px;display:block}
+.phdr .co .s{font-size:11.5px;color:#444;margin-top:2px}
+.phdr .co .a{font-size:10.5px;color:#666;margin-top:5px;line-height:1.55}
+.phdr .rt{text-align:right;flex:0 0 auto}
+.phdr .rt .t{font-size:16px;font-weight:800;color:#1F3864}
+.phdr .rt .no{font-family:ui-monospace,monospace;font-size:15px;font-weight:700;margin-top:3px}
+.phdr .rt .d{font-size:11px;color:#555;margin-top:3px}
+.pbox{border:1px solid #999;border-radius:4px;margin-bottom:9px;break-inside:avoid}
+.pbox > .h{background:#eef2f8;border-bottom:1px solid #999;padding:5px 9px;
+  font-size:11.5px;font-weight:800;color:#1F3864;letter-spacing:.3px}
+.pbox > .b{padding:8px 9px}
+.p2{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.prow{display:flex;gap:8px;padding:2.5px 0;font-size:12px}
+.prow .k{color:#555;flex:0 0 84px}
+.prow .v{font-weight:700;flex:1;word-break:break-word}
+.pfree{border:1px solid #ccc;border-radius:3px;padding:7px 9px;min-height:34px;
+  background:#fafafa;white-space:pre-line;font-size:12px}
+table.ptab{width:100%;border-collapse:collapse;font-size:11.5px}
+table.ptab th{background:#eef2f8;border:1px solid #999;padding:5px 7px;text-align:left;font-size:11px;color:#1F3864}
+table.ptab td{border:1px solid #bbb;padding:5px 7px}
+table.ptab td.n{text-align:right;font-variant-numeric:tabular-nums}
+.psum{margin-left:auto;width:62mm}
+.psum .r{display:flex;justify-content:space-between;padding:3.5px 0;font-size:12px;border-bottom:1px dotted #bbb}
+.psum .r.t{border-bottom:0;border-top:1.5px solid #1F3864;margin-top:3px;padding-top:6px;
+  font-size:15px;font-weight:800;color:#1F3864}
+.pwar{border:1px solid #1F3864;border-radius:4px;padding:7px 9px;font-size:11.5px;background:#f6f9fd;margin-bottom:9px}
+.pwar b{color:#1F3864}
+.pnote{font-size:10px;color:#555;line-height:1.6;border-top:1px dashed #aaa;padding-top:7px;margin-top:4px}
+.psign{display:grid;grid-template-columns:1fr 1fr;gap:26px;margin-top:20px;break-inside:avoid}
+.psign .s{text-align:center}
+.psign .l{border-bottom:1px dotted #333;height:34px;margin-bottom:5px}
+.psign .c{font-size:11px;color:#444}
+.pfoot{display:flex;justify-content:space-between;align-items:flex-end;margin-top:14px;
+  border-top:1px solid #bbb;padding-top:7px;font-size:10px;color:#666}
+.pqr img,.pqr canvas{width:64px;height:64px}
+.pph{display:flex;gap:5px;flex-wrap:wrap}
+.pph img{width:31mm;height:31mm;object-fit:cover;border:1px solid #bbb;border-radius:3px}
 
 @media print{
   aside,.phead,.noprint,nav,.npanel,.fmask{display:none !important}
@@ -770,6 +849,8 @@ form[hidden]{display:none}
   </div>
 </div>
 
+<div id="printArea"></div>
+
 <div class="fmask" id="fmask">
   <div class="fmodal">
     <div class="fhead"><div class="ttl"><h4 id="fmTitle">—</h4><p class="sub" id="fmSub"></p></div>
@@ -792,7 +873,20 @@ const SUPABASE_KEY = 'sb_publishable_m10p5I53UNKTZbUAEiUaCw_OCSR63mq';
 /* รูปภาพ — เอา URL ที่ลงท้ายด้วย /exec จาก Apps Script มาใส่
    ปล่อยว่างไว้ = ปิดฟีเจอร์รูป ระบบส่วนอื่นยังใช้ได้ปกติ */
 const UPLOAD_URL   = 'https://script.google.com/macros/s/AKfycbxsh18xEyOaOb6sWKwF55I786IDXB0yASFiZ-j8hGWXOMBbwBLEvd7k0OkP-9D1y35V/exec';
-const UPLOAD_TOKEN = 'masaru-repair-6heftvnll9fldpgb';   // ตรงกับ TOKEN ใน upload.gs แล้ว
+const UPLOAD_TOKEN = 'masaru-repair-6heftvnll9fldpgb';   // ตรงกับ TOKEN ใน upload.gs
+
+/* ข้อมูลที่พิมพ์บนหัวเอกสาร — แก้ให้ตรงกับที่จดทะเบียน */
+const COMPANY = {
+  name:   'บริษัท มาซารุ มาร์เก็ตติ้ง จำกัด',
+  brand:  'MASARU',
+  sub:    'ศูนย์บริการหลังการขาย (Claims & Returns Center)',
+  addr:   '— ที่อยู่บริษัท —',
+  phone:  '— เบอร์โทรศูนย์บริการ —',
+  taxid:  '— เลขประจำตัวผู้เสียภาษี —',
+  note:   'เงื่อนไข: บริษัทรับประกันงานซ่อมเฉพาะรายการที่ระบุในเอกสารนี้เป็นเวลา 30 วันนับจากวันส่งมอบ '
+        + 'ไม่ครอบคลุมความเสียหายจากการใช้งานผิดวิธี ตกกระแทก หรือน้ำเข้า '
+        + 'กรุณาเก็บเอกสารนี้ไว้เป็นหลักฐานในการติดต่อครั้งถัดไป'
+}; แล้ว
 /* ===================================================================== */
 
 /* ---------- ขั้นตอน 6 ขั้น + สี ramp เดียวไล่อ่อน→เข้ม ---------- */
@@ -1075,7 +1169,8 @@ function renderStaged(){
     `<div class="ph"><img src="${URL.createObjectURL(f)}" alt="รูปก่อนรับซ่อม ${i+1}">
      <button class="x" onclick="unstage(${i})" title="เอาออก">✕</button></div>`).join('')
     + (INTAKE_FILES.length < 6
-      ? `<label class="ph add">＋<input type="file" accept="image/*" multiple hidden onchange="stageIntake(this)"></label>` : '');
+      ? `<label class="ph add" title="เลือกรูป">＋<input type="file" accept="image/*" multiple hidden onchange="stageIntake(this)"></label>
+         <label class="ph add" title="ถ่ายรูป" style="font-size:19px">📷<input type="file" accept="image/*" capture="environment" hidden onchange="stageIntake(this)"></label>` : '');
 }
 
 /* =====================================================================
@@ -1849,8 +1944,10 @@ function photoBox(phase, label, max){
         <img src="${photoUrl(p.storage_key)}" alt="${label}" loading="lazy"
              onclick="window.open('${photoOpen(p.storage_key)}','_blank')">
         <button class="x noprint" onclick="deletePhoto('${p.id}','${p.storage_key}')" title="ลบรูป">✕</button></div>`).join('')}
-      ${uploadOn() && list.length < max ? `<label class="ph add noprint">＋
-        <input type="file" accept="image/*" multiple hidden onchange="addPhotos(this,'${phase}')"></label>` : ''}
+      ${uploadOn() && list.length < max ? `<label class="ph add noprint" title="เลือกรูปจากเครื่อง">＋
+        <input type="file" accept="image/*" multiple hidden onchange="addPhotos(this,'${phase}')"></label>
+        <label class="ph add noprint" title="ถ่ายรูปเลย" style="font-size:19px">📷
+        <input type="file" accept="image/*" capture="environment" hidden onchange="addPhotos(this,'${phase}')"></label>` : ''}
     </div></div>`;
 }
 
@@ -1926,7 +2023,10 @@ function renderJobPage(){
         <div class="noprint" style="margin-top:6px;text-align:center">
           <label style="text-align:left">QR Code ใบงาน</label>
           <div id="qrbox"></div>
-          <button class="btn sm" style="margin-top:9px" onclick="window.print()">🖨️ พิมพ์ใบงาน</button>
+          <div class="row" style="justify-content:center;margin-top:9px">
+            <button class="btn sm" onclick="printJob('intake')">🖨️ ใบรับเครื่อง</button>
+            <button class="btn sm g" onclick="printJob('delivery')">🖨️ ใบส่งมอบ</button>
+          </div>
         </div>
       </div>
     </div>
@@ -2962,6 +3062,143 @@ document.addEventListener('click', e => {
   if ($('npanel').classList.contains('on') && !$('npanel').contains(e.target) && e.target !== $('bellBtn')) closeBell();
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeBell(); });
+
+
+/* =====================================================================
+   เอกสารสำหรับพิมพ์ — SOP แบบฟอร์ม #5 ใบปิดงาน/ใบส่งมอบสินค้า
+   2 แบบ: ใบรับเครื่อง (ตอนรับ) · ใบส่งมอบ (ตอนปิดงาน)
+   ===================================================================== */
+function printJob(kind){
+  const j = S.job;
+  if (!j) return;
+  const deliver = kind === 'delivery';
+  const w  = WARRANTY[j.warranty_case] || WARRANTY.unknown;
+  const pc = S.lines.reduce((s,l) => s + Number(l.line_total||0), 0);
+  const total = pc + (Number(j.labor_cost)||0) - (Number(j.discount)||0);
+  const now = new Date().toLocaleString('th-TH',{ day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+
+  const row = (k,v) => `<div class="prow"><span class="k">${k}</span><span class="v">${esc(v ?? '—')}</span></div>`;
+  const photos = ph => S.photos.filter(x => x.phase === ph).slice(0,4)
+    .map(p => `<img src="${photoUrl(p.storage_key)}" alt="">`).join('');
+
+  const before = photos('before'), after = photos('after');
+
+  $('printArea').innerHTML = `
+  <div class="pdoc">
+    <div class="phdr">
+      <div class="co">
+        <b>${esc(COMPANY.brand)}</b>
+        <div class="s">${esc(COMPANY.name)}</div>
+        <div class="s">${esc(COMPANY.sub)}</div>
+        <div class="a">${esc(COMPANY.addr)}<br>โทร ${esc(COMPANY.phone)} · เลขผู้เสียภาษี ${esc(COMPANY.taxid)}</div>
+      </div>
+      <div class="rt">
+        <div class="t">${deliver ? 'ใบส่งมอบสินค้า / ปิดงานซ่อม' : 'ใบรับเครื่องเข้าซ่อม'}</div>
+        <div class="no">${esc(j.job_no)}</div>
+        <div class="d">พิมพ์เมื่อ ${now}</div>
+        <div class="d">สถานะ: <b>${esc(STATUS[j.status] || j.status)}</b></div>
+      </div>
+    </div>
+
+    <div class="p2">
+      <div class="pbox"><div class="h">ข้อมูลลูกค้า</div><div class="b">
+        ${row('ชื่อลูกค้า', j.customer_name)}
+        ${row('เบอร์โทร', j.customer_phone)}
+        ${row('เลข Order', j.order_no)}
+        ${row('ช่องทางที่ซื้อ', j.platform)}
+      </div></div>
+      <div class="pbox"><div class="h">ข้อมูลเครื่องมือ</div><div class="b">
+        ${row('ประเภทเครื่อง', j.tool_type)}
+        ${row('แบรนด์ / รุ่น', [j.brand,j.model].filter(Boolean).join(' '))}
+        ${row('Serial No.', j.serial_no)}
+        ${row('ของที่นำมาด้วย', j.accessories)}
+      </div></div>
+    </div>
+
+    <div class="p2">
+      <div class="pbox"><div class="h">กำหนดการ</div><div class="b">
+        ${row('วันที่รับเครื่อง', dth(j.received_at))}
+        ${row('กำหนดเสร็จ', dth(j.due_date))}
+        ${deliver ? row('วันที่ส่งมอบ', j.delivered_at ? dth(j.delivered_at) : '—') : ''}
+        ${row('ช่างผู้รับผิดชอบ', j.tech_name)}
+      </div></div>
+      <div class="pbox"><div class="h">เลขพัสดุอ้างอิง</div><div class="b">
+        ${row('พัสดุขาเข้า', j.tracking_in)}
+        ${row('พัสดุขาออก', j.tracking_out)}
+        ${row('ประเภทเคส', CASE_TYPE[j.case_type])}
+        ${j.old_unit_disposition ? row('เครื่องเดิม', DISPOSITION[j.old_unit_disposition]) : ''}
+      </div></div>
+    </div>
+
+    <div class="pwar">
+      <b>เงื่อนไขการรับผิดชอบค่าใช้จ่าย — ${esc(w.l)}</b><br>
+      ค่าขนส่ง: <b>${esc(w.ship)}</b> &nbsp;·&nbsp; ค่าอะไหล่: <b>${esc(w.parts)}</b>
+      &nbsp;·&nbsp; ค่าแรง: <b>${esc(w.labor)}</b>
+    </div>
+
+    <div class="pbox"><div class="h">อาการเสียที่ลูกค้าแจ้ง</div>
+      <div class="b"><div class="pfree">${esc(j.symptom || '—')}</div></div></div>
+
+    ${deliver ? `
+    <div class="pbox"><div class="h">ผลการตรวจเช็คและการซ่อม</div><div class="b">
+      <div style="font-size:11px;color:#555;margin-bottom:3px">อาการที่พบ</div>
+      <div class="pfree">${esc(j.inspect_result || '—')}</div>
+      <div style="font-size:11px;color:#555;margin:7px 0 3px">วิธีการซ่อม</div>
+      <div class="pfree">${esc(j.repair_method || '—')}</div>
+      <div style="font-size:11px;color:#555;margin:7px 0 3px">ผลการทดสอบ</div>
+      <div class="pfree">${esc(j.note || '—')}</div>
+    </div></div>
+
+    <div class="pbox"><div class="h">รายการอะไหล่ที่ใช้</div><div class="b">
+      <table class="ptab">
+        <thead><tr><th style="width:26mm">PART NO.</th><th>รายการ</th>
+          <th class="n" style="width:16mm">จำนวน</th><th class="n" style="width:24mm">ราคา</th></tr></thead>
+        <tbody>${S.lines.length ? S.lines.map(l => `<tr>
+          <td>${esc(l.parts_master?.part_no||'')}</td><td>${esc(l.parts_master?.name||'')}</td>
+          <td class="n">${l.qty}</td><td class="n">${money2(l.line_total)}</td></tr>`).join('')
+          : '<tr><td colspan="4" style="text-align:center;color:#777">ไม่ได้ใช้อะไหล่</td></tr>'}</tbody>
+      </table>
+      <div class="psum">
+        <div class="r"><span>ค่าอะไหล่</span><span>${money2(pc)}</span></div>
+        <div class="r"><span>ค่าแรง</span><span>${money2(j.labor_cost)}</span></div>
+        ${Number(j.discount) ? `<div class="r"><span>ส่วนลด</span><span>−${money2(j.discount)}</span></div>` : ''}
+        <div class="r t"><span>รวมทั้งสิ้น</span><span>฿${money2(total)}</span></div>
+      </div>
+    </div></div>` : ''}
+
+    ${before || (deliver && after) ? `
+    <div class="pbox"><div class="h">ภาพประกอบ</div><div class="b">
+      ${before ? `<div style="font-size:11px;color:#555;margin-bottom:4px">ก่อนซ่อม</div>
+        <div class="pph">${before}</div>` : ''}
+      ${deliver && after ? `<div style="font-size:11px;color:#555;margin:8px 0 4px">หลังซ่อม</div>
+        <div class="pph">${after}</div>` : ''}
+    </div></div>` : ''}
+
+    <div class="pnote">${esc(COMPANY.note)}</div>
+
+    <div class="psign">
+      <div class="s"><div class="l"></div>
+        <div class="c">${deliver ? 'ผู้ส่งมอบ (เจ้าหน้าที่ศูนย์บริการ)' : 'ผู้รับเครื่อง (เจ้าหน้าที่ศูนย์บริการ)'}</div>
+        <div class="c">วันที่ ......... / ......... / .........</div></div>
+      <div class="s"><div class="l"></div>
+        <div class="c">${deliver ? 'ผู้รับสินค้า (ลูกค้า)' : 'ผู้ส่งเครื่อง (ลูกค้า)'}</div>
+        <div class="c">วันที่ ......... / ......... / .........</div></div>
+    </div>
+
+    <div class="pfoot">
+      <div>${esc(COMPANY.name)} · เอกสารนี้ออกจากระบบรับซ่อมอัตโนมัติ · ผู้พิมพ์ ${esc(who())}</div>
+      <div class="pqr" id="pqr"></div>
+    </div>
+  </div>`;
+
+  const q = $('pqr');
+  if (q && window.QRCode){
+    q.innerHTML = '';
+    new QRCode(q, { text: location.origin + location.pathname + '?job=' + j.id,
+      width:64, height:64, correctLevel: QRCode.CorrectLevel.L });
+  }
+  setTimeout(() => window.print(), 350);   // รอ QR + รูปโหลด
+}
 
 /* เปิดใบงานจาก QR */
 window.addEventListener('load', () => {
