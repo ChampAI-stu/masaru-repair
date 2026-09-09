@@ -375,26 +375,6 @@ svg .nm{fill:var(--ink);font-size:12.5px;font-family:"Sarabun",sans-serif}
   color:var(--ink2);cursor:pointer}
 .gtab.on{background:#fff;color:var(--navy);box-shadow:0 1px 3px rgba(26,36,54,.12)}
 form[hidden]{display:none}
-.dlink{background:none;border:0;color:var(--blue);font:600 13px Sarabun,sans-serif;
-  cursor:pointer;text-decoration:underline;padding:4px}
-.dlink:hover{color:var(--navy)}
-#diagBox{margin-top:13px;border:1px solid var(--line);border-radius:9px;overflow:hidden;
-  background:#fbfcfe;max-height:52vh;overflow-y:auto}
-#diagBox[hidden]{display:none}
-.dstep{display:flex;gap:9px;padding:8px 12px;border-bottom:1px solid var(--line2);font-size:13px;align-items:flex-start}
-.dstep:last-child{border-bottom:0}
-.dstep .i{flex:0 0 18px}
-.dstep .t{flex:1;min-width:0}
-.dstep .t b{display:block;font-weight:600}
-.dstep .t span{font-size:11.5px;color:var(--ink3);word-break:break-word;
-  font-family:ui-monospace,monospace;display:block;margin-top:2px}
-.dstep.bad .t b{color:var(--crit)}
-.dstep.ok .t b{color:var(--good)}
-.dstep.warn .t b{color:var(--warn)}
-.dfix{padding:12px;background:var(--crit-l);border-top:1px solid #f0cbc8;font-size:13px}
-.dfix pre{background:#fff;border:1px solid #e6d0ce;border-radius:6px;padding:9px;
-  overflow-x:auto;font-size:11.5px;margin:7px 0 0;white-space:pre-wrap}
-.dok{padding:12px;background:var(--good-l);border-top:1px solid #b6ddca;font-size:13px}
 
 .gfoot{margin-top:18px;padding-top:16px;border-top:1px solid var(--line2);font-size:12.5px;color:var(--ink3);text-align:center}
 .app[hidden]{display:none}
@@ -534,11 +514,7 @@ table.ptab td.n{text-align:right;font-variant-numeric:tabular-nums}
     </form>
 
     <div id="liErr" class="gerr" hidden></div>
-    <div id="diagBox" hidden></div>
     <div class="gfoot" id="gFoot">ยังไม่มีบัญชี — ขอโค้ดเชิญจากผู้ดูแลระบบ แล้วกดแท็บ "สมัครสมาชิก"</div>
-    <div style="text-align:center;margin-top:9px">
-      <button type="button" class="dlink" onclick="selfTest()">🩺 เข้าไม่ได้? กดตรวจระบบ</button>
-    </div>
   </div>
 </div>
 
@@ -564,7 +540,6 @@ table.ptab td.n{text-align:right;font-variant-numeric:tabular-nums}
       <div class="st" id="connSt">● กำลังเชื่อมต่อ…</div>
       <button class="btn" id="logoutBtn" style="width:100%;margin-top:11px;background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.2);color:#fff">
         ออกจากระบบ</button>
-      <button class="dlink" style="color:#8fa2c1;width:100%;margin-top:6px" onclick="inAppTest()">🩺 ตรวจระบบ</button>
     </div>
   </aside>
 
@@ -934,7 +909,7 @@ const COMPANY = {
   note:   'เงื่อนไข: บริษัทรับประกันงานซ่อมเฉพาะรายการที่ระบุในเอกสารนี้เป็นเวลา 30 วันนับจากวันส่งมอบ '
         + 'ไม่ครอบคลุมความเสียหายจากการใช้งานผิดวิธี ตกกระแทก หรือน้ำเข้า '
         + 'กรุณาเก็บเอกสารนี้ไว้เป็นหลักฐานในการติดต่อครั้งถัดไป'
-}; แล้ว
+};
 /* ===================================================================== */
 
 /* ---------- ขั้นตอน 6 ขั้น + สี ramp เดียวไล่อ่อน→เข้ม ---------- */
@@ -1435,7 +1410,7 @@ $('loginForm').addEventListener('submit', async e => {
     console.error('[repair] login', err);
     $('liErr').innerHTML = esc(authMsg(err))
       + '<div style="font-weight:400;font-size:12px;margin-top:5px;opacity:.9">' + esc(err.message || err) + '</div>'
-      + '<button type="button" class="dlink" style="color:#fff;margin-top:4px" onclick="selfTest()">🩺 กดตรวจระบบ</button>';
+      ;
     $('liErr').hidden = false;
     $('liPass').focus();
   } finally { btn.disabled = false; btn.textContent = 'เข้าสู่ระบบ'; }
@@ -1551,7 +1526,7 @@ async function startApp(session){
     console.error('[repair] startApp ล้มเหลว', e);
     $('liErr').innerHTML = '⚠️ ' + esc(authMsg(e)) +
       '<div style="font-weight:400;font-size:12px;margin-top:6px;opacity:.85">' + esc(e.message || e) + '</div>' +
-      '<button type="button" class="dlink" style="color:#fff;margin-top:4px" onclick="selfTest()">🩺 กดตรวจระบบ</button>';
+      '';
     $('liErr').hidden = false;
     $('gate').hidden = false; $('app').hidden = true;
     try { await sb.auth.signOut(); } catch(_){}
@@ -3129,119 +3104,6 @@ document.addEventListener('click', e => {
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeBell(); });
 
 
-
-/* =====================================================================
-   ตรวจระบบด้วยตัวเอง — กดจากหน้าเข้าสู่ระบบ ไม่ต้องมีไฟล์แยก
-   ===================================================================== */
-/** เรียกจากในแอป — โชว์ผลตรวจเป็น modal */
-async function inAppTest(){
-  $('gate').hidden = false; $('app').hidden = true;
-  $('liEmail').value = ME.email || '';
-  await selfTest();
-  const b = document.createElement('button');
-  b.className = 'btn g'; b.textContent = '← กลับเข้าระบบ'; b.style.cssText = 'width:100%;margin-top:11px';
-  b.onclick = () => { $('gate').hidden = true; $('app').hidden = false; b.remove(); };
-  $('diagBox').after(b);
-}
-
-async function selfTest(){
-  const box = $('diagBox');
-  box.hidden = false;
-  let out = '', fails = [];
-  const put = (st, title, detail) => {
-    out += `<div class="dstep ${st}"><span class="i">${{ok:'✅',bad:'❌',warn:'⚠️'}[st]}</span>
-      <span class="t"><b>${esc(title)}</b>${detail ? `<span>${esc(detail)}</span>` : ''}</span></div>`;
-    box.innerHTML = out;
-    if (st === 'bad') fails.push(title);
-  };
-
-  put('warn', 'กำลังตรวจ…', '');
-  out = ''; box.innerHTML = '';
-
-  /* 0 — โค้ดหน้าเว็บพังไหม */
-  if (window.__bootErr.length){
-    put('bad', '0. โค้ดหน้าเว็บมี error', window.__bootErr.join(' | ').slice(0,200));
-  } else put('ok', '0. โค้ดหน้าเว็บโหลดครบ', '');
-
-  /* 1 — ค่าเชื่อมต่อ */
-  if (!SUPABASE_URL || !SUPABASE_KEY) return put('bad', '1. ยังไม่ได้ใส่ค่า SUPABASE_URL / KEY', '');
-  put('ok', '1. ค่าเชื่อมต่อ', SUPABASE_URL);
-  if (!sb) return put('bad', '1b. สร้าง client ไม่สำเร็จ', 'ไลบรารี supabase-js โหลดไม่ขึ้น — เช็คอินเทอร์เน็ต/ตัวบล็อกโฆษณา');
-
-  /* 2 — เข้าสู่ระบบด้วยค่าที่กรอกไว้ */
-  const em = val('liEmail'), pw = $('liPass').value;
-  let session = null;
-  try {
-    const { data:{ session:s } } = await sb.auth.getSession();
-    session = s;
-  } catch(e){}
-
-  if (!session){
-    if (!em || !pw) return put('warn', '2. ยังไม่ได้กรอกอีเมล/รหัสผ่าน',
-      'กรอกให้ครบก่อนแล้วกดตรวจอีกครั้ง จะได้ตรวจสิทธิ์ต่อได้');
-    try {
-      const { data, error } = await sb.auth.signInWithPassword({ email:em, password:pw });
-      if (error) throw error;
-      session = data.session;
-      put('ok', '2. เข้าสู่ระบบผ่าน', 'user id: ' + session.user.id);
-    } catch(e){
-      put('bad', '2. เข้าสู่ระบบไม่ผ่าน', e.message);
-      return finish();
-    }
-  } else put('ok', '2. มี session อยู่แล้ว', session.user.email);
-
-  /* 3 — role ใน token */
-  const jr = session.user.app_metadata?.role;
-  put(jr ? 'ok' : 'warn', '3. role ใน token: ' + (jr || 'ไม่มี'),
-      jr ? '' : 'ถ้าตาราง app_users มี role อยู่ ให้ออกจากระบบแล้วเข้าใหม่ 1 ครั้ง');
-
-  /* 4+ — อ่านตารางทีละตัว */
-  const checks = [
-    ['app_users (บัญชีนี้)', () => sb.from('app_users').select('full_name, role').eq('id', session.user.id).maybeSingle(), 1],
-    ['technicians',          () => sb.from('technicians').select('id').limit(1), 1],
-    ['symptom_categories',   () => sb.from('symptom_categories').select('code').limit(1), 1],
-    ['parts_master',         () => sb.from('parts_master').select('id').limit(1), 1],
-    ['warranty_rules',       () => sb.from('warranty_rules').select('code').limit(1), 0],
-    ['v_jobs',               () => sb.from('v_jobs').select('id').limit(1), 0],
-    ['v_parts_stock',        () => sb.from('v_parts_stock').select('part_no').limit(1), 0],
-    ['repair_customers',     () => sb.from('repair_customers').select('id').limit(1), 0]
-  ];
-  let i = 4;
-  for (const [name, fn, blocking] of checks){
-    try {
-      const { data, error } = await fn();
-      if (error) throw error;
-      if (name.startsWith('app_users')){
-        if (!data) put('bad', `${i}. ${name} — ไม่มีแถวของบัญชีนี้`,
-          'บัญชียังไม่ผูกสิทธิ์ · นี่คือสาเหตุที่เข้าไม่ได้');
-        else put('ok', `${i}. ${name}`, `role=${data.role} · ${data.full_name}`);
-      } else put('ok', `${i}. อ่าน ${name} ได้`, '');
-    } catch(e){
-      put(blocking ? 'bad' : 'warn', `${i}. อ่าน ${name} ไม่ได้`, e.message);
-    }
-    i++;
-  }
-  finish();
-
-  function finish(){
-    if (!fails.length){
-      out += `<div class="dok">🎉 <b>ผ่านทุกขั้น</b> — บัญชีนี้เข้าระบบได้
-        <div style="margin-top:5px">ถ้ายังเข้าไม่ได้ ให้กด <b>Ctrl+Shift+R</b> ล้างแคช
-        แล้วเช็คว่า push ไฟล์ล่าสุดขึ้น repo แล้ว</div></div>`;
-    } else {
-      out += `<div class="dfix"><b>สาเหตุ: ${esc(fails[0])}</b>
-        <div style="margin-top:5px">ก๊อปคำสั่งนี้ไปรันใน Supabase → SQL Editor</div>
-        <pre>-- คืนสิทธิ์อ่านทั้งหมด (แก้ permission denied หลัง drop view)
-grant select on all tables in schema public to authenticated;
-grant execute on all functions in schema public to authenticated;
-
--- ผูกบัญชีนี้เป็นผู้ดูแลระบบ
-select public.set_user_role('${esc(val('liEmail') || 'อีเมลของคุณ')}', 'admin', 'แชมป์');</pre>
-        <div style="margin-top:6px">แล้ว <b>ออกจากระบบและเข้าใหม่ 1 ครั้ง</b></div></div>`;
-    }
-    box.innerHTML = out;
-  }
-}
 
 /* =====================================================================
    เอกสารสำหรับพิมพ์ — SOP แบบฟอร์ม #5 ใบปิดงาน/ใบส่งมอบสินค้า
