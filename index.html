@@ -2765,17 +2765,59 @@ async function loadMoneyReport(){
   const rwOf = j => Number(rate[j.severity || 'medium'] || 0);
   const rewardTotal = live.filter(j => j.status === 'delivered').reduce((s,j) => s + rwOf(j), 0);
 
-  $('repKpi').innerHTML = [
-    ['nc','🟢','รายได้จริง (ค่าอะไหล่+ค่าแรงที่ลูกค้าจ่าย)', '฿' + money(revenue),
-      live.filter(j => partsByCustomer(j)).length + ' เคสนอกประกัน'],
-    ['nd','🔴','ต้นทุนอะไหล่เคลม',        '฿' + money(claim),
-      live.filter(j => !partsByCustomer(j)).length + ' เคสเคลม'],
-    ['nb','🚚','ค่าส่งที่บริษัทออก',       '฿' + money(shipCo),
-      'ลูกค้าออกอีก ฿' + money(shipCus)],
-    ['na','📊','เหลือสุทธิของบริษัท',      '฿' + money(revenue - cogsSum - claim - shipCo - rewardTotal),
-      'หักรางวัลช่าง ฿' + money(rewardTotal) + ' แล้ว']
-  ].map(([cl,e,l,nv,u]) => `<div class="kpi ${cl}"><div class="t"><span class="l">${l}</span><span class="e">${e}</span></div>
-    <div class="n">${nv}</div><div class="sub2">${esc(u)}</div></div>`).join('');
+  /* ---------- KPI ----------
+     ศูนย์ซ่อมเป็น cost center โดยออกแบบ — ตัวชี้วัดคือ "ต้นทุนถูกลงไหม"
+     ไม่ใช่ "หาเงินได้เท่าไหร่" · ช่องรายได้จึงโผล่เฉพาะเมื่อมีเคสนอกประกันจริง */
+  const paidJobs  = live.filter(j => partsByCustomer(j));
+  const claimJobs = live.filter(j => !partsByCustomer(j));
+  const centerCost = claim + shipCo + rewardTotal;      // ต้นทุนศูนย์จริง
+  const perCase = live.length ? centerCost / live.length : 0;
+
+  /* เทียบเดือนนี้กับเดือนก่อน — ตัวที่บอกได้ว่าดีขึ้นหรือแย่ลง */
+  const ym = d => { const x = new Date(d); return x.getFullYear() * 12 + x.getMonth(); };
+  const nowYm = ym(new Date());
+  const costOf = j => claimCost(j) + shipCompany(j)
+                    + (j.status === 'delivered' ? rwOf(j) : 0);
+  const bucket = n => live.filter(j => ym(j.received_at) === nowYm - n);
+  const thisM = bucket(0), lastM = bucket(1);
+  const cThis = thisM.reduce((s,j) => s + costOf(j), 0);
+  const cLast = lastM.reduce((s,j) => s + costOf(j), 0);
+  /* เทียบต่อเคส ยุติธรรมกว่าเทียบยอดรวม เพราะจำนวนเคสแต่ละเดือนไม่เท่ากัน */
+  const pThis = thisM.length ? cThis / thisM.length : 0;
+  const pLast = lastM.length ? cLast / lastM.length : 0;
+  const diff  = pLast ? Math.round((pThis - pLast) / pLast * 100) : null;
+  const trend = diff === null ? ['na','—','ยังไม่มีเดือนก่อนให้เทียบ']
+              : diff > 0      ? ['nd','▲ +' + diff + '%', 'แย่ลง — ต้นทุนต่อเคสสูงขึ้น']
+              : diff < 0      ? ['nc','▼ ' + diff + '%',  'ดีขึ้น — ต้นทุนต่อเคสลดลง']
+                              : ['na','เท่าเดิม', 'ต้นทุนต่อเคสไม่เปลี่ยน'];
+
+  const cards = [
+    ['nd','🔴','ต้นทุนศูนย์รวม', '฿' + money(centerCost),
+      `อะไหล่เคลม ฿${money(claim)} · ค่าส่ง ฿${money(shipCo)} · รางวัลช่าง ฿${money(rewardTotal)}`],
+    ['nb','📉','ต้นทุนต่อเคส',   '฿' + money(perCase),
+      live.length + ' เคสทั้งหมด · ยิ่งต่ำยิ่งดี'],
+    [trend[0],'📈','เทียบเดือนก่อน', trend[1],
+      `เดือนนี้ ฿${money(pThis)}/เคส · เดือนก่อน ฿${money(pLast)}/เคส`],
+    ['ne','🚚','ค่าส่งที่บริษัทออก', '฿' + money(shipCo),
+      'ลูกค้าออกอีก ฿' + money(shipCus) + ' (ไม่ใช่เงินบริษัท)']
+  ];
+
+  /* ช่องรายได้ — โผล่เฉพาะเมื่อมีเคสที่ลูกค้าจ่ายจริง ไม่งั้นเป็น ฿0 กินที่เปล่า ๆ */
+  if (paidJobs.length) cards.push(
+    ['nc','🟢','รายได้จริง (ลูกค้าจ่าย)', '฿' + money(revenue),
+      paidJobs.length + ' เคสนอกประกัน · เหลือหลังหักทุนอะไหล่ ฿' + money(revenue - cogsSum)]);
+
+  $('repKpi').innerHTML = cards.map(([cl,e,l,nv,u]) =>
+    `<div class="kpi ${cl}"><div class="t"><span class="l">${l}</span><span class="e">${e}</span></div>
+      <div class="n">${nv}</div><div class="sub2">${esc(u)}</div></div>`).join('');
+
+  /* บอกให้ชัดว่าทำไมไม่มีช่องรายได้ กันคนเข้าใจผิดว่าระบบพัง */
+  if (!paidJobs.length) $('repKpi').insertAdjacentHTML('beforeend',
+    `<div class="kpi" style="border-style:dashed;background:#fbfcfe">
+      <div class="t"><span class="l">รายได้จริง</span><span class="e">🟢</span></div>
+      <div class="n" style="font-size:19px;color:var(--ink3)">ยังไม่มี</div>
+      <div class="sub2">ไม่มีเคสนอกประกันที่เก็บเงินลูกค้า —
+        ช่องนี้จะแสดงตัวเลขเองเมื่อมีเคสแรก</div></div>`);
 
   /* ---------- แยกตามเงื่อนไขประกัน ---------- */
   const wRows = Object.keys(WARRANTY).map(code => {
