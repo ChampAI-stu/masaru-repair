@@ -141,6 +141,8 @@ select.mini{padding:5px 8px;font-size:13px;border-radius:7px}
 .st3{background:var(--warn-l);color:var(--warn)}.st4{background:var(--gold-l);color:#8a6d18}
 .st5{background:#efe9fa;color:#54399b}.st6{background:var(--good-l);color:var(--good)}
 .st0{background:#f0f0f0;color:#8a8a8a}
+.st-await{background:#fdf3e0;color:#8a6d18}
+.st-reject{background:#f2f2f2;color:#9a5b57;text-decoration:line-through}
 .tag-crit{background:var(--crit-l);color:var(--crit)}
 .tag-warn{background:var(--warn-l);color:var(--warn)}
 .tag-good{background:var(--good-l);color:var(--good)}
@@ -470,7 +472,7 @@ form[hidden]{display:none}
       <div class="sp"></div>
       <div class="search">
         <span class="mg">🔍</span>
-        <input type="text" id="gSearch" placeholder="ค้นหาใบงาน / ลูกค้า"
+        <input type="text" id="gSearch" placeholder="ค้นหา ใบงาน / Order / Tracking"
                title="ค้นได้จากเลขที่งาน ชื่อลูกค้า Serial รุ่น หรืออาการเสีย">
       </div>
       <button class="bell" id="bellBtn" title="การแจ้งเตือน" aria-haspopup="true" aria-expanded="false">
@@ -567,6 +569,23 @@ form[hidden]{display:none}
             <span class="sub2">เลขที่ใบงานอัตโนมัติ: <b class="mono" id="nextJobNo" style="color:var(--gold)">—</b></span></h3>
           <div class="cb">
             <div class="split" style="grid-template-columns:1fr 1fr">
+              <div style="grid-column:1/-1">
+                <div style="font-weight:700;color:var(--navy);margin-bottom:11px">🧾 ข้อมูลอ้างอิงตาม SOP</div>
+                <div class="grid g3" style="gap:11px">
+                  <div><label>เลขคำสั่งซื้อ (Order No.)</label>
+                    <input type="text" id="nOrder" placeholder="เลข Order จากแพลตฟอร์ม"></div>
+                  <div><label>เลขพัสดุขาเข้า (Tracking)</label>
+                    <input type="text" id="nTrackIn" placeholder="เลขที่ลูกค้าส่งมา"></div>
+                  <div><label>แพลตฟอร์ม / ช่องทาง</label><select id="nPlatform">
+                    <option value="">— ไม่ระบุ —</option>
+                    ${''}</select></div>
+                  <div><label>ประเภทเคส <span class="req">*</span></label><select id="nCaseType"></select></div>
+                  <div><label>เงื่อนไขประกัน <span class="req">*</span></label><select id="nWarranty"></select></div>
+                  <div><label>แอดมินที่รับเรื่อง</label><input type="text" id="nAdmin" placeholder="ชื่อแอดมิน"></div>
+                </div>
+                <div id="warnBox" style="margin-top:11px"></div>
+              </div>
+
               <div>
                 <div style="font-weight:700;color:var(--navy);margin-bottom:11px">👤 ข้อมูลลูกค้า</div>
                 <div class="grid">
@@ -690,6 +709,14 @@ form[hidden]{display:none}
           <div class="cb"><div id="revChart"></div></div>
         </div>
         <div class="card">
+          <h3>แยกตามช่องทางที่ลูกค้าซื้อ (1 ปี)</h3>
+          <div class="cb"><div class="tw"><table id="tblPlat">
+            <thead><tr><th>ช่องทาง</th><th class="num">เคสทั้งหมด</th><th class="num">ค้างอยู่</th>
+              <th class="num">ใน 7 วัน</th><th class="num">ในประกัน</th><th class="num">นอกประกัน</th>
+              <th class="num">ยอดรวม</th></tr></thead><tbody></tbody></table></div></div>
+        </div>
+
+        <div class="card">
           <h3>อาการเสียแยกตามรุ่น (ซ้ำ 2 ครั้งขึ้นไป · 1 ปี)</h3>
           <div class="cb"><div class="tw"><table id="tblModel">
             <thead><tr><th>แบรนด์</th><th>รุ่น</th><th>อาการ</th><th class="num">จำนวนครั้ง</th></tr></thead><tbody></tbody></table></div>
@@ -768,21 +795,41 @@ const UPLOAD_TOKEN = 'masaru-repair-6heftvnll9fldpgb';   // ตรงกับ T
 
 /* ---------- ขั้นตอน 6 ขั้น + สี ramp เดียวไล่อ่อน→เข้ม ---------- */
 const STEPS = [
-  { n:1, main:'received',   label:'รับเครื่อง',            hint:'บันทึกลูกค้า เครื่องมือ อาการเสีย',   st:['received'],                 c:'#c3d6ec', ink:'#2b4a7a' },
+  { n:1, main:'received',   label:'รับเครื่อง',            hint:'บันทึกลูกค้า เครื่องมือ อาการเสีย',   st:['awaiting_parcel','received'], c:'#c3d6ec', ink:'#2b4a7a' },
   { n:2, main:'inspecting', label:'ตรวจเช็ค',              hint:'บันทึกอาการที่พบจากการตรวจเช็ค',       st:['inspecting'],               c:'#9cbbdf', ink:'#26456f' },
   { n:3, main:'assigned',   label:'มอบหมายงาน',            hint:'เลือกช่างผู้รับผิดชอบและเวลาทำงาน',    st:['assigned','wait_approve'],  c:'#75a0d0', ink:'#1f3c63' },
   { n:4, main:'repairing',  label:'ซ่อม / เปลี่ยนอะไหล่',   hint:'ซ่อม เปลี่ยนอะไหล่ หรือรออุปกรณ์',    st:['repairing','wait_parts'],   c:'#4f83bb', ink:'#fff'    },
   { n:5, main:'testing',    label:'ตรวจสอบ',               hint:'ทดสอบเครื่องก่อนส่งมอบ',              st:['testing'],                  c:'#35659c', ink:'#fff'    },
   { n:6, main:'ready',      label:'ส่งมอบลูกค้า',           hint:'นัดรับเครื่องและปิดงาน',              st:['ready','delivered'],        c:'#1F3864', ink:'#fff'    }
 ];
+/* ---------- ตาม SOP-CLM-01 ---------- */
+const PLATFORMS = ['TikTok','Shopee','Lazada','Facebook','LINE','หน้าร้าน','ดีลเลอร์','อื่น ๆ'];
+const CASE_TYPE = {
+  claim:     'เคลม / ส่งซ่อม',
+  part_only: 'ส่งอะไหล่ให้ลูกค้าเปลี่ยนเอง',
+  replace:   'เปลี่ยนสินค้าใหม่',
+  return:    'ตีกลับ ยกเลิกการสั่งซื้อ',
+  consult:   'สอบถาม / ให้คำปรึกษา'
+};
+const WARRANTY = {
+  within7:      { l:'ภายใน 7 วัน',               ship:'บริษัท', parts:'บริษัท', labor:'บริษัท', cls:'tag-good' },
+  in_warranty:  { l:'ในประกัน 1 / 6 / 12 เดือน',  ship:'ลูกค้า', parts:'บริษัท', labor:'บริษัท', cls:'tag-warn' },
+  out_warranty: { l:'นอกประกัน / ประกันขาด',       ship:'ลูกค้า', parts:'ลูกค้า', labor:'ลูกค้า', cls:'tag-crit' },
+  unknown:      { l:'ยังไม่ระบุ',                 ship:'—',      parts:'—',      labor:'—',      cls:'st0' }
+};
+const SEVERITY = { light:'เคสเบา', heavy:'เคสหนัก' };
+const opts = (obj, cur) => Object.entries(obj)
+  .map(([k,v]) => `<option value="${k}" ${k===cur?'selected':''}>${esc(typeof v === 'string' ? v : v.l)}</option>`).join('');
+
 const STATUS = {
+  awaiting_parcel:'รอลูกค้าส่งของ',
   received:'ได้รับเครื่อง', inspecting:'ตรวจเช็ค', assigned:'มอบหมายแล้ว', wait_approve:'รออนุมัติ',
   repairing:'กำลังซ่อม', wait_parts:'รออะไหล่', testing:'ทดสอบ',
-  ready:'พร้อมส่งมอบ', delivered:'ส่งมอบแล้ว', cancelled:'ยกเลิก'
+  ready:'พร้อมส่งมอบ', delivered:'ส่งมอบแล้ว', rejected:'ไม่รับเคลม', cancelled:'ยกเลิก'
 };
 const STEP_OF = {};
 STEPS.forEach(s => s.st.forEach(k => STEP_OF[k] = s.n));
-const CLOSED = ['delivered','cancelled'];
+const CLOSED = ['delivered','cancelled','rejected'];
 const stepOf = st => STEP_OF[st] || 0;
 
 let sb = null;
@@ -1361,6 +1408,11 @@ async function startApp(session){
   const to = S.techs.map(t => `<option value="${t.id}">${esc(t.nickname || t.full_name)}</option>`).join('');
   $('fTech').insertAdjacentHTML('beforeend', to);
   $('nSymCat').insertAdjacentHTML('beforeend', S.cats.map(c => `<option value="${c.code}">${esc(c.name_th)}</option>`).join(''));
+  $('nPlatform').insertAdjacentHTML('beforeend', PLATFORMS.map(p => `<option>${esc(p)}</option>`).join(''));
+  $('nCaseType').innerHTML  = opts(CASE_TYPE, 'claim');
+  $('nWarranty').innerHTML  = opts(WARRANTY, 'unknown');
+  $('nWarranty').addEventListener('change', showWarrantyBox);
+  showWarrantyBox();
   $('rcPart').insertAdjacentHTML('beforeend', S.parts.map(p => `<option value="${esc(p.part_no)}">${esc(p.part_no)} · ${esc(p.name)}</option>`).join(''));
 
   $('gSearch').addEventListener('input', () => {
@@ -1535,7 +1587,10 @@ function filterCounts(){
     overdue:    open.filter(j => j.days_overdue > 0).length,
     wait_parts: S.jobs.filter(j => j.status === 'wait_parts').length,
     unassigned: open.filter(j => !j.technician_id).length,
-    ready:      S.jobs.filter(j => j.status === 'ready').length
+    ready:      S.jobs.filter(j => j.status === 'ready').length,
+    waiting:    S.jobs.filter(j => j.status === 'awaiting_parcel').length,
+    nowarranty: open.filter(j => j.warranty_case === 'out_warranty').length,
+    nocondition:open.filter(j => !j.warranty_case || j.warranty_case === 'unknown').length
   };
   const sc = stepCounts();
   STEPS.forEach(s => c['step' + s.n] = sc[s.n]);
@@ -1543,8 +1598,9 @@ function filterCounts(){
 }
 function renderChips(){
   const c = filterCounts();
-  const A = [['all','ทั้งหมด'],['open','งานค้าง'],['overdue','เกินกำหนด'],
-             ['wait_parts','รออะไหล่'],['unassigned','ยังไม่มอบหมาย'],['ready','พร้อมส่งมอบ']];
+  const A = [['all','ทั้งหมด'],['open','งานค้าง'],['waiting','รอลูกค้าส่งของ'],['overdue','เกินกำหนด'],
+             ['wait_parts','รออะไหล่'],['unassigned','ยังไม่มอบหมาย'],['ready','พร้อมส่งมอบ'],
+             ['nowarranty','นอกประกัน'],['nocondition','ยังไม่ระบุประกัน']];
   $('chipsA').innerHTML = A.map(([k,l]) =>
     `<button class="chip ${S.filter===k?'on':''}" onclick="setFilter('${k}')">${l}<span class="c">${c[k]}</span></button>`).join('');
   $('chipsB').innerHTML = STEPS.map(s =>
@@ -1562,6 +1618,9 @@ function matchFilter(j){
   if (f === 'wait_parts') return j.status === 'wait_parts';
   if (f === 'unassigned') return !CLOSED.includes(j.status) && !j.technician_id;
   if (f === 'ready')      return j.status === 'ready';
+  if (f === 'waiting')    return j.status === 'awaiting_parcel';
+  if (f === 'nowarranty') return !CLOSED.includes(j.status) && j.warranty_case === 'out_warranty';
+  if (f === 'nocondition')return !CLOSED.includes(j.status) && (!j.warranty_case || j.warranty_case === 'unknown');
   if (f.startsWith('step')) return stepOf(j.status) === Number(f.slice(4));
   return true;
 }
@@ -1571,7 +1630,8 @@ function renderJobs(){
   const rows = S.jobs.filter(j => {
     if (!matchFilter(j)) return false;
     if (tc && j.technician_id !== tc) return false;
-    if (q && ![j.job_no,j.customer_name,j.serial_no,j.model,j.brand,j.tool_type,j.symptom]
+    if (q && ![j.job_no,j.customer_name,j.serial_no,j.model,j.brand,j.tool_type,j.symptom,
+               j.order_no,j.tracking_in,j.tracking_out,j.platform]
       .join(' ').toLowerCase().includes(q)) return false;
     return true;
   });
@@ -1585,7 +1645,8 @@ function renderJobs(){
     return `<tr class="click ${S.seen === j.id ? 'seen' : ''}" tabindex="0"
       onclick="openJob('${j.id}')"
       onkeydown="if(event.key==='Enter'){event.preventDefault();openJob('${j.id}')}">
-      <td class="mono"><b>${esc(j.job_no)}</b><div class="sub2">${dth(j.received_at)}</div></td>
+      <td class="mono"><b>${esc(j.job_no)}</b>
+        <div class="sub2">${j.order_no ? 'Order ' + esc(j.order_no) : dth(j.received_at)}</div></td>
       <td>${esc(j.customer_name || '—')}<div class="sub2">${esc(j.customer_phone || '')}</div></td>
       <td>${esc([j.brand,j.model].filter(Boolean).join(' ') || j.tool_type || '—')}
         <div class="sub2">${esc(j.serial_no || '')}</div></td>
@@ -1596,6 +1657,8 @@ function renderJobs(){
           ${S.techs.map(t => `<option value="${t.id}" ${t.id===j.technician_id?'selected':''}>${esc(t.nickname||t.full_name)}</option>`).join('')}
         </select></td>
       <td><span class="pill st${s||0}"><span class="d"></span>${STATUS[j.status]||j.status}</span>
+        ${j.warranty_case && j.warranty_case !== 'unknown'
+          ? `<div style="margin-top:3px"><span class="pill ${WARRANTY[j.warranty_case].cls}">${esc(WARRANTY[j.warranty_case].l)}</span></div>` : ''}
         ${sd ? `<div class="sub2">ขั้น ${s}/6 · ${esc(sd.label)}</div>` : ''}</td>
       <td ${late?'style="color:var(--crit);font-weight:700"':''}>${dth(j.due_date)}
         ${late ? `<div><span class="pill tag-crit">เกิน ${j.days_overdue} วัน</span></div>` : ''}</td>
@@ -1619,6 +1682,16 @@ async function assignTech(id, tid){
 /* =====================================================================
    รับเครื่อง
    ===================================================================== */
+/** กล่องสรุปความรับผิดชอบค่าใช้จ่าย ตาม SOP หน้า 4 */
+function warrantyBox(code){
+  const w = WARRANTY[code] || WARRANTY.unknown;
+  if (code === 'unknown') return '<div class="box-warn">⚠️ ยังไม่ระบุเงื่อนไขประกัน — ต้องเลือกก่อนเริ่มซ่อม</div>';
+  const cls = code === 'within7' ? 'box-ok' : code === 'in_warranty' ? 'box-warn' : 'box-crit';
+  return `<div class="${cls}"><b>${esc(w.l)}</b> — ค่าส่ง: <b>${esc(w.ship)}</b> ·
+    ค่าอะไหล่: <b>${esc(w.parts)}</b> · ค่าแรง: <b>${esc(w.labor)}</b></div>`;
+}
+function showWarrantyBox(){ $('warnBox').innerHTML = warrantyBox(val('nWarranty')); }
+
 async function lookupCustomer(){
   const ph = val('nPhone');
   if (!ph) return toast('ใส่เบอร์โทรก่อน', true);
@@ -1631,9 +1704,11 @@ async function lookupCustomer(){
 }
 
 function clearIntake(){
-  ['nSerial','nToolType','nBrand','nModel','nPhone','nCustName','nAddress','nSymptom','nAcc','nCustId']
-    .forEach(id => $(id).value = '');
-  $('nSymCat').value = '';
+  ['nSerial','nToolType','nBrand','nModel','nPhone','nCustName','nAddress','nSymptom','nAcc','nCustId',
+   'nOrder','nTrackIn','nAdmin'].forEach(id => $(id).value = '');
+  $('nSymCat').value = ''; $('nPlatform').value = '';
+  $('nCaseType').value = 'claim'; $('nWarranty').value = 'unknown';
+  showWarrantyBox();
   const t = new Date(), d = n => String(n).padStart(2,'0');
   const iso = x => x.getFullYear() + '-' + d(x.getMonth()+1) + '-' + d(x.getDate());
   $('nRecv').value = iso(t);
@@ -1674,7 +1749,13 @@ async function saveJob(){
       model: val('nModel') || null, serial_no: val('nSerial') || null,
       symptom: val('nSymptom'), symptom_category: val('nSymCat') || null,
       accessories: val('nAcc') || null,
-      status: 'received',
+      order_no:      val('nOrder')    || null,
+      tracking_in:   val('nTrackIn')  || null,
+      platform:      val('nPlatform') || null,
+      case_type:     val('nCaseType'),
+      warranty_case: val('nWarranty'),
+      admin_name:    val('nAdmin') || who(),
+      status: val('nTrackIn') ? 'received' : 'awaiting_parcel',
       received_at: rec ? new Date(rec + 'T09:00:00').toISOString() : undefined,
       due_date: val('nDue') || null, created_by: who()
     }).select('id, job_no').single();
@@ -1781,6 +1862,10 @@ function renderJobPage(){
     <span class="mono" style="font-size:18px;font-weight:800;color:var(--navy)">${esc(j.job_no)}</span>
     <span class="pill st${cur}"><span class="d"></span>${STATUS[j.status]||j.status}</span>
     ${late ? `<span class="pill tag-crit">เกินกำหนด ${j.days_overdue} วัน</span>` : ''}
+    ${j.warranty_case && j.warranty_case !== 'unknown'
+      ? `<span class="pill ${WARRANTY[j.warranty_case].cls}">${esc(WARRANTY[j.warranty_case].l)}</span>` : ''}
+    ${j.status === 'rejected' && j.reject_reason
+      ? `<span class="pill tag-crit" title="${esc(j.reject_reason)}">ไม่รับเคลม</span>` : ''}
     <span class="sp" style="flex:1"></span>
     <div style="display:flex;align-items:center;gap:9px">
       <div class="avatar" style="width:32px;height:32px;font-size:12px">${esc((j.tech_name||'—').slice(0,2))}</div>
@@ -1798,6 +1883,13 @@ function renderJobPage(){
         <div class="kv"><span class="k">ประวัติซ่อม</span><span class="v">
           ${hist ? `<a href="#" onclick="showHistory('${j.customer_id}');return false" style="color:var(--blue)">ดูประวัติ (${hist})</a>`
                  : '<span class="muted">ครั้งแรก</span>'}</span></div>
+        <div class="kv"><span class="k">เลข Order</span><span class="v mono">${esc(j.order_no||'—')}</span></div>
+        <div class="kv"><span class="k">พัสดุขาเข้า</span><span class="v mono">${esc(j.tracking_in||'—')}</span></div>
+        ${j.tracking_out ? `<div class="kv"><span class="k">พัสดุขาออก</span><span class="v mono">${esc(j.tracking_out)}</span></div>` : ''}
+        <div class="kv"><span class="k">ช่องทาง</span><span class="v">${esc(j.platform||'—')}</span></div>
+        <div class="kv"><span class="k">ประเภทเคส</span><span class="v">${esc(CASE_TYPE[j.case_type]||'—')}</span></div>
+        <div class="kv"><span class="k">ประกัน</span><span class="v">
+          <span class="pill ${(WARRANTY[j.warranty_case]||WARRANTY.unknown).cls}">${esc((WARRANTY[j.warranty_case]||WARRANTY.unknown).l)}</span></span></div>
         <div class="kv"><span class="k">ประเภทเครื่อง</span><span class="v">${esc(j.tool_type||'—')}</span></div>
         <div class="kv"><span class="k">แบรนด์ / รุ่น</span><span class="v">${esc([j.brand,j.model].filter(Boolean).join(' ')||'—')}</span></div>
         <div class="kv"><span class="k">Serial No.</span><span class="v mono">${esc(j.serial_no||'—')}</span></div>
@@ -1864,8 +1956,25 @@ function stepForm(nStep, j, pc){
                                                    : back + save + extras}</div>`;
 
   /* ---- 1 รับเครื่อง ---- */
-  if (nStep === 1) return hint + `
-    <div class="grid g2">
+  if (nStep === 1){
+    const waiting = j.status === 'awaiting_parcel';
+    return hint + (waiting
+      ? '<div class="box-warn">📦 <b>รอลูกค้าส่งของมาที่ศูนย์</b> — กรอกเลขพัสดุขาเข้าแล้วกด "รับพัสดุเข้าศูนย์"</div>' : '')
+    + `
+    <div class="grid g3">
+      <div><label>เลขคำสั่งซื้อ (Order No.)</label><input type="text" id="sOrder" value="${esc(j.order_no||'')}"></div>
+      <div><label>เลขพัสดุขาเข้า</label><input type="text" id="sTrackIn" value="${esc(j.tracking_in||'')}"></div>
+      <div><label>แพลตฟอร์ม</label><select id="sPlatform"><option value="">— ไม่ระบุ —</option>
+        ${PLATFORMS.map(p => `<option ${p===j.platform?'selected':''}>${esc(p)}</option>`).join('')}</select></div>
+      <div><label>ประเภทเคส</label><select id="sCaseType">${opts(CASE_TYPE, j.case_type)}</select></div>
+      <div><label>เงื่อนไขประกัน <span class="req">*</span></label>
+        <select id="sWarranty" onchange="document.getElementById('wBox').innerHTML=warrantyBox(this.value)">
+          ${opts(WARRANTY, j.warranty_case)}</select></div>
+      <div><label>แอดมินที่รับเรื่อง</label><input type="text" id="sAdmin" value="${esc(j.admin_name||'')}"></div>
+    </div>
+    <div id="wBox" style="margin-top:13px">${warrantyBox(j.warranty_case)}</div>
+
+    <div class="grid g2" style="margin-top:14px">
       <div><label>วันที่รับ</label><input type="date" id="sRecv" value="${(j.received_at||'').slice(0,10)}"></div>
       <div><label>กำหนดเสร็จ</label><input type="date" id="sDue" value="${(j.due_date||'').slice(0,10)}"></div>
     </div>
@@ -1873,7 +1982,11 @@ function stepForm(nStep, j, pc){
       <textarea id="sSymptom">${esc(j.symptom||'')}</textarea></div>
     <div style="margin-top:14px"><label>ของที่นำมาด้วย</label>
       <input type="text" id="sAcc" value="${esc(j.accessories||'')}" placeholder="กล่อง, ดอกสว่าน"></div>
-    ` + foot(`<button class="btn g" onclick="moveStep(2)">ไปตรวจเช็ค →</button>`);
+    ` + foot(
+      (waiting ? `<button class="btn p" onclick="receiveParcel()">📦 รับพัสดุเข้าศูนย์</button>`
+               : `<button class="btn g" onclick="moveStep(2)">ไปตรวจเช็ค →</button>`)
+      + `<button class="btn dn" onclick="rejectClaim()">ไม่รับเคลม</button>`);
+  }
 
   /* ---- 2 ตรวจเช็ค ---- */
   if (nStep === 2) return hint + `
@@ -1883,7 +1996,17 @@ function stepForm(nStep, j, pc){
     </select></div>
     <div style="margin-top:14px"><label>อาการที่พบ (จากการตรวจเช็ค) <span class="req">*</span></label>
       <textarea id="sInspect" placeholder="เช่น ทริกเกอร์ชำรุด">${esc(j.inspect_result||'')}</textarea></div>
-    ${recap('อาการที่ลูกค้าแจ้ง: ' + esc(j.symptom || '—'))}
+    <div class="grid g2" style="margin-top:14px">
+      <div><label>ความรุนแรงของเคส</label><select id="sSeverity">
+        <option value="">— ยังไม่ระบุ —</option>${opts(SEVERITY, j.severity)}</select></div>
+      <div><label>ประเมินการซ่อม</label><select id="sRepairable">
+        <option value="">— ยังไม่ระบุ —</option>
+        <option value="yes" ${j.repairable === true  ? 'selected':''}>ซ่อมได้</option>
+        <option value="no"  ${j.repairable === false ? 'selected':''}>ซ่อมไม่ได้ — ควรเปลี่ยนสินค้าใหม่</option>
+      </select></div>
+    </div>
+    ${recap('อาการที่ลูกค้าแจ้ง: ' + esc(j.symptom || '—')
+      + '\nเงื่อนไขประกัน: ' + esc((WARRANTY[j.warranty_case]||WARRANTY.unknown).l))}
     ` + foot(`<button class="btn g" onclick="moveStep(3)">ไปมอบหมายงาน →</button>`);
 
   /* ---- 3 มอบหมายงาน ---- */
@@ -1931,7 +2054,9 @@ function stepForm(nStep, j, pc){
       <div class="sumrow total"><span>รวมทั้งหมด</span><span id="sTotal">฿${money2(pc + (Number(j.labor_cost)||0) - (Number(j.discount)||0))}</span></div>
     </div>
     <div style="margin-top:16px">${photoBox('during','รูประหว่างซ่อม',6)}</div>
-    ${recap('ผลตรวจเช็ค: ' + esc(j.inspect_result || '—'))}
+    <div style="margin-top:16px">${warrantyBox(j.warranty_case)}</div>
+    ${recap('ผลตรวจเช็ค: ' + esc(j.inspect_result || '—')
+      + (j.severity ? '\nความรุนแรง: ' + esc(SEVERITY[j.severity]) : ''))}
     ` + foot(
       (j.status !== 'wait_parts'
         ? `<button class="btn" onclick="setStatus('wait_parts')">📦 รออะไหล่</button>`
@@ -1961,6 +2086,13 @@ function stepForm(nStep, j, pc){
       <div class="kv"><span class="k">วันส่งมอบ</span>
         <span class="v" ${done?'':'style="color:var(--ink3);font-weight:600"'}>${done ? dtth(j.delivered_at) : 'ยังไม่ส่งมอบ'}</span></div>
     </div>
+    <div class="grid g2" style="margin-top:16px">
+      <div><label>เลขพัสดุขาออก (Tracking ส่งคืน)</label>
+        <input type="text" id="sTrackOut" value="${esc(j.tracking_out||'')}" placeholder="เลขที่ส่งคืนลูกค้า"></div>
+      <div><label>อ้างอิงเลขคำสั่งซื้อเดิม</label>
+        <input type="text" value="${esc(j.order_no||'—')}" disabled></div>
+    </div>
+    <div style="margin-top:14px">${warrantyBox(j.warranty_case)}</div>
     <p style="margin:16px 0 0;color:var(--ink2)">
       ${done ? '✅ ปิดงานเรียบร้อยแล้ว' : 'เมื่อลูกค้ารับเครื่องแล้ว กดยืนยันส่งมอบเพื่อปิดงาน'}</p>
     <div style="margin-top:16px">${photoBox('document','เอกสาร / ใบเสร็จ',4)}</div>
@@ -1990,6 +2122,16 @@ function collectStep(){
   if ($('sSymptom'))  p.symptom         = g('sSymptom') || null;
   if ($('sAcc'))      p.accessories     = g('sAcc') || null;
   if ($('sCat'))      p.symptom_category= g('sCat') || null;
+  if ($('sOrder'))    p.order_no        = g('sOrder')    || null;
+  if ($('sTrackIn'))  p.tracking_in     = g('sTrackIn')  || null;
+  if ($('sTrackOut')) p.tracking_out    = g('sTrackOut') || null;
+  if ($('sPlatform')) p.platform        = g('sPlatform') || null;
+  if ($('sCaseType')) p.case_type       = g('sCaseType');
+  if ($('sWarranty')) p.warranty_case   = g('sWarranty');
+  if ($('sAdmin'))    p.admin_name      = g('sAdmin') || null;
+  if ($('sSeverity')) p.severity        = g('sSeverity') || null;
+  if ($('sRepairable')) p.repairable    = g('sRepairable') === 'yes' ? true
+                                         : g('sRepairable') === 'no' ? false : null;
   if ($('sInspect'))  p.inspect_result  = g('sInspect') || null;
   if ($('sTech'))     p.technician_id   = g('sTech') || null;
   if ($('sStart'))    p.started_at      = hmTs(g('sStart'), base);
@@ -2012,6 +2154,36 @@ async function saveStep(extra){
     if (keep && !extra?.status){ S.peek = keep; renderJobPage(); }
     reloadAll();
   } catch(e){ fail(e); }
+}
+
+/** A9 — พัสดุมาถึงศูนย์ */
+async function receiveParcel(){
+  if (!val('sTrackIn') && !await confirmModal('ยังไม่มีเลขพัสดุขาเข้า',
+      'SOP ข้อ A9.1 ให้ตรวจสอบเลขอ้างอิงก่อนรับเข้า\nยืนยันรับเข้าโดยไม่มีเลขพัสดุ?', { ok:'รับเข้าเลย' })) return;
+  S.peek = null;
+  await saveStep({ status:'received', received_at: new Date().toISOString() });
+}
+
+/** A3.1 — ไม่รับเคลม ปิดเรื่อง */
+async function rejectClaim(){
+  const f = await formModal({
+    title:'ไม่รับเคลม — ปิดเรื่อง', subtitle:'ตาม SOP ข้อ A3.1 ต้องบันทึกเหตุผลทุกครั้ง',
+    ok:'ยืนยันไม่รับเคลม', danger:true,
+    fields:[
+      { k:'reason', label:'เหตุผล', type:'select', required:true, value:'not_genuine', options:[
+        { v:'not_genuine',   t:'เป็นสินค้าปลอม / ไม่ใช่สินค้าของบริษัท' },
+        { v:'not_our_channel', t:'ไม่ได้ซื้อจากบริษัทหรือช่องทางจำหน่ายที่เป็นทางการ' },
+        { v:'customer_decline', t:'ลูกค้าไม่ประสงค์ใช้บริการต่อ (A3.3)' },
+        { v:'other', t:'อื่น ๆ' } ]},
+      { k:'note', label:'รายละเอียดเพิ่มเติม', type:'textarea',
+        placeholder:'บันทึกสิ่งที่แจ้งลูกค้าไป' }
+    ]});
+  if (!f) return;
+  const TXT = { not_genuine:'สินค้าปลอม/ไม่ใช่ของบริษัท', not_our_channel:'ไม่ได้ซื้อจากช่องทางทางการ',
+                customer_decline:'ลูกค้าไม่ประสงค์ใช้บริการต่อ', other:'อื่น ๆ' };
+  S.peek = null;
+  await saveStep({ status:'rejected', case_type:'consult',
+    reject_reason: TXT[f.reason] + (f.note ? ' — ' + f.note : '') });
 }
 
 async function setStatus(st){
@@ -2264,6 +2436,16 @@ async function loadReport(){
     return { label: t.nickname || t.full_name, value: Math.round(v), sub: '฿' + money(v), color:'#2E75B6' };
   }).sort((a,b) => b.value - a.value);
   $('revChart').innerHTML = items.some(i => i.value > 0) ? hBarsSVG(items) : '<div class="empty">ยังไม่มีรายได้บันทึกไว้</div>';
+
+  try {
+    const { data: plat } = await sb.from('v_by_platform').select('*');
+    $('tblPlat').querySelector('tbody').innerHTML = (plat||[]).length ? plat.map(p => `<tr>
+      <td><b>${esc(p.platform)}</b></td><td class="num">${p.job_count}</td>
+      <td class="num">${p.open_count}</td><td class="num">${p.within7}</td>
+      <td class="num">${p.in_warranty}</td><td class="num">${p.out_warranty}</td>
+      <td class="num"><b>฿${money(p.revenue)}</b></td></tr>`).join('')
+      : '<tr><td colspan="7" class="empty">ยังไม่มีข้อมูล</td></tr>';
+  } catch(e){ console.warn(e); }
 
   try {
     const { data } = await sb.from('v_symptoms_by_model').select('*').limit(40);
@@ -2561,6 +2743,20 @@ function buildAlerts(){
           t1:`${j.job_no} · ${j.customer_name || '—'}`,
           t2:`${j.customer_phone || 'ไม่มีเบอร์ติดต่อ'} · รวม ฿${money(j.total_cost)}`,
           rt:'นัดรับได้', go:() => openJob(j.id) }));
+
+  // รอลูกค้าส่งของนานเกิน 7 วัน (SOP A6-A7)
+  S.jobs.filter(j => j.status === 'awaiting_parcel' && (j.days_in_shop ?? 0) > 7)
+        .forEach(j => A.push({ g:'รอลูกค้าส่งของนานเกิน 7 วัน', lv:'warn', ic:'📮',
+          t1:`${j.job_no} · ${j.customer_name || '—'}`,
+          t2:`${j.order_no ? 'Order ' + j.order_no + ' · ' : ''}แจ้งเคลมมาแล้ว ${j.days_in_shop} วัน`,
+          rt:'ตามลูกค้า', go:() => openJob(j.id) }));
+
+  // ยังไม่ระบุเงื่อนไขประกัน — กระทบว่าใครจ่ายเงิน
+  open.filter(j => !j.warranty_case || j.warranty_case === 'unknown')
+      .forEach(j => A.push({ g:'ยังไม่ระบุเงื่อนไขประกัน', lv:'crit', ic:'⚖️',
+        t1:`${j.job_no} · ${j.customer_name || '—'}`,
+        t2:'ต้องระบุก่อนเริ่มซ่อม ไม่งั้นเก็บเงินลูกค้าไม่ถูก',
+        rt:'ต้องระบุ', go:() => openJob(j.id) }));
 
   // อะไหล่หมด / ติดลบ / ถึงจุดสั่งซื้อ
   (S.stock || []).filter(p => p.stock_state !== 'ปกติ')
