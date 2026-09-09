@@ -101,6 +101,9 @@
 
     <div class="content">
 
+      <div id="authWarn" class="awarn" hidden></div>
+      <div id="bootErrBox" hidden></div>
+
       <div id="setup" class="setup" style="display:none">
         <h3 style="margin:0 0 8px;color:var(--navy)">⚙️ ยังไม่ได้ตั้งค่าการเชื่อมต่อ</h3>
         <p style="margin:0">แก้ <code>SUPABASE_URL</code> และ <code>SUPABASE_KEY</code> ที่ต้น <code>&lt;script&gt;</code> ท้ายไฟล์</p>
@@ -703,6 +706,83 @@ function goPage(p){
 }
 
 /* =====================================================================
+   คงสถานะล็อกอินให้ทนสภาพจริง
+     · token refresh ล้มชั่วคราว (เน็ตกระตุก / เครื่อง sleep / เปิดหลายแท็บ)
+       ทำให้ Supabase ยิง SIGNED_OUT ได้ ทั้งที่ session ยังใช้ได้อยู่
+     · เดิมเจอ SIGNED_OUT แล้ว reload ทันที = เด้งออกทั้งที่ไม่ได้กดออก
+     · ใหม่ = ตรวจให้ชัดก่อน ลองต่ออายุ 1 รอบ แล้วค่อยตัดสิน
+   ===================================================================== */
+let _authBound  = false;
+let _userLogout = false;      // true เฉพาะเมื่อผู้ใช้กดปุ่มออกจากระบบเอง
+
+function authNotice(msg, kind){
+  const el = $('authWarn');
+  if (!el) return;
+  el.hidden = !msg;
+  el.className = 'awarn' + (kind ? ' ' + kind : '');
+  el.innerHTML = msg || '';
+}
+
+function bindAuthEvents(){
+  if (_authBound) return;
+  _authBound = true;
+
+  sb.auth.onAuthStateChange(async (ev, session) => {
+    console.info('[auth]', ev, session ? '· มี session' : '· ไม่มี session');
+
+    if (ev === 'TOKEN_REFRESHED'){ authNotice(''); return; }
+    if (ev === 'SIGNED_IN')      { authNotice(''); return; }
+    if (ev !== 'SIGNED_OUT') return;
+
+    if (_userLogout) { location.reload(); return; }   // กดออกเอง = ออกจริง
+
+    /* ยังไม่เคยเข้าระบบในหน้านี้ ไม่ต้องทำอะไร */
+    if (!ME.id) return;
+
+    /* เน็ตหลุด — รอให้กลับมาเอง ไม่ไล่ออก */
+    if (navigator.onLine === false){
+      authNotice('🔌 <b>อินเทอร์เน็ตหลุด</b> — ยังไม่ต้องปิดหน้านี้ ระบบจะเชื่อมต่อใหม่ให้เองเมื่อเน็ตกลับมา', 'warn');
+      return;
+    }
+
+    /* เช็คว่าไม่มี session จริงหรือเปล่า แล้วลองต่ออายุอีก 1 รอบ */
+    try {
+      const { data } = await sb.auth.getSession();
+      if (data?.session){ authNotice(''); return; }
+    } catch(e){}
+    try {
+      const { data } = await sb.auth.refreshSession();
+      if (data?.session){
+        authNotice('');
+        console.info('[auth] ต่ออายุ session สำเร็จ ไม่ต้องล็อกอินใหม่');
+        return;
+      }
+    } catch(e){ console.warn('[auth] ต่ออายุไม่สำเร็จ', e); }
+
+    authNotice('🔑 <b>เซสชันหมดอายุ</b> — กำลังพากลับไปหน้าเข้าสู่ระบบ', 'crit');
+    setTimeout(() => location.reload(), 1400);
+  });
+
+  /* เน็ตกลับมา / กลับมาที่แท็บนี้ → ต่ออายุให้เลย ไม่ต้องรอพัง */
+  window.addEventListener('online', async () => {
+    if (!ME.id) return;
+    authNotice('');
+    try { await sb.auth.refreshSession(); await reloadAll(); } catch(e){ console.warn(e); }
+  });
+  window.addEventListener('offline', () => {
+    if (ME.id) authNotice('🔌 <b>อินเทอร์เน็ตหลุด</b> — ข้อมูลที่ยังไม่กดบันทึกอย่าปิดหน้านี้', 'warn');
+  });
+  document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState !== 'visible' || !ME.id) return;
+    try {
+      const { data } = await sb.auth.getSession();
+      if (!data?.session) await sb.auth.refreshSession();
+    } catch(e){ console.warn('[auth] เช็ค session ตอนกลับมาที่แท็บ', e); }
+  });
+}
+
+
+/* =====================================================================
    boot
    ===================================================================== */
 (async function boot(){
@@ -712,13 +792,22 @@ function goPage(p){
     document.querySelectorAll('.page').forEach(v => v.classList.remove('on'));
     return;
   }
-  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+    auth: {
+      persistSession:     true,    // จำการล็อกอินไว้ใน localStorage
+      autoRefreshToken:   true,    // ต่ออายุ token ให้เองก่อนหมด
+      detectSessionInUrl: false,   // ระบบนี้ใช้ ?job= ไม่ได้ใช้ลิงก์เข้าระบบทางอีเมล
+      storageKey: 'masaru-repair-auth'
+    }
+  });
+  bindAuthEvents();
   try {
     const { data:{ session } } = await sb.auth.getSession();
     if (session) return startApp(session);
-  } catch(e){ console.warn(e); }
+  } catch(e){ console.warn('getSession ล้มเหลว', e); }
   $('liEmail').focus();
 })();
+
 
 /* ---------- ล็อกอิน ---------- */
 function authMsg(e){
@@ -826,9 +915,16 @@ $('signForm').addEventListener('submit', async e => {
 
 $('logoutBtn').addEventListener('click', async () => {
   if (!await confirmModal('ออกจากระบบ?', 'ครั้งหน้าต้องกรอกอีเมลและรหัสผ่านใหม่', { ok:'ออกจากระบบ' })) return;
+  _userLogout = true;
   try { await sb.auth.signOut(); } catch(e){}
   location.reload();
 });
+
+async function forceLogout(){
+  _userLogout = true;
+  try { await sb.auth.signOut(); } catch(e){}
+  location.reload();
+}
 
 /* ---------- เริ่มระบบหลังล็อกอินผ่าน ---------- */
 async function startApp(session){
@@ -865,21 +961,47 @@ async function startApp(session){
 
     // role ใน token ไม่ตรงกับในตาราง → ต่ออายุ token 1 รอบ ไม่งั้น RLS ฝั่ง DB จะมองเป็นสิทธิ์เก่า
     if (jwtRole !== ME.role){
-      try {
-        const { data: fresh } = await sb.auth.refreshSession();
-        const nr = fresh?.session?.user?.app_metadata?.role;
-        if (nr && nr !== ME.role) console.warn('token role =', nr, '/ app_users role =', ME.role);
-      } catch(e){ console.warn('refreshSession ไม่สำเร็จ', e); }
+      /* ทำครั้งเดียวต่อการเปิดแท็บ — เดิมยิงทุกครั้งที่เปิดหน้า
+         ถ้า set_user_role ไม่ได้อัปเดต auth.users ด้วย role จะไม่ตรงตลอดไป
+         แล้วการยิง refreshSession รัว ๆ ทำให้ refresh token ชนกันเองจนเด้งออก */
+      let once = false;
+      try { once = sessionStorage.getItem('repair_role_refreshed') === ME.role; } catch(e){}
+      if (!once){
+        try {
+          const { data: fresh } = await sb.auth.refreshSession();
+          const nr = fresh?.session?.user?.app_metadata?.role;
+          try { sessionStorage.setItem('repair_role_refreshed', ME.role); } catch(e){}
+          if (nr && nr !== ME.role)
+            console.warn('token role =', nr, '/ app_users role =', ME.role,
+                         '— ให้แอดมินรัน set_user_role() ใหม่ เพื่ออัปเดต app_metadata');
+        } catch(e){ console.warn('refreshSession ไม่สำเร็จ', e); }
+      }
     }
     console.info('[repair] เข้าสู่ระบบเป็น', ME.name, '· สิทธิ์', ME.role, '· เมนู', (ROLE_PAGES[ME.role]||[]).join(', '));
   } catch(e){
     console.error('[repair] startApp ล้มเหลว', e);
-    $('liErr').innerHTML = '⚠️ ' + esc(authMsg(e)) +
-      '<div style="font-weight:400;font-size:12px;margin-top:6px;opacity:.85">' + esc(e.message || e) + '</div>' +
-      '';
-    $('liErr').hidden = false;
-    $('gate').hidden = false; $('app').hidden = true;
-    try { await sb.auth.signOut(); } catch(_){}
+    /* โหลดข้อมูลตั้งต้นไม่สำเร็จ ไม่ได้แปลว่าล็อกอินไม่ผ่าน
+       เดิม signOut() ทิ้งทั้งเซสชัน → เน็ตกระตุกครั้งเดียวก็ต้องล็อกอินใหม่
+       ใหม่ = เก็บเซสชันไว้ ให้กด "ลองใหม่" หรือออกเองถ้าต้องการ */
+    const netErr = /failed to fetch|networkerror|load failed|timeout/i.test(e?.message || '');
+    $('bootErrBox').innerHTML =
+      `<div class="card"><div class="cb">
+        <h4 style="margin:0 0 7px;color:var(--crit)">⚠️ โหลดข้อมูลตั้งต้นไม่สำเร็จ</h4>
+        <div style="font-size:14px">${esc(authMsg(e))}</div>
+        <div class="muted" style="font-size:12.5px;margin-top:6px;word-break:break-word">${esc(e.message || e)}</div>
+        <div class="box-info" style="margin-top:11px;font-size:13px">
+          ${netErr
+            ? 'ดูเหมือนเน็ตมีปัญหา — <b>ยังล็อกอินอยู่</b> กดลองใหม่ได้เลย ไม่ต้องกรอกรหัสใหม่'
+            : 'ฐานข้อมูลตอบว่าอ่านไม่ได้ — <b>ยังล็อกอินอยู่</b> แก้ที่ Supabase แล้วกดลองใหม่'}
+        </div>
+        <div style="display:flex;gap:9px;margin-top:13px;flex-wrap:wrap">
+          <button class="btn p" onclick="location.reload()">🔄 ลองใหม่</button>
+          <button class="btn dn" onclick="forceLogout()">ออกจากระบบ</button>
+        </div>
+      </div></div>`;
+    $('bootErrBox').hidden = false;
+    $('gate').hidden = true; $('app').hidden = false;
+    document.querySelectorAll('.page').forEach(v => v.classList.remove('on'));
     return;
   }
 
@@ -915,12 +1037,14 @@ async function startApp(session){
   if (ME.role === 'tech' && ME.techId) $('fTech').value = ME.techId;
 
   $('gate').hidden = true; $('app').hidden = false;
+  $('bootErrBox').hidden = true;
+  authNotice('');
   try { clearIntake(); } catch(e){ console.warn('clearIntake', e); }
   try { goPage(allow[0]); } catch(e){ console.warn('goPage', e); }
   try { await reloadAll(); } catch(e){ fail(e); }
 
-  // token หมดอายุ → กลับไปหน้าล็อกอิน
-  sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_OUT') location.reload(); });
+  // การจัดการ session ย้ายไปที่ bindAuthEvents() ตอน boot แล้ว
+  // ผูกที่นี่ไม่ได้ เพราะ startApp ถูกเรียกซ้ำได้ → listener ซ้อนกันหลายตัว
 }
 
 async function reloadAll(){
