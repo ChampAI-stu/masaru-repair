@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<link rel="stylesheet" href="repair.css" onerror="window.__cssFail = 1">
+<link rel="stylesheet" href="repair.css" onerror="window.__cssFail=1">
 </head>
 <body>
 
@@ -588,66 +588,30 @@ function showCrash(msg, src){
 window.addEventListener('error', e => showCrash(e.message, (e.filename||'') + ':' + (e.lineno||'')));
 
 /* ---------------------------------------------------------------------
-   ตรวจว่าไฟล์ประกอบโหลดครบไหม
-     หน้าเว็บแยกเป็น 4 ไฟล์ ถ้าลืมอัปตัวใดตัวหนึ่ง หน้าจะเพี้ยนแบบเงียบ ๆ
-     ตัวนี้เอา class จริงมาลองใช้ ถ้าสไตล์ไม่ติด = ไฟล์ไม่มา
-     ข้อความใช้ inline style ทั้งหมด เพราะตอนนั้นยังไม่มี CSS ให้ใช้
+   ไฟล์ประกอบโหลดครบไหม — เตือนใน Console เท่านั้น ไม่บังหน้าจอ
+   หน้าเว็บใช้ 4 ไฟล์: index.html · repair.css · repair-ui.js · repair-print.js
+   ต้องอยู่โฟลเดอร์เดียวกัน ถ้าขาดตัวใด จะเห็นสาเหตุที่ F12 → Console
    ------------------------------------------------------------------ */
-function checkAssets(){
+window.addEventListener('load', () => {
   const miss = [];
-
-  // repair.css — ลองสร้าง .card แล้วดูว่า border-radius ติดไหม
-  let cssOk = false;
   try {
     const t = document.createElement('div');
     t.className = 'card';
     t.style.cssText = 'position:absolute;left:-9999px;top:0';
     document.body.appendChild(t);
-    const cs = getComputedStyle(t);
-    cssOk = cs.borderRadius !== '0px' && cs.borderRadius !== '';
+    const br = getComputedStyle(t).borderRadius;
     t.remove();
+    if (window.__cssFail || !br || br === '0px') miss.push('repair.css');
   } catch(e){}
-  if (!cssOk || window.__cssFail) miss.push(['repair.css', 'หน้าเว็บจะไม่มีสไตล์เลย ตัวหนังสือกองกันแบบที่เห็นอยู่นี้']);
+  if (typeof formModal !== 'function' || typeof donutSVG !== 'function') miss.push('repair-ui.js');
+  if (typeof printJob !== 'function') miss.push('repair-print.js');
 
-  // repair-ui.js — เช็คฟังก์ชันที่อยู่ในไฟล์นั้น
-  if (typeof formModal !== 'function' || typeof donutSVG !== 'function')
-    miss.push(['repair-ui.js', 'หน้าต่างฟอร์ม กราฟ และการอัปโหลดรูปจะใช้ไม่ได้']);
-
-  // repair-print.js
-  if (typeof printJob !== 'function')
-    miss.push(['repair-print.js', 'พิมพ์ใบรับเครื่อง / ใบส่งมอบ / ใบขอจัดซื้อ ไม่ได้']);
-
-  if (!miss.length) return;
-
-  const box = document.createElement('div');
-  box.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#1F3864;color:#fff;'
-    + 'padding:28px 22px;overflow:auto;font:400 15px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif';
-  box.innerHTML =
-      '<div style="max-width:620px;margin:0 auto">'
-    + '<div style="font-size:22px;font-weight:800;margin-bottom:6px">📁 ไฟล์ประกอบยังไม่ครบ</div>'
-    + '<div style="opacity:.85;margin-bottom:20px">ระบบนี้ใช้ 4 ไฟล์ทำงานร่วมกัน '
-    + 'ต้องอยู่<b>โฟลเดอร์เดียวกัน</b>ทั้งหมด — ที่ขาดคือ:</div>'
-    + miss.map(([f, why]) =>
-        '<div style="background:rgba(255,255,255,.1);border-radius:10px;padding:13px 16px;margin-bottom:11px">'
-      + '<div style="font-family:ui-monospace,monospace;font-size:16px;font-weight:700">' + f + '</div>'
-      + '<div style="font-size:13.5px;opacity:.85;margin-top:3px">' + why + '</div></div>').join('')
-    + '<div style="margin-top:22px;font-size:14px;line-height:1.9">'
-    + '<b>เช็ค 4 ข้อนี้ตามลำดับ</b><br>'
-    + '1. ไฟล์อยู่ใน repo แล้วหรือยัง — เปิด '
-    + '<a href="' + miss[0][0] + '" style="color:#ffd966" target="_blank">'
-    + location.origin + location.pathname.replace(/[^/]*$/, '') + miss[0][0] + '</a> '
-    + 'ถ้าขึ้น 404 = ยังไม่มีไฟล์<br>'
-    + '2. ชื่อไฟล์ตรงเป๊ะไหม — เบราว์เซอร์มักเติมชื่อเป็น <code>repair (1).css</code> เวลาดาวน์โหลดซ้ำ '
-    + 'และ GitHub Pages <b>แยกตัวพิมพ์ใหญ่-เล็ก</b><br>'
-    + '3. อยู่โฟลเดอร์เดียวกับ index.html ไหม — ห้ามเอาไปใส่ <code>assets/</code> หรือ <code>css/</code><br>'
-    + '4. เพิ่ง push เสร็จ? GitHub Pages ใช้เวลา build 1–2 นาที รอแล้วกด Ctrl+Shift+R'
-    + '</div>'
-    + '<button onclick="location.reload()" style="margin-top:22px;background:#ffd966;color:#1F3864;'
-    + 'border:0;border-radius:9px;padding:12px 22px;font:700 15px inherit;cursor:pointer">🔄 โหลดใหม่</button>'
-    + '</div>';
-  document.body.appendChild(box);
-}
-window.addEventListener('load', checkAssets);
+  if (miss.length){
+    console.warn('[repair] ไฟล์ประกอบยังโหลดไม่ครบ:', miss.join(', '),
+      '\n· ถ้าเพิ่ง push ขึ้น GitHub Pages ให้รอ 1-2 นาที แล้วกด Ctrl+Shift+R',
+      '\n· ถ้ายังไม่หาย เปิด', location.href.replace(/[^/]*$/, '') + miss[0], 'ดูว่าขึ้น 404 ไหม');
+  }
+});
 window.addEventListener('unhandledrejection', e => showCrash(e.reason?.message || e.reason, 'promise'));
 </script>
 
