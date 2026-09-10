@@ -136,6 +136,33 @@ function confirmModal(title, msg, { ok = 'ยืนยัน', danger = true } =
   });
 }
 
+/**
+ * หน้าต่างแสดงข้อมูลอย่างเดียว — ใช้ดูอะไรสักอย่างโดยไม่ต้องย้ายหน้า
+ * html เป็น HTML ดิบ (ผู้เรียกต้อง esc เองแล้ว)
+ */
+function infoModal(title, subtitle, html, { ok = 'ปิด', wide = true } = {}){
+  $('fmTitle').textContent = title;
+  $('fmSub').textContent = subtitle || '';
+  $('fmSub').style.display = subtitle ? '' : 'none';
+  $('fmOk').textContent = ok;
+  $('fmOk').className = 'btn g';
+  $('fmCancel').style.display = 'none';
+  $('fmBody').outerHTML = `<div class="cinfo" id="fmBody">${html}</div>`;
+  $('fmask').classList.add('on');
+  $('fmask').classList.toggle('wide', !!wide);
+  document.body.style.overflow = 'hidden';
+  setTimeout(() => $('fmOk').focus(), 60);
+  return new Promise(res => {
+    _fmDone = () => res(true);
+    $('fmForm').onsubmit = e => { e.preventDefault(); closeForm(true); };
+  }).finally(() => {
+    $('fmask').classList.remove('wide');
+    $('fmCancel').style.display = '';
+    const b = $('fmBody');
+    if (b && !b.classList.contains('fbody')) b.outerHTML = '<div class="fbody" id="fmBody"></div>';
+  });
+}
+
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && $('fmask').classList.contains('on')) closeForm(null);
 });
