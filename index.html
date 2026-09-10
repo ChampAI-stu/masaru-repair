@@ -58,6 +58,7 @@
     <nav>
       <button data-p="dash"   class="on"><span class="e">📊</span>แดชบอร์ด</button>
       <button data-p="jobs"><span class="e">📋</span>ใบงานซ่อม</button>
+      <button data-p="dispatch"><span class="e">🎯</span>จ่ายงานช่าง</button>
       <button data-p="intake"><span class="e">➕</span>รับเครื่อง / บันทึกงาน</button>
       <button data-p="cust"><span class="e">👥</span>ลูกค้า</button>
       <button data-p="parts"><span class="e">📦</span>คลังอะไหล่</button>
@@ -169,6 +170,58 @@
               <tbody></tbody></table></div>
             <div id="jobsEmpty" class="empty" style="display:none">ไม่มีใบงานที่ตรงเงื่อนไข</div>
             <div id="pgJobs"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ จ่ายงานช่าง ============ -->
+      <div class="page" id="p-dispatch">
+        <div class="kpis" id="dspKpi"></div>
+
+        <div class="card">
+          <h3>🎯 กระดานช่องรับงาน <span class="sp"></span>
+            <span class="muted" style="font-weight:400;font-size:13px" id="dspRule"></span>
+            <button class="btn sm p" id="dspRun" onclick="runDispatch()">⚡ จ่ายงานอัตโนมัติ</button>
+          </h3>
+          <div class="cb">
+            <div class="tw"><table id="tblBoard">
+              <thead><tr><th>ช่าง</th>
+                <th class="lv-light">🟢 ง่าย</th>
+                <th class="lv-medium">🔵 กลาง</th>
+                <th class="lv-heavy">🔴 ยาก</th>
+                <th class="num">งานค้างรวม</th></tr></thead>
+              <tbody></tbody></table></div>
+            <div class="box-info" style="margin-top:12px;font-size:13px">
+              ช่องว่างเรียงคิวจาก <b>คนที่ว่างมานานที่สุดได้ก่อน</b> ·
+              งานที่ไม่มีช่องว่างจะรอในคิวจนกว่าจะมีช่างเคลียร์งานเสร็จ
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>⏳ คิวรอจ่าย <span class="sp"></span>
+            <span class="pill tag-warn" id="dspQCount">0</span></h3>
+          <div class="cb">
+            <div class="tw"><table id="tblQueue">
+              <thead><tr><th class="num">คิว</th><th>ใบงาน</th><th>ระดับ</th><th>ลูกค้า</th>
+                <th>เครื่องมือ</th><th>อาการ</th><th class="num">รอมาแล้ว</th>
+                <th class="num noprint"></th></tr></thead>
+              <tbody></tbody></table></div>
+            <div id="dspQEmpty" class="empty" style="display:none">
+              ไม่มีงานรอคิว — ช่างรับงานได้ครบทุกใบแล้ว 👍</div>
+          </div>
+        </div>
+
+        <div class="card" id="cardNoLevel" hidden>
+          <h3>⚠️ ใบงานที่ยังไม่ระบุระดับความยาก <span class="sp"></span>
+            <span class="pill tag-crit" id="noLvCount">0</span></h3>
+          <div class="cb">
+            <div class="box-warn">ระบบจ่ายงานตามระดับความยาก ใบที่ยังไม่ระบุจึง<b>ไม่เข้าคิว</b> —
+              เปิดใบงานแล้วเลือกระดับที่ขั้นตรวจเช็ค</div>
+            <div class="tw" style="margin-top:11px"><table id="tblNoLevel">
+              <thead><tr><th>ใบงาน</th><th>ลูกค้า</th><th>เครื่องมือ</th><th>อาการ</th>
+                <th class="num">ค้างมาแล้ว</th><th class="num noprint"></th></tr></thead>
+              <tbody></tbody></table></div>
           </div>
         </div>
       </div>
@@ -676,6 +729,15 @@ let DIFF_DAYS   = { light:1, medium:2, heavy:3 };
 let REWARD_RATE = { light:0, medium:0, heavy:0 };
 const diffDays = sv => Number(DIFF_DAYS[sv || 'medium']) || 2;
 
+/* ระดับความยาก + จำนวนช่องรับงานต่อคน — ประกาศไว้ตรงนี้ให้ startApp ใช้ได้ทัน
+   (ถ้าไปประกาศท้ายไฟล์จะติด TDZ เพราะ startApp เรียกก่อน) */
+const LEVELS = [
+  { k:'light',  t:'ง่าย',  ico:'🟢' },
+  { k:'medium', t:'กลาง', ico:'🔵' },
+  { k:'heavy',  t:'ยาก',  ico:'🔴' }
+];
+let SLOTS = { light:1, medium:1, heavy:1 };
+
 /* ใครจ่ายอะไหล่ในเคสนี้ — อ่านจากตาราง warranty_rules ผ่าน v_jobs
    'ลูกค้า' = คิดราคาขาย (รายได้)  ·  'บริษัท' = คิดราคาทุน (ต้นทุนเคลม) */
 const partsByCustomer = j => (j?.parts_by || WARRANTY[j?.warranty_case]?.parts) === 'ลูกค้า';
@@ -718,7 +780,8 @@ const stepOf = st => STEP_OF[st] || 0;
 
 let sb = null;
 const S = { jobs:[], techs:[], cats:[], parts:[], custs:[], stock:[], job:null, lines:[], photos:[], slog:[], filter:'open', range:'all', seen:null, peek:null, custView:null, pg:{jobs:1,cust:1,parts:1}, per:30,
-  adjust:[], shortage:[], shortDaily:[], prs:[], score:[], repTab:'work' };
+  adjust:[], shortage:[], shortDaily:[], prs:[], score:[], repTab:'work',
+  board:[], queue:[] };
 
 /* ---------- ผู้ใช้ที่ล็อกอินอยู่ ---------- */
 let ME = { id:null, email:'', name:'', role:'staff', techId:null };
@@ -727,9 +790,9 @@ const isBoss = () => ME.role === 'head' || ME.role === 'admin';
 const ROLE_LABEL = { staff:'พนักงานรับเครื่อง', tech:'ช่างซ่อม', head:'หัวหน้าช่าง', admin:'ผู้ดูแลระบบ' };
 const ROLE_PAGES = {
   staff: ['dash','jobs','intake','cust','job'],
-  tech:  ['dash','jobs','parts','report','job'],
-  head:  ['dash','jobs','intake','cust','parts','report','setting','job'],
-  admin: ['dash','jobs','intake','cust','parts','report','setting','job']
+  tech:  ['dash','jobs','dispatch','parts','report','job'],
+  head:  ['dash','jobs','dispatch','intake','cust','parts','report','setting','job'],
+  admin: ['dash','jobs','dispatch','intake','cust','parts','report','setting','job']
 };
 
 
@@ -739,6 +802,7 @@ const ROLE_PAGES = {
 const PGT = {
   dash:   ['แดชบอร์ดหัวหน้าช่าง','ภาพรวมงานซ่อมทั้งหมด'],
   jobs:   ['ใบงานซ่อม','รายการงานทั้งหมดในระบบ'],
+  dispatch:['จ่ายงานช่าง','ช่องรับงานตามระดับความยาก · คิวรอจ่าย'],
   intake: ['รับเครื่อง / บันทึกงาน','ขั้นตอนที่ 1/6 — สร้างใบงานซ่อมและ QR Code'],
   cust:   ['ลูกค้า','ประวัติลูกค้าและการซ่อม'],
   parts:  ['คลังอะไหล่','สต็อกและการเบิกใช้'],
@@ -756,6 +820,7 @@ function goPage(p){
   $('side').classList.remove('open');
   window.scrollTo(0,0);
   if (p === 'cust')   { closeCust(); renderCust(); }
+  if (p === 'dispatch') loadDispatch();
   if (p === 'parts')  loadParts();
   if (p === 'report') loadReport();
   if (p === 'setting') loadSettings();
@@ -1003,6 +1068,7 @@ async function startApp(session){
     (cfg.data || []).forEach(r => {
       if (r.key === 'difficulty_days') DIFF_DAYS   = { ...DIFF_DAYS,   ...(r.value || {}) };
       if (r.key === 'reward_rate')     REWARD_RATE = { ...REWARD_RATE, ...(r.value || {}) };
+      if (r.key === 'slots_per_level') SLOTS       = { ...SLOTS,       ...(r.value || {}) };
     });
     if (techs.error) throw techs.error;
 
@@ -1970,6 +2036,11 @@ async function saveStep(extra){
     const { error } = await sb.from('repair_jobs').update({ ...collectStep(), ...(extra||{}) }).eq('id', S.job.id);
     if (error) throw error;
     toast('✅ บันทึกแล้ว');
+    /* ปิดงาน = ช่องว่าง → ลองจ่ายคิวต่อให้เลย ไม่ต้องรอหัวหน้ามากด */
+    if (extra?.status && CLOSED.includes(extra.status)){
+      try { await sb.rpc('dispatch_queue', { p_by:'ระบบ (ปิดงาน ' + who() + ')' }); }
+      catch(e){ console.warn('dispatch หลังปิดงาน', e); }
+    }
     await openJob(S.job.id);
     if (keep && !extra?.status){ S.peek = keep; renderJobPage(); }
     reloadAll();
@@ -2309,6 +2380,177 @@ async function receivePR(no){
   } catch(e){ fail(e); }
 }
 
+
+/* =====================================================================
+   จ่ายงานช่าง — ช่องรับงานตามระดับความยาก + คิวยุติธรรม
+     · ช่างทุกคนมีช่องละ 1 งานต่อระดับ (ปรับได้ในหน้าตั้งค่า)
+     · เติมช่องให้เต็มก่อน เกินนั้นรอคิว
+     · ช่องว่างนานที่สุด = ได้งานใหม่ก่อน
+   ===================================================================== */
+
+/** "ว่างมา x" — อ่านง่ายกว่าโชว์วันเวลาเต็ม */
+function agoTxt(ts){
+  if (!ts) return '';
+  const t = new Date(ts).getTime();
+  if (!t || t < 864e5) return 'ยังไม่เคยรับงานระดับนี้';
+  const h = (Date.now() - t) / 36e5;
+  if (h < 1)  return 'ว่างมา ' + Math.max(1, Math.round(h * 60)) + ' นาที';
+  if (h < 24) return 'ว่างมา ' + Math.round(h) + ' ชม.';
+  return 'ว่างมา ' + Math.round(h / 24) + ' วัน';
+}
+const waitTxt = hrs => !hrs || hrs < 1 ? Math.max(1, Math.round((hrs||0)*60)) + ' นาที'
+                     : hrs < 24 ? Math.round(hrs) + ' ชม.'
+                     : Math.round(hrs/24) + ' วัน';
+
+async function loadDispatch(){
+  try {
+    const [board, queue] = await Promise.all([
+      sb.from('v_tech_slots').select('*'),
+      sb.from('v_dispatch_queue').select('*')
+    ]);
+    if (board.error) throw board.error;
+    S.board = board.data || [];
+    S.queue = queue.error ? [] : (queue.data || []);
+    /* ความจุจริงอ่านจาก view (slot_capacity ฝั่ง DB) ค่า SLOTS ใช้แค่ตอนไม่มีข้อมูล */
+    LEVELS.forEach(l => {
+      const r = S.board.find(x => x.level === l.k);
+      if (r && r.capacity) SLOTS[l.k] = Number(r.capacity);
+    });
+    renderDispatch();
+  } catch(e){
+    if (/does not exist|not exist/i.test(e.message||''))
+      toast('❌ ยังไม่ได้รัน 16_dispatch.sql — หน้าจ่ายงานยังใช้ไม่ได้', true);
+    else fail(e);
+  }
+}
+
+function renderDispatch(){
+  const board = S.board || [], queue = S.queue || [];
+  const by = {};                      // technician_id → { light, medium, heavy }
+  board.forEach(r => { (by[r.technician_id] = by[r.technician_id] || {})[r.level] = r; });
+
+  const techs = [...new Set(board.map(r => r.technician_id))]
+    .map(id => ({ id, ...board.find(r => r.technician_id === id) }))
+    .sort((a,b) => (a.code||'').localeCompare(b.code||''));
+
+  const capAll  = techs.length * LEVELS.reduce((s,l) => s + (Number(SLOTS[l.k])||1), 0);
+  const usedAll = board.reduce((s,r) => s + Number(r.used||0), 0);
+  const freeAll = Math.max(0, capAll - usedAll);
+
+  /* ---- KPI ---- */
+  $('dspKpi').innerHTML = [
+    ['na','🎯','ช่องทั้งหมด', capAll,      techs.length + ' ช่าง × ' +
+      LEVELS.map(l => (Number(SLOTS[l.k])||1)).join('+') + ' ช่อง'],
+    ['nb','🔧','ใช้อยู่',      usedAll,     capAll ? Math.round(usedAll/capAll*100) + '% ของความจุ' : ''],
+    [freeAll ? 'nc' : 'nd','🟩','ช่องว่าง', freeAll, freeAll ? 'พร้อมรับงานใหม่' : 'เต็มทุกช่อง'],
+    [queue.length ? 'nd' : 'nc','⏳','รอคิว', queue.length,
+      queue.length ? 'รอนานสุด ' + waitTxt(Math.max(...queue.map(q => Number(q.hours_waiting)||0))) : 'ไม่มีงานค้างคิว']
+  ].map(([cl,e,l,n,u]) => `<div class="kpi ${cl}"><div class="t"><span class="l">${l}</span><span class="e">${e}</span></div>
+    <div class="n">${n}</div><div class="sub2">${esc(u)}</div></div>`).join('');
+
+  $('dspRule').textContent = 'ช่องต่อคน — ' +
+    LEVELS.map(l => l.t + ' ' + (Number(SLOTS[l.k])||1)).join(' · ') + ' (แก้ได้ที่ตั้งค่า)';
+  $('dspRun').hidden = !isBoss() || !queue.length || !freeAll;
+
+  /* ---- กระดาน ---- */
+  $('tblBoard').querySelector('tbody').innerHTML = techs.length ? techs.map(t => {
+    const mine = t.technician_id === ME.techId;
+    return `<tr ${mine ? 'style="background:var(--gold-l)"' : ''}>
+      <td><b>${esc(t.tech_name)}</b>${mine ? ' <span class="pill st1">คุณ</span>' : ''}
+        <div class="sub2 mono">${esc(t.code||'')}</div></td>
+      ${LEVELS.map(l => slotCell(by[t.technician_id]?.[l.k], l)).join('')}
+      <td class="num"><b style="font-size:16px">${t.load_total ?? 0}</b></td></tr>`;
+  }).join('') : '<tr><td colspan="5" class="empty">ยังไม่มีช่างที่ใช้งานอยู่</td></tr>';
+
+  /* ---- คิว ---- */
+  $('dspQCount').textContent = queue.length + ' ใบ';
+  $('dspQEmpty').style.display = queue.length ? 'none' : 'block';
+  $('tblQueue').querySelector('tbody').innerHTML = queue.map(q => {
+    const lv = LEVELS.find(l => l.k === q.severity) || { t:'—', ico:'' };
+    const wait = Number(q.hours_waiting) || 0;
+    return `<tr class="click" onclick="openJob('${q.id}')">
+      <td class="num"><b>${q.queue_no}</b></td>
+      <td class="mono"><b>${esc(q.job_no)}</b></td>
+      <td><span class="pill lv-${q.severity}">${lv.ico} ${lv.t}</span></td>
+      <td>${esc(q.customer_name || '—')}</td>
+      <td>${esc([q.brand,q.model].filter(Boolean).join(' ') || q.tool_type || '—')}</td>
+      <td class="sub2">${esc((q.symptom||'').slice(0,40))}</td>
+      <td class="num ${wait >= 24 ? '' : 'muted'}" ${wait >= 24 ? 'style="color:var(--crit);font-weight:700"' : ''}>
+        ${esc(waitTxt(wait))}</td>
+      <td class="num noprint nostop" onclick="event.stopPropagation()">
+        ${isBoss() ? `<button class="btn sm" onclick="assignOne('${q.id}')">จ่ายใบนี้</button>` : ''}</td></tr>`;
+  }).join('');
+
+  /* ---- ใบที่ยังไม่ระบุระดับ = ไม่เข้าคิว ---- */
+  const noLv = S.jobs.filter(j => !j.severity && !j.technician_id && !CLOSED.includes(j.status));
+  $('cardNoLevel').hidden = !noLv.length;
+  $('noLvCount').textContent = noLv.length + ' ใบ';
+  if (noLv.length) $('tblNoLevel').querySelector('tbody').innerHTML = noLv.map(j => `<tr>
+    <td class="mono"><b>${esc(j.job_no)}</b></td>
+    <td>${esc(j.customer_name || '—')}</td>
+    <td>${esc([j.brand,j.model].filter(Boolean).join(' ') || j.tool_type || '—')}</td>
+    <td class="sub2">${esc((j.symptom||'').slice(0,40))}</td>
+    <td class="num">${j.days_in_shop ?? 0} วัน</td>
+    <td class="num noprint"><button class="btn sm p" onclick="openJob('${j.id}')">ระบุระดับ</button></td></tr>`).join('');
+}
+
+/** ช่องเดียวในกระดาน — เต็ม = โชว์ใบงาน · ว่าง = โชว์ว่าว่างมานานแค่ไหน */
+function slotCell(s, lv){
+  if (!s) return '<td class="muted">—</td>';
+  const cap = Number(s.capacity) || 1, used = Number(s.used) || 0;
+  const jobs = S.jobs.filter(j => j.technician_id === s.technician_id
+                               && j.severity === lv.k && !CLOSED.includes(j.status));
+  const chips = jobs.map(j => `<div class="slotjob ${j.days_overdue > 0 ? 'late' : ''}"
+      onclick="openJob('${j.id}')" title="${esc(j.symptom||'')}">
+      <b>${esc(j.job_no.replace(/^REP-\d{4}-/,'#'))}</b>
+      <span>${esc([j.brand,j.model].filter(Boolean).join(' ') || j.tool_type || '')}</span>
+      ${j.days_overdue > 0 ? `<em>เกิน ${j.days_overdue} วัน</em>` : ''}</div>`).join('');
+  /* ระบบนับว่าใช้อยู่ n งาน แต่หาใบในเครื่องไม่เจอ (คนละสิทธิ์ / ยังไม่รีเฟรช)
+     ต้องโชว์ว่าไม่ว่าง ไม่งั้นช่องจะดูโล่งทั้งที่มีงานอยู่ */
+  const ghost = Math.max(0, used - jobs.length);
+  const busy = ghost ? `<div class="slotjob" style="cursor:default;border-left-color:var(--ink3)">
+      <b>กำลังทำอยู่</b><span>${ghost} งาน</span></div>` : '';
+  const empty = Array.from({ length: Math.max(0, cap - used) }, () =>
+    `<div class="slotfree">ว่าง<span>${esc(agoTxt(s.free_since))}</span></div>`).join('');
+  return `<td class="slotcell lv-${lv.k}">${chips}${busy}${empty}</td>`;
+}
+
+/** จ่ายทั้งคิว */
+async function runDispatch(){
+  const btn = $('dspRun');
+  btn.disabled = true; btn.textContent = 'กำลังจ่าย…';
+  try {
+    const { data, error } = await sb.rpc('dispatch_queue', { p_by: who() });
+    if (error) throw error;
+    const n = (data || []).length;
+    if (!n) toast('ไม่มีช่องว่างที่ตรงกับระดับของงานในคิว — ต้องรอช่างเคลียร์งานก่อน');
+    else {
+      toast(`✅ จ่ายงานแล้ว ${n} ใบ`);
+      await formModal({
+        title:'ผลการจ่ายงาน', subtitle:`จ่ายไป ${n} ใบ ตามลำดับคิว`, ok:'ปิด',
+        fields:[{ k:'x', label:'รายละเอียด', type:'textarea',
+          value:(data||[]).map(r => {
+            const lv = LEVELS.find(l => l.k === r.level);
+            return `${r.job_no}  →  ${r.tech_name}  (${lv ? lv.t : r.level}` +
+                   `${r.waited_hours ? ' · รอมา ' + waitTxt(Number(r.waited_hours)) : ''})`;
+          }).join('\n') }]
+      });
+    }
+    await loadDispatch(); reloadAll();
+  } catch(e){ fail(e); }
+  finally { btn.disabled = false; btn.textContent = '⚡ จ่ายงานอัตโนมัติ'; }
+}
+
+/** จ่ายใบเดียว */
+async function assignOne(id){
+  try {
+    const { data, error } = await sb.rpc('auto_assign', { p_job_id:id, p_by:who() });
+    if (error) throw error;
+    if (!data) toast('ยังไม่มีช่องว่างของระดับนี้ — ใบนี้รอคิวต่อ', true);
+    else toast('✅ จ่ายให้ ' + data + ' แล้ว');
+    await loadDispatch(); reloadAll();
+  } catch(e){ fail(e); }
+}
 
 /* =====================================================================
    ลูกค้า
