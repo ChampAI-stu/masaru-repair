@@ -287,6 +287,24 @@ svg .nm{fill:var(--ink);font-size:12.5px;font-family:"Sarabun",sans-serif}
 .awarn[hidden]{display:none}
 #bootErrBox[hidden]{display:none}
 
+/* ---------- กระดานจ่ายงาน ---------- */
+.lv-light{color:#2b4a7a}.lv-medium{color:#26456f}.lv-heavy{color:#1F3864}
+th.lv-light,th.lv-medium,th.lv-heavy{background:#f6f9fd}
+.pill.lv-light{background:#eaf1f9;color:#2b4a7a}
+.pill.lv-medium{background:#dbe7f5;color:#1f3c63}
+.pill.lv-heavy{background:#1F3864;color:#fff}
+.slotcell{vertical-align:top;min-width:150px;padding:7px 9px}
+.slotjob{background:#fff;border:1px solid var(--line);border-left:3px solid var(--blue);
+  border-radius:7px;padding:6px 9px;margin-bottom:5px;cursor:pointer;font-size:12.5px;line-height:1.45}
+.slotjob:hover{background:#f6f9fd;border-color:var(--blue)}
+.slotjob b{display:block;font-family:ui-monospace,monospace;color:var(--navy)}
+.slotjob span{color:var(--ink3);display:block}
+.slotjob em{color:var(--crit);font-style:normal;font-weight:700;font-size:11.5px}
+.slotjob.late{border-left-color:var(--crit);background:var(--crit-l)}
+.slotfree{border:1px dashed #c4d2e6;border-radius:7px;padding:8px 9px;text-align:center;
+  font-size:12.5px;font-weight:600;color:var(--good);background:#f4faf7}
+.slotfree span{display:block;font-weight:400;font-size:11.5px;color:var(--ink3);margin-top:1px}
+
 .box-info{background:#f2f6fc;border:1px solid #d3e0f0;border-radius:9px;padding:11px 14px;font-size:14px;color:var(--ink2)}
 .muted{color:var(--ink3)}
 .empty{text-align:center;padding:38px 14px;color:var(--ink3)}
