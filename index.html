@@ -1726,10 +1726,93 @@ function techBox(j){
     </div>
     <div style="display:flex;gap:9px;margin-top:10px;flex-wrap:wrap">
       ${j.severity ? `<button type="button" class="btn p sm" onclick="assignNow()">⚡ จ่ายงานเดี๋ยวนี้</button>` : ''}
-      <button type="button" class="btn sm" onclick="goPage('dispatch')">ดูกระดานจ่ายงาน</button>
+      <button type="button" class="btn sm" onclick="peekBoard()">👀 ดูกระดานจ่ายงาน</button>
       ${isBoss() && j.severity ? `<button type="button" class="btn sm" onclick="overrideTech()">🔁 เลือกช่างเอง</button>` : ''}
     </div>
   </div>`;
+}
+
+/** ดูกระดานจ่ายงานแบบไม่ต้องย้ายหน้า — ใบงานที่เปิดอยู่จะถูกไฮไลท์ในคิว */
+async function peekBoard(){
+  const jobId = S.job?.id || null;
+  try {
+    const [board, queue] = await Promise.all([
+      sb.from('v_tech_slots').select('*'),
+      sb.from('v_dispatch_queue').select('*')
+    ]);
+    if (board.error) throw board.error;
+    S.board = board.data || [];
+    S.queue = queue.error ? [] : (queue.data || []);
+    LEVELS.forEach(l => {
+      const r = S.board.find(x => x.level === l.k);
+      if (r && r.capacity) SLOTS[l.k] = Number(r.capacity);
+    });
+
+    const techs = [...new Set(S.board.map(r => r.technician_id))]
+      .map(id => S.board.find(r => r.technician_id === id))
+      .sort((a,b) => (a.code||'').localeCompare(b.code||''));
+    const by = {};
+    S.board.forEach(r => { (by[r.technician_id] = by[r.technician_id] || {})[r.level] = r; });
+
+    const capAll  = S.board.reduce((s,r) => s + Number(r.capacity||0), 0);
+    const usedAll = S.board.reduce((s,r) => s + Number(r.used||0), 0);
+    const lvOf = k => LEVELS.find(l => l.k === k);
+
+    const html = `
+      <div class="kpis" style="margin-bottom:14px">
+        ${[['na','🎯','ช่องทั้งหมด', capAll, techs.length + ' ช่าง'],
+           ['nb','🔧','ใช้อยู่', usedAll, capAll ? Math.round(usedAll/capAll*100) + '%' : ''],
+           [capAll-usedAll ? 'nc' : 'nd','🟩','ช่องว่าง', capAll - usedAll,
+             capAll-usedAll ? 'พร้อมรับงาน' : 'เต็มทุกช่อง'],
+           [S.queue.length ? 'nd' : 'nc','⏳','รอคิว', S.queue.length,
+             S.queue.length ? 'ใบงาน' : 'ไม่มีคิว']
+          ].map(([cl,e,l,n,u]) => `<div class="kpi ${cl}" style="padding:11px 13px">
+            <div class="t"><span class="l" style="font-size:11.5px">${l}</span><span class="e">${e}</span></div>
+            <div class="n" style="font-size:21px">${n}</div>
+            <div class="sub2">${esc(u)}</div></div>`).join('')}
+      </div>
+
+      <div class="tw"><table>
+        <thead><tr><th>ช่าง</th>${LEVELS.map(l =>
+          `<th class="lv-${l.k}">${l.ico} ${l.t}</th>`).join('')}<th class="num">ค้างรวม</th></tr></thead>
+        <tbody>${techs.length ? techs.map(t => {
+          const mine = t.technician_id === ME.techId;
+          return `<tr ${mine ? 'style="background:var(--gold-l)"' : ''}>
+            <td><b>${esc(t.tech_name)}</b>${mine ? ' <span class="pill st1">คุณ</span>' : ''}
+              <div class="sub2 mono">${esc(t.code||'')}</div></td>
+            ${LEVELS.map(l => slotCell(by[t.technician_id]?.[l.k], l)).join('')}
+            <td class="num"><b>${t.load_total ?? 0}</b></td></tr>`;
+        }).join('') : '<tr><td colspan="5" class="empty">ยังไม่มีช่างที่ใช้งานอยู่</td></tr>'}</tbody>
+      </table></div>
+
+      <div style="margin-top:16px;font-weight:700;font-size:13.5px;color:var(--ink2)">
+        ⏳ คิวรอจ่าย ${S.queue.length} ใบ</div>
+      ${S.queue.length ? `<div class="tw" style="margin-top:7px"><table>
+        <thead><tr><th class="num">คิว</th><th>ใบงาน</th><th>ระดับ</th><th>เครื่องมือ</th>
+          <th class="num">รอมาแล้ว</th></tr></thead>
+        <tbody>${S.queue.map(q => {
+          const me2 = q.id === jobId, lv = lvOf(q.severity) || { t:'—', ico:'' };
+          return `<tr ${me2 ? 'style="background:var(--gold-l);font-weight:700"' : ''}>
+            <td class="num">${q.queue_no}</td>
+            <td class="mono">${esc(q.job_no)}${me2 ? ' <span class="pill st1">ใบนี้</span>' : ''}</td>
+            <td><span class="pill lv-${q.severity}">${lv.ico} ${lv.t}</span></td>
+            <td>${esc([q.brand,q.model].filter(Boolean).join(' ') || q.tool_type || '—')}</td>
+            <td class="num">${esc(waitTxt(Number(q.hours_waiting)||0))}</td></tr>`;
+        }).join('')}</tbody></table></div>`
+        : '<div class="empty" style="padding:18px">ไม่มีงานรอคิว — ช่างรับได้ครบทุกใบแล้ว 👍</div>'}
+
+      <div class="box-info" style="margin-top:14px;font-size:12.5px">
+        ช่องว่างเรียงคิวจาก <b>คนที่ว่างมานานที่สุดได้ก่อน</b> ·
+        ระบบจ่ายให้เองเมื่อมีช่องว่าง ไม่ต้องเลือกช่างเอง</div>`;
+
+    await infoModal('🎯 กระดานจ่ายงาน',
+      'ช่องต่อคน — ' + LEVELS.map(l => l.t + ' ' + (Number(SLOTS[l.k])||1)).join(' · '),
+      html);
+  } catch(e){
+    if (/does not exist|not exist/i.test(e.message||''))
+      toast('❌ ยังไม่ได้รัน 16_dispatch.sql', true);
+    else fail(e);
+  }
 }
 
 /** จ่ายงานใบนี้ตามคิว — ใครก็กดได้ ระบบเป็นคนเลือกช่างเอง */
