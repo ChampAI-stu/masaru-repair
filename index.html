@@ -175,10 +175,10 @@ const MODULES = [
     desc:'คลังกลาง–ศูนย์ซ่อม–ฝ่ายขาย · รับเข้า · โอนคลัง · ตรวจนับ · จุดสั่งซื้อ',
     roles:['staff','tech','head','admin'] },
 
-  { k:'sales', cls:'m3', ico:'🛒', ready:false, href:'sales-parts.html',
+  { k:'sales', cls:'m3', ico:'🛒', ready:true, href:'sales-parts.html',
     name:'อะไหล่ฝ่ายขาย',
-    desc:'อะไหล่สำหรับงานขาย — ยังไม่ได้กำหนดขอบเขต',
-    roles:['head','admin'] }
+    desc:'ออกใบขาย · ตัดสต๊อกตอนยืนยัน · ยอดขาย–กำไรแยกช่องทาง · สินค้าขายดี',
+    roles:['staff','head','admin'] }
 ];
 
 let sb = null;
@@ -276,10 +276,12 @@ function renderModules(){
 /** ตัวเลขจริงบนการ์ด — อ่านอย่างเดียว พังก็ไม่กระทบการเข้าใช้งาน */
 async function loadStats(){
   try {
-    const [jobs, stock, wh] = await Promise.all([
+    const [jobs, stock, wh, so, mon] = await Promise.all([
       sb.from('v_jobs').select('status,days_overdue').limit(2000),
       sb.from('v_stock_all').select('stock_state,qty_total').limit(4000),
-      sb.from('v_wh_summary').select('wh_code,stock_value').limit(50)
+      sb.from('v_wh_summary').select('wh_code,stock_value').limit(50),
+      sb.from('v_sales_orders').select('status').limit(3000),
+      sb.from('v_sales_by_month').select('ym,revenue,profit').limit(3)
     ]);
 
     if (!jobs.error){
@@ -302,6 +304,18 @@ async function loadStats(){
       ];
       if (val !== null) STAT.parts.push(
         { l:'มูลค่าคงคลัง', v:'฿' + Math.round(val).toLocaleString('th-TH') });
+    }
+    if (!so.error){
+      const rows = so.data || [];
+      const wait = rows.filter(o => o.status === 'confirmed').length;
+      const ym   = new Date().toISOString().slice(0, 7);
+      const cur  = mon.error ? null : (mon.data || []).find(m => m.ym === ym);
+      STAT.sales = [
+        { l:'ออเดอร์ทั้งหมด', v:rows.length },
+        { l:'รอส่งของ', v:wait, c: wait ? 'warn' : '' }
+      ];
+      if (cur) STAT.sales.push(
+        { l:'ยอดขายเดือนนี้', v:'฿' + Math.round(Number(cur.revenue) || 0).toLocaleString('th-TH') });
     }
     $('conn').textContent = '● เชื่อมต่อฐานข้อมูลแล้ว';
     renderModules();
