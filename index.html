@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MASARU · ระบบคลัง</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+:root{
+  --navy:#1F3864; --navy-d:#16294a; --blue:#2E75B6; --blue-l:#eaf1f9;
+  --gold:#C9A84C; --gold-l:#faf3e0;
+  --good:#12875C; --good-l:#e4f2ec;
+  --warn:#C98A12; --warn-l:#fbf1dc;
+  --crit:#BE3A32; --crit-l:#fbeae9;
+  --ink:#1a2436; --ink2:#5c6a83; --ink3:#8c99b0;
+  --bg:#f2f5f9; --card:#fff; --line:#dde5f0; --line2:#eaeff7;
+  --r:14px; --sh:0 1px 3px rgba(26,36,54,.07);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;min-height:100%}
+body{font-family:"Sarabun",system-ui,-apple-system,sans-serif;background:var(--bg);
+  color:var(--ink);font-size:15px;line-height:1.6}
+
+/* ---------- โครง ---------- */
+.wrap{max-width:1080px;margin:0 auto;padding:34px 20px 60px}
+.top{display:flex;align-items:center;gap:15px;margin-bottom:6px}
+.logo{width:52px;height:52px;border-radius:13px;background:var(--gold);
+  display:grid;place-items:center;font-size:26px;flex:0 0 auto;
+  box-shadow:0 2px 8px rgba(201,168,76,.35)}
+h1{font-size:25px;font-weight:800;color:var(--navy);margin:0;letter-spacing:-.2px}
+.sub{color:var(--ink2);font-size:14px}
+.hr{height:1px;background:var(--line);margin:22px 0 24px}
+
+/* ---------- การ์ดโมดูล ---------- */
+.mods{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:18px}
+.mod{background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+  padding:22px;box-shadow:var(--sh);display:flex;flex-direction:column;gap:11px;
+  text-decoration:none;color:inherit;position:relative;overflow:hidden;
+  transition:transform .13s,box-shadow .13s,border-color .13s}
+.mod::before{content:"";position:absolute;inset:0 auto 0 0;width:4px;background:var(--blue)}
+.mod.m1::before{background:var(--blue)}
+.mod.m2::before{background:var(--good)}
+.mod.m3::before{background:var(--gold)}
+a.mod:hover{transform:translateY(-3px);box-shadow:0 8px 22px rgba(26,36,54,.13);
+  border-color:var(--blue)}
+a.mod:focus-visible{outline:3px solid var(--blue-l);outline-offset:2px}
+.mod .ico{font-size:32px;line-height:1}
+.mod h2{font-size:18px;font-weight:800;margin:0;color:var(--navy)}
+.mod .d{font-size:13.5px;color:var(--ink2);flex:1;line-height:1.65}
+.mod .stat{display:flex;gap:16px;flex-wrap:wrap;padding-top:12px;
+  border-top:1px solid var(--line2);margin-top:2px}
+.mod .stat div{font-size:12.5px;color:var(--ink3)}
+.mod .stat b{display:block;font-size:20px;font-weight:800;color:var(--navy);
+  line-height:1.25;font-variant-numeric:tabular-nums}
+.mod .stat b.warn{color:var(--warn)} .mod .stat b.crit{color:var(--crit)}
+.mod .go{font-size:13.5px;font-weight:700;color:var(--blue)}
+
+.mod.soon{opacity:.72;background:#fafbfd}
+.mod.soon::before{background:var(--line)}
+.mod.soon .go{color:var(--ink3)}
+.tag{position:absolute;top:14px;right:14px;font-size:11.5px;font-weight:700;
+  padding:3px 10px;border-radius:999px;background:var(--line2);color:var(--ink2)}
+.tag.on{background:var(--good-l);color:var(--good)}
+
+/* ---------- ล็อกอิน ---------- */
+.gate{max-width:390px;margin:8vh auto;background:#fff;border:1px solid var(--line);
+  border-radius:16px;padding:30px 28px;box-shadow:0 8px 28px rgba(26,36,54,.1)}
+.gate .logo{margin:0 auto 14px}
+.gate h1{text-align:center;font-size:21px}
+.gate .sub{text-align:center;margin-bottom:22px}
+label{display:block;font-size:12.5px;font-weight:600;color:var(--ink2);margin:0 0 5px}
+input{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:9px;
+  font:inherit;font-size:16px;background:#fff;outline:none;margin-bottom:14px}
+input:focus{border-color:var(--blue);box-shadow:0 0 0 3px var(--blue-l)}
+.btn{width:100%;background:var(--navy);color:#fff;border:0;padding:12px;border-radius:10px;
+  font:700 15px "Sarabun",sans-serif;cursor:pointer}
+.btn:hover{background:var(--navy-d)} .btn:disabled{opacity:.6;cursor:default}
+.err{background:var(--crit-l);border:1px solid #f0cbc8;color:var(--crit);
+  border-radius:9px;padding:10px 13px;font-size:13.5px;margin-bottom:14px}
+.err[hidden]{display:none}
+
+/* ---------- แถบผู้ใช้ ---------- */
+.me{display:flex;align-items:center;gap:11px;background:#fff;border:1px solid var(--line);
+  border-radius:12px;padding:11px 15px;box-shadow:var(--sh)}
+.av{width:36px;height:36px;border-radius:10px;background:var(--navy);color:#fff;
+  display:grid;place-items:center;font-weight:700;font-size:13px;flex:0 0 auto}
+.me .n{font-weight:700;line-height:1.3}
+.me .r{font-size:12.5px;color:var(--ink3)}
+.sp{flex:1}
+.lnk{background:none;border:1px solid var(--line);border-radius:9px;padding:7px 14px;
+  font:600 13px "Sarabun",sans-serif;color:var(--ink2);cursor:pointer}
+.lnk:hover{background:var(--bg);color:var(--ink)}
+.foot{margin-top:34px;text-align:center;color:var(--ink3);font-size:12.5px}
+[hidden]{display:none !important}
+@media(max-width:600px){ .wrap{padding:22px 15px 44px} h1{font-size:21px} }
+</style>
+</head>
+<body>
+
+<!-- ============ ล็อกอิน ============ -->
+<div id="gate" class="gate" hidden>
+  <div class="logo">🏭</div>
+  <h1>MASARU · ระบบคลัง</h1>
+  <div class="sub">เข้าสู่ระบบครั้งเดียว ใช้ได้ทุกโมดูล</div>
+  <div id="err" class="err" hidden></div>
+  <form id="loginForm">
+    <label for="em">อีเมล</label>
+    <input type="email" id="em" placeholder="you@masaru.co.th" autocomplete="username" required>
+    <label for="pw">รหัสผ่าน</label>
+    <input type="password" id="pw" placeholder="••••••••" autocomplete="current-password" required>
+    <button class="btn" id="btn" type="submit">เข้าสู่ระบบ</button>
+  </form>
+  <div class="foot" style="margin-top:18px">
+    ยังไม่มีบัญชี — ขอโค้ดเชิญจากผู้ดูแลระบบ<br>
+    แล้วสมัครที่ <a href="repair.html" style="color:var(--blue)">หน้าระบบซ่อม</a>
+  </div>
+</div>
+
+<!-- ============ เลือกโมดูล ============ -->
+<div id="app" class="wrap" hidden>
+  <div class="top">
+    <div class="logo">🏭</div>
+    <div>
+      <h1>MASARU · ระบบคลัง</h1>
+      <div class="sub">เลือกโมดูลที่ต้องการใช้งาน</div>
+    </div>
+  </div>
+
+  <div class="hr"></div>
+
+  <div class="me" style="margin-bottom:22px">
+    <div class="av" id="av">—</div>
+    <div><div class="n" id="uname">—</div><div class="r" id="urole">—</div></div>
+    <span class="sp"></span>
+    <button class="lnk" onclick="logout()">ออกจากระบบ</button>
+  </div>
+
+  <div class="mods" id="mods"></div>
+
+  <div class="foot">
+    บริษัท มาซารุ มาร์เก็ตติ้ง จำกัด · ระบบภายในองค์กร<br>
+    <span id="conn">กำลังโหลดข้อมูล…</span>
+  </div>
+</div>
+
+<script>
+/* =====================================================================
+   MASARU · ระบบคลัง — หน้าเลือกโมดูล (Hub)
+     · ล็อกอินที่นี่ครั้งเดียว ทุกโมดูลใช้ session เดียวกัน
+       (storageKey ต้องตรงกับที่โมดูลใช้ ไม่งั้นต้องล็อกอินซ้ำทุกหน้า)
+     · การ์ดแต่ละใบดึงตัวเลขจริงมาโชว์ จะได้รู้สถานะก่อนกดเข้า
+   ===================================================================== */
+const SUPABASE_URL = 'https://rmunaewdmlnsiwogmozq.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_m10p5I53UNKTZbUAEiUaCw_OCSR63mq';
+const AUTH_KEY     = 'masaru-repair-auth';   // ⚠️ ต้องตรงกับทุกโมดูล
+
+const $ = id => document.getElementById(id);
+const esc = s => (s ?? '').toString()
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+const ROLE_LABEL = { staff:'พนักงานรับเครื่อง', tech:'ช่างซ่อม',
+                     head:'หัวหน้าศูนย์บริการ', admin:'ผู้ดูแลระบบ' };
+
+/* ---------- นิยามโมดูล ----------
+   roles = ตำแหน่งที่เข้าได้ · ready = สร้างเสร็จแล้วหรือยัง */
+const MODULES = [
+  { k:'repair', cls:'m1', ico:'🔧', ready:true,  href:'repair.html',
+    name:'ระบบรับซ่อมเครื่องมือ',
+    desc:'รับเครื่อง · จ่ายงานช่างอัตโนมัติ · ติดตาม 6 ขั้นตอน · เคลมตาม SOP-CLM-01',
+    roles:['staff','tech','head','admin'] },
+
+  { k:'parts', cls:'m2', ico:'📦', ready:true, href:'parts.html',
+    name:'คลังอะไหล่',
+    desc:'คลังกลาง–ศูนย์ซ่อม–ฝ่ายขาย · รับเข้า · โอนคลัง · ตรวจนับ · จุดสั่งซื้อ',
+    roles:['staff','tech','head','admin'] },
+
+  { k:'sales', cls:'m3', ico:'🛒', ready:false, href:'sales-parts.html',
+    name:'อะไหล่ฝ่ายขาย',
+    desc:'อะไหล่สำหรับงานขาย — ยังไม่ได้กำหนดขอบเขต',
+    roles:['head','admin'] }
+];
+
+let sb = null;
+let ME = { id:null, email:'', name:'', role:'staff' };
+const STAT = {};
+
+/* ---------- เริ่มระบบ ---------- */
+(async function boot(){
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+    auth: { persistSession:true, autoRefreshToken:true,
+            detectSessionInUrl:false, storageKey:AUTH_KEY }
+  });
+  try {
+    const { data:{ session } } = await sb.auth.getSession();
+    if (session) return start(session);
+  } catch(e){ console.warn('getSession', e); }
+  $('gate').hidden = false;
+  $('em').focus();
+})();
+
+$('loginForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const b = $('btn');
+  b.disabled = true; b.textContent = 'กำลังเข้าสู่ระบบ…'; $('err').hidden = true;
+  try {
+    const { data, error } = await sb.auth.signInWithPassword({
+      email: $('em').value.trim(), password: $('pw').value });
+    if (error) throw error;
+    $('gate').hidden = true;
+    await start(data.session);
+  } catch(err){
+    const m = (err?.message || '').toLowerCase();
+    $('err').textContent =
+      m.includes('invalid login')       ? 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' :
+      m.includes('email not confirmed') ? 'อีเมลนี้ยังไม่ได้ยืนยัน — ให้ผู้ดูแลติ๊ก Auto Confirm ให้' :
+      m.includes('failed to fetch')     ? 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ — ตรวจอินเทอร์เน็ต' :
+      (err?.message || 'เข้าสู่ระบบไม่สำเร็จ');
+    $('err').hidden = false;
+  } finally { b.disabled = false; b.textContent = 'เข้าสู่ระบบ'; }
+});
+
+async function start(session){
+  ME.id = session.user.id;
+  ME.email = session.user.email || '';
+  ME.name = ME.email.split('@')[0];
+
+  try {
+    const { data, error } = await sb.from('app_users')
+      .select('full_name, role').eq('id', ME.id).maybeSingle();
+    if (error) throw error;
+    if (!data) throw new Error('บัญชี ' + ME.email + ' ยังไม่ได้ผูกสิทธิ์ — ให้ผู้ดูแลตั้งค่าให้ก่อน');
+    ME.name = data.full_name || ME.name;
+    ME.role = data.role || 'staff';
+  } catch(e){
+    /* อ่านสิทธิ์ไม่ได้ = ไม่ไล่ออก แค่บอกให้ชัด แล้วให้ลองใหม่ */
+    $('gate').hidden = false;
+    $('err').innerHTML = esc(e.message || e) +
+      '<div style="font-weight:400;font-size:12.5px;margin-top:5px">' +
+      'ยังล็อกอินอยู่ — กดเข้าสู่ระบบอีกครั้งเพื่อลองใหม่</div>';
+    $('err').hidden = false;
+    return;
+  }
+
+  $('av').textContent = (ME.name || '—').slice(0,2);
+  $('uname').textContent = ME.name;
+  $('urole').textContent = (ROLE_LABEL[ME.role] || ME.role) + ' · ' + ME.email;
+  $('app').hidden = false;
+
+  renderModules();
+  loadStats();
+}
+
+/* ---------- การ์ดโมดูล ---------- */
+function renderModules(){
+  const allow = MODULES.filter(m => m.roles.includes(ME.role));
+  $('mods').innerHTML = allow.length ? allow.map(m => {
+    const s = STAT[m.k];
+    const inner = `
+      <span class="tag ${m.ready ? 'on' : ''}">${m.ready ? 'พร้อมใช้งาน' : 'กำลังพัฒนา'}</span>
+      <div class="ico">${m.ico}</div>
+      <h2>${esc(m.name)}</h2>
+      <div class="d">${esc(m.desc)}</div>
+      ${s ? `<div class="stat">${s.map(x =>
+        `<div>${esc(x.l)}<b class="${x.c || ''}">${esc(x.v)}</b></div>`).join('')}</div>` : ''}
+      <div class="go">${m.ready ? 'เข้าใช้งาน →' : 'ยังเปิดไม่ได้'}</div>`;
+    return m.ready
+      ? `<a class="mod ${m.cls}" href="${m.href}">${inner}</a>`
+      : `<div class="mod ${m.cls} soon">${inner}</div>`;
+  }).join('')
+    : `<div class="mod soon"><div class="ico">🔒</div><h2>ยังไม่มีโมดูลที่เข้าได้</h2>
+       <div class="d">ตำแหน่ง "${esc(ROLE_LABEL[ME.role] || ME.role)}" ยังไม่ได้รับสิทธิ์เข้าโมดูลใด —
+         ติดต่อผู้ดูแลระบบ</div></div>`;
+}
+
+/** ตัวเลขจริงบนการ์ด — อ่านอย่างเดียว พังก็ไม่กระทบการเข้าใช้งาน */
+async function loadStats(){
+  try {
+    const [jobs, stock, wh] = await Promise.all([
+      sb.from('v_jobs').select('status,days_overdue').limit(2000),
+      sb.from('v_stock_all').select('stock_state,qty_total').limit(4000),
+      sb.from('v_wh_summary').select('wh_code,stock_value').limit(50)
+    ]);
+
+    if (!jobs.error){
+      const CLOSED = ['delivered','cancelled','rejected'];
+      const open = (jobs.data || []).filter(j => !CLOSED.includes(j.status));
+      const late = open.filter(j => j.days_overdue > 0).length;
+      STAT.repair = [
+        { l:'งานค้าง', v:open.length },
+        { l:'เกินกำหนด', v:late, c: late ? 'crit' : '' }
+      ];
+    }
+    if (!stock.error){
+      const rows = stock.data || [];
+      const low  = rows.filter(p => p.stock_state !== 'ปกติ').length;
+      const val  = wh.error ? null
+        : (wh.data || []).reduce((s, w) => s + (Number(w.stock_value) || 0), 0);
+      STAT.parts = [
+        { l:'รายการอะไหล่', v:rows.length },
+        { l:'ต้องสั่งเพิ่ม', v:low, c: low ? 'warn' : '' }
+      ];
+      if (val !== null) STAT.parts.push(
+        { l:'มูลค่าคงคลัง', v:'฿' + Math.round(val).toLocaleString('th-TH') });
+    }
+    $('conn').textContent = '● เชื่อมต่อฐานข้อมูลแล้ว';
+    renderModules();
+  } catch(e){
+    console.warn('loadStats', e);
+    $('conn').textContent = '● โหลดตัวเลขไม่สำเร็จ — เข้าใช้งานโมดูลได้ตามปกติ';
+  }
+}
+
+async function logout(){
+  try { await sb.auth.signOut(); } catch(e){}
+  location.reload();
+}
+</script>
+</body>
+</html>
