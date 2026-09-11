@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>อะไหล่ฝ่ายขาย · MASARU</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<link rel="stylesheet" href="repair.css">
+<style>
+/* เฉพาะโมดูลขาย — ที่เหลือใช้ repair.css ร่วมกับโมดูลอื่น */
+.toolbar{display:flex;gap:9px;flex-wrap:wrap;align-items:center;padding:12px 18px;border-bottom:1px solid var(--line2)}
+.toolbar input[type=text]{flex:1;min-width:180px;padding:8px 12px;border:1px solid var(--line);border-radius:9px;font:inherit}
+.toolbar select{padding:8px 11px;border:1px solid var(--line);border-radius:9px;font:inherit;background:#fff}
+.qcell{font-variant-numeric:tabular-nums;text-align:right}
+.qneg{color:var(--crit);font-weight:700}
+.qzero{color:var(--ink3)}
+.money{font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.pf{font-weight:700} .pf.up{color:var(--good)} .pf.dn{color:var(--crit)}
+.cartbox{border:1px dashed var(--line);border-radius:10px;padding:4px 14px;margin:10px 0}
+.cartbox .ln{display:flex;gap:10px;align-items:center;padding:8px 0;
+  border-bottom:1px solid var(--line2);font-size:13.5px}
+.cartbox .ln:last-child{border-bottom:0}
+.cartbox .ln .sp{flex:1}
+.sumrow{display:flex;gap:10px;justify-content:space-between;font-size:14px;padding:3px 0}
+.sumrow.big{font-weight:800;font-size:16px;color:var(--navy);border-top:1px solid var(--line);
+  margin-top:6px;padding-top:9px}
+</style>
+</head>
+<body>
+
+<!-- ============ หน้าล็อกอิน ============ -->
+<div class="gate" id="gate">
+  <div class="gbox">
+    <div class="glogo"><div class="ic">🛒</div>
+      <div><b>อะไหล่ฝ่ายขาย</b><small>ระบบคลัง · MASARU</small></div></div>
+    <form id="loginForm" autocomplete="on">
+      <div class="f"><label for="liEmail">อีเมล</label>
+        <input type="email" id="liEmail" required autocomplete="username" placeholder="you@masaru.co.th"></div>
+      <div class="f"><label for="liPass">รหัสผ่าน</label>
+        <input type="password" id="liPass" required autocomplete="current-password" placeholder="••••••••"></div>
+      <button class="btn g" id="liBtn" type="submit" style="width:100%;padding:12px;margin-top:4px">เข้าสู่ระบบ</button>
+    </form>
+    <div id="liErr" class="gerr" hidden></div>
+    <div class="gfoot">ใช้บัญชีเดียวกับระบบรับซ่อม · <a href="index.html">กลับหน้าหลัก</a></div>
+  </div>
+</div>
+
+<div class="app" id="app" hidden>
+  <aside id="side">
+    <div class="logo">
+      <div class="ic">🛒</div>
+      <div><b>อะไหล่ฝ่ายขาย</b><small>ระบบคลัง · MASARU</small></div>
+    </div>
+    <div class="navlbl">เมนูหลัก</div>
+    <nav>
+      <button data-p="ov"   class="on"><span class="e">📊</span>ภาพรวมยอดขาย</button>
+      <button data-p="so"><span class="e">🧾</span>ใบขาย</button>
+      <button data-p="stock"><span class="e">📦</span>ของพร้อมขาย</button>
+      <button data-p="cust"><span class="e">👥</span>ลูกค้า</button>
+    </nav>
+    <div class="navlbl" style="margin-top:14px">โมดูลอื่น</div>
+    <nav>
+      <button onclick="location.href='index.html'"><span class="e">🏠</span>หน้าหลักระบบคลัง</button>
+      <button onclick="location.href='parts.html'"><span class="e">📦</span>คลังอะไหล่</button>
+      <button onclick="location.href='repair.html'"><span class="e">🔧</span>ระบบรับซ่อม</button>
+    </nav>
+    <div class="sidefoot">
+      <div class="k" id="roleLbl">ผู้ใช้งาน</div>
+      <div class="v" id="userName">—</div>
+      <div class="st" id="connSt">● กำลังเชื่อมต่อ…</div>
+      <button class="btn" id="logoutBtn" style="width:100%;margin-top:11px;background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.2);color:#fff">
+        ออกจากระบบ</button>
+    </div>
+  </aside>
+
+  <div class="mainarea">
+    <div class="phead">
+      <button class="burger" onclick="document.getElementById('side').classList.toggle('open')">☰</button>
+      <div>
+        <h1 id="pgTitle">ภาพรวมยอดขาย</h1>
+        <div class="sub" id="pgSub">ยอดขาย กำไร และสินค้าขายดี</div>
+      </div>
+      <div class="sp"></div>
+      <button class="btn p" onclick="newOrder()">➕ ออกใบขาย</button>
+      <button class="btn" onclick="reloadAll()">🔄</button>
+      <div class="avatar" id="avatar">—</div>
+    </div>
+
+    <div class="content">
+      <div id="authWarn" class="awarn" hidden></div>
+
+      <!-- ============ ภาพรวม ============ -->
+      <div class="page on" id="p-ov">
+        <div class="kpis" id="ovKpi"></div>
+        <div class="split">
+          <div class="card">
+            <h3>ยอดขายรายเดือน</h3>
+            <div class="cb"><div class="chartwrap" id="monChart"></div></div>
+          </div>
+          <div class="card">
+            <h3>แยกตามช่องทางขาย</h3>
+            <div class="cb"><div class="chartwrap" id="platChart"></div></div>
+          </div>
+        </div>
+        <div class="card">
+          <h3>🏆 อะไหล่ขายดี 90 วัน<span class="sp"></span>
+            <span class="sub2">เรียงตามจำนวนที่ขายไป</span></h3>
+          <div class="cb" style="padding-top:0"><div id="topTbl"></div></div>
+        </div>
+      </div>
+
+      <!-- ============ ใบขาย ============ -->
+      <div class="page" id="p-so">
+        <div class="card">
+          <h3>ใบขายอะไหล่<span class="sp"></span>
+            <button class="btn p sm" onclick="newOrder()">➕ ออกใบขาย</button></h3>
+          <div class="box-info" style="margin:12px 18px">
+            ของจะถูกตัดออกจากคลังตอนกด <b>ยืนยันออเดอร์</b> — ใบร่างแก้ได้อิสระ ของยังไม่ขยับ ·
+            ยกเลิกใบที่ยืนยันไปแล้ว ระบบคืนของเข้าคลังให้เอง
+          </div>
+          <div class="toolbar">
+            <input type="text" id="oSearch" placeholder="🔍 ค้นหา เลขที่ใบ / ลูกค้า / เบอร์ / เลขออเดอร์">
+            <select id="oStatus">
+              <option value="">ทุกสถานะ</option>
+              <option value="draft">ใบร่าง</option>
+              <option value="confirmed">ยืนยันแล้ว รอส่ง</option>
+              <option value="delivered">ส่งของแล้ว</option>
+              <option value="cancelled">ยกเลิก</option>
+            </select>
+            <select id="oPlat"><option value="">ทุกช่องทาง</option></select>
+          </div>
+          <div class="cb" style="padding-top:0"><div id="soTbl"></div></div>
+        </div>
+      </div>
+
+      <!-- ============ ของพร้อมขาย ============ -->
+      <div class="page" id="p-stock">
+        <div class="card">
+          <h3>ของในคลังฝ่ายขาย<span class="sp"></span>
+            <button class="btn sm" onclick="location.href='parts.html'">🔁 ไปโอนของจากคลังกลาง</button></h3>
+          <div class="toolbar">
+            <input type="text" id="sSearch" placeholder="🔍 ค้นหา รหัส / ชื่ออะไหล่">
+            <label style="display:flex;align-items:center;gap:6px;font-size:13.5px">
+              <input type="checkbox" id="sHas" checked> แสดงเฉพาะที่มีของ</label>
+          </div>
+          <div class="cb" style="padding-top:0"><div id="stockTbl"></div></div>
+        </div>
+      </div>
+
+      <!-- ============ ลูกค้า ============ -->
+      <div class="page" id="p-cust">
+        <div class="card">
+          <h3>ทะเบียนลูกค้า<span class="sp"></span>
+            <span class="sub2">ใช้ฐานเดียวกับระบบรับซ่อม</span>
+            <button class="btn p sm" onclick="editCust(null)">➕ เพิ่มลูกค้า</button></h3>
+          <div class="toolbar">
+            <input type="text" id="cSearch" placeholder="🔍 ค้นหา ชื่อ / เบอร์โทร">
+          </div>
+          <div class="cb" style="padding-top:0"><div id="custTbl"></div></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ============ หน้าต่างฟอร์ม (repair-ui.js ใช้ตัวนี้) ============ -->
+<div class="fmask" id="fmask">
+  <div class="fmodal">
+    <div class="fhead"><div class="ttl"><h4 id="fmTitle">—</h4><p class="sub" id="fmSub"></p></div>
+      <button class="x" type="button" id="fmX" aria-label="ปิด">✕</button></div>
+    <form id="fmForm"><div class="fbody" id="fmBody"></div>
+      <div class="ffoot">
+        <button type="button" class="btn" id="fmCancel">ยกเลิก</button>
+        <button type="submit" class="btn g" id="fmOk">บันทึก</button>
+      </div></form>
+  </div>
+</div>
+
+<script src="repair-ui.js"></script>
+<script>
+/* =====================================================================
+   MASARU · ระบบคลัง — โมดูล 3: อะไหล่ฝ่ายขาย
+   ⚠️ ห้ามใส่ type="module" — ปุ่มทั้งหมดเรียกฟังก์ชันผ่าน onclick=
+   ต้องรัน 17_warehouse.sql และ 18_sales.sql ก่อนใช้งาน
+   ===================================================================== */
+const SUPABASE_URL = 'https://rmunaewdmlnsiwogmozq.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_m10p5I53UNKTZbUAEiUaCw_OCSR63mq';
+const AUTH_KEY     = 'masaru-repair-auth';   // ต้องตรงกับทุกโมดูล
+const UPLOAD_URL   = '';                     // โมดูลนี้ยังไม่ใช้รูป
+
+const PLATFORMS = ['TikTok','Shopee','Lazada','Facebook','LINE','หน้าร้าน','ดีลเลอร์','อื่น ๆ'];
+const CUST_TYPE = { end_user:'ลูกค้าทั่วไป', dealer:'ดีลเลอร์', shop:'ร้านค้า', internal:'ภายในบริษัท' };
+
+const SO_LABEL = { draft:'ใบร่าง', confirmed:'ยืนยันแล้ว รอส่ง',
+                   delivered:'ส่งของแล้ว', cancelled:'ยกเลิก' };
+const SO_PILL  = { draft:'st0', confirmed:'st3', delivered:'st6', cancelled:'tag-crit' };
+
+let sb = null;
+let ME = { id:null, email:'', name:'', role:'staff' };
+const who    = () => ME.name || ME.email || 'ไม่ระบุ';
+const isBoss = () => ME.role === 'head' || ME.role === 'admin';
+const ROLE_LABEL = { staff:'พนักงานรับเครื่อง', tech:'ช่างซ่อม', head:'หัวหน้าช่าง', admin:'ผู้ดูแลระบบ' };
+
+const S = {
+  orders:[], lines:[], stock:[], custs:[], master:[], top:[], byMonth:[], byPlat:[],
+  page:'ov', cart:[], pg:{}, per:30
+};
+window.PAGERS = {
+  so:    () => renderOrders(),
+  stock: () => renderStock(),
+  cust:  () => renderCust()
+};
+
+const PAGE_META = {
+  ov:    ['ภาพรวมยอดขาย', 'ยอดขาย กำไร และสินค้าขายดี'],
+  so:    ['ใบขาย',        'ออกใบ · ยืนยันตัดสต๊อก · ส่งของ · ยกเลิกคืนของ'],
+  stock: ['ของพร้อมขาย',  'ยอดคงเหลือในคลังฝ่ายขาย'],
+  cust:  ['ลูกค้า',        'ฐานลูกค้าเดียวกับระบบรับซ่อม']
+};
+
+const qCell = n => {
+  const v = Number(n) || 0;
+  return `<td class="qcell ${v < 0 ? 'qneg' : (v === 0 ? 'qzero' : '')}">${money(v)}</td>`;
+};
+const pf = n => {
+  const v = Number(n) || 0;
+  return `<span class="pf ${v > 0 ? 'up' : (v < 0 ? 'dn' : '')}">฿${money(v)}</span>`;
+};
+
+
+/* =====================================================================
+   คงสถานะล็อกอิน — ยกชุดเดียวกับโมดูลอื่น
+   ===================================================================== */
+let _authBound = false, _userLogout = false;
+
+function authNotice(msg, kind){
+  const el = $('authWarn');
+  if (!el) return;
+  el.hidden = !msg;
+  el.className = 'awarn' + (kind ? ' ' + kind : '');
+  el.innerHTML = msg || '';
+}
+
+function bindAuthEvents(){
+  if (_authBound) return;
+  _authBound = true;
+  sb.auth.onAuthStateChange(async (ev) => {
+    if (ev === 'TOKEN_REFRESHED' || ev === 'SIGNED_IN'){ authNotice(''); return; }
+    if (ev !== 'SIGNED_OUT') return;
+    if (_userLogout){ location.reload(); return; }
+    if (!ME.id) return;
+    if (navigator.onLine === false){
+      authNotice('🔌 <b>อินเทอร์เน็ตหลุด</b> — ยังไม่ต้องปิดหน้านี้ ระบบจะเชื่อมต่อใหม่ให้เองเมื่อเน็ตกลับมา', 'warn');
+      return;
+    }
+    try { const { data } = await sb.auth.getSession();     if (data?.session){ authNotice(''); return; } } catch(e){}
+    try { const { data } = await sb.auth.refreshSession(); if (data?.session){ authNotice(''); return; } } catch(e){}
+    authNotice('🔑 <b>เซสชันหมดอายุ</b> — กำลังพากลับไปหน้าเข้าสู่ระบบ', 'crit');
+    setTimeout(() => location.reload(), 1400);
+  });
+  window.addEventListener('online', async () => {
+    if (!ME.id) return;
+    authNotice('');
+    try { await sb.auth.refreshSession(); await reloadAll(); } catch(e){ console.warn(e); }
+  });
+  window.addEventListener('offline', () => {
+    if (ME.id) authNotice('🔌 <b>อินเทอร์เน็ตหลุด</b> — ข้อมูลที่ยังไม่กดบันทึกอย่าปิดหน้านี้', 'warn');
+  });
+}
+
+
+/* =====================================================================
+   boot
+   ===================================================================== */
+(async function boot(){
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+    auth: { persistSession:true, autoRefreshToken:true, detectSessionInUrl:false, storageKey:AUTH_KEY }
+  });
+  bindAuthEvents();
+  try {
+    const { data:{ session } } = await sb.auth.getSession();
+    if (session) return startApp(session);
+  } catch(e){ console.warn('getSession ล้มเหลว', e); }
+  $('liEmail').focus();
+})();
+
+$('loginForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const btn = $('liBtn');
+  btn.disabled = true; btn.textContent = 'กำลังเข้าสู่ระบบ…'; $('liErr').hidden = true;
+  try {
+    const { data, error } = await sb.auth.signInWithPassword({
+      email: val('liEmail'), password: $('liPass').value });
+    if (error) throw error;
+    await startApp(data.session);
+  } catch(err){
+    const m = (err?.message || '').toLowerCase();
+    $('liErr').textContent = m.includes('invalid login')
+      ? 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' : (err?.message || 'เข้าสู่ระบบไม่สำเร็จ');
+    $('liErr').hidden = false;
+  } finally { btn.disabled = false; btn.textContent = 'เข้าสู่ระบบ'; }
+});
+
+$('logoutBtn').addEventListener('click', async () => {
+  _userLogout = true;
+  try { await sb.auth.signOut(); } catch(e){}
+  location.href = 'index.html';
+});
+
+async function startApp(session){
+  ME.id = session.user.id; ME.email = session.user.email || '';
+  try {
+    const { data, error } = await sb.from('app_users')
+      .select('full_name,role').eq('id', ME.id).maybeSingle();
+    if (error) throw error;
+    ME.name = data?.full_name || ME.email;
+    ME.role = data?.role || 'staff';
+  } catch(e){
+    console.warn('อ่านข้อมูลผู้ใช้ไม่ได้', e);
+    ME.name = ME.email;
+    authNotice('⚠️ อ่านข้อมูลผู้ใช้ไม่ได้ — บางเมนูอาจใช้ไม่ได้ · ' + esc(e.message || ''), 'warn');
+  }
+
+  $('gate').hidden = true; $('app').hidden = false;
+  $('userName').textContent = ME.name;
+  $('roleLbl').textContent  = ROLE_LABEL[ME.role] || ME.role;
+  $('avatar').textContent   = (ME.name || '?').trim().charAt(0).toUpperCase();
+
+  $('oPlat').innerHTML = '<option value="">ทุกช่องทาง</option>' +
+    PLATFORMS.map(p => `<option>${esc(p)}</option>`).join('');
+
+  bindNav(); bindFilters();
+  await reloadAll();
+}
+
+function bindNav(){
+  document.querySelectorAll('nav button[data-p]').forEach(b =>
+    b.addEventListener('click', () => goPage(b.dataset.p)));
+}
+
+function goPage(p){
+  if (!PAGE_META[p]) return;
+  S.page = p;
+  document.querySelectorAll('nav button[data-p]').forEach(b => b.classList.toggle('on', b.dataset.p === p));
+  document.querySelectorAll('.page').forEach(el => el.classList.toggle('on', el.id === 'p-' + p));
+  $('pgTitle').textContent = PAGE_META[p][0];
+  $('pgSub').textContent   = PAGE_META[p][1];
+  $('side').classList.remove('open');
+  window.scrollTo({ top:0 });
+  /* กราฟที่อยู่ในแท็บซ่อน วัดความกว้างไม่ได้ ต้องวาดใหม่ตอนโผล่ */
+  if (p === 'ov') requestAnimationFrame(() => drawCharts());
+}
+
+function bindFilters(){
+  $('oSearch')?.addEventListener('input',  () => { S.pg.so = 1;    renderOrders(); });
+  $('oStatus')?.addEventListener('change', () => { S.pg.so = 1;    renderOrders(); });
+  $('oPlat')?.addEventListener('change',   () => { S.pg.so = 1;    renderOrders(); });
+  $('sSearch')?.addEventListener('input',  () => { S.pg.stock = 1; renderStock(); });
+  $('sHas')?.addEventListener('change',    () => { S.pg.stock = 1; renderStock(); });
+  $('cSearch')?.addEventListener('input',  () => { S.pg.cust = 1;  renderCust(); });
+  window.addEventListener('resize', () => { if (S.page === 'ov') drawCharts(); });
+}
+
+
+/* =====================================================================
+   โหลดข้อมูล
+   ===================================================================== */
+async function reloadAll(){
+  if (!sb || !ME.id) return;
+  $('connSt').textContent = '● กำลังโหลด…';
+  try {
+    const [orders, stock, custs, master, top, mon, plat] = await Promise.all([
+      sb.from('v_sales_orders').select('*').limit(2000),
+      sb.from('v_stock_by_wh').select('*').eq('wh_code', 'SALES'),
+      sb.from('repair_customers').select('*').order('name').limit(3000),
+      sb.from('parts_master').select('*').eq('is_active', true).order('part_no'),
+      sb.from('v_top_sell_parts').select('*').limit(50),
+      sb.from('v_sales_by_month').select('*').limit(24),
+      sb.from('v_sales_by_platform').select('*')
+    ]);
+    for (const r of [orders, stock, custs, master, top, mon, plat]) if (r.error) throw r.error;
+
+    S.orders  = orders.data || [];
+    S.stock   = stock.data  || [];
+    S.custs   = custs.data  || [];
+    S.master  = master.data || [];
+    S.top     = top.data    || [];
+    S.byMonth = mon.data    || [];
+    S.byPlat  = plat.data   || [];
+
+    renderOverview(); renderOrders(); renderStock(); renderCust();
+    $('connSt').textContent = '● เชื่อมต่อแล้ว';
+  } catch(e){
+    $('connSt').textContent = '● โหลดไม่สำเร็จ';
+    if (/does not exist|not exist/i.test(e.message || ''))
+      toast('❌ ยังไม่ได้รัน 18_sales.sql ในฐานข้อมูล', true);
+    else fail(e);
+  }
+}
+
+const partOptions = () => S.master.map(p => {
+  const st = S.stock.find(s => s.part_no === p.part_no);
+  return { v:p.part_no, t:`${p.part_no} — ${p.name} · เหลือ ${Number(st?.qty) || 0}` };
+});
+const custOptions = () => [{ v:'', t:'— ลูกค้าหน้าร้าน / ไม่เปิดทะเบียน —' }]
+  .concat(S.custs.map(c => ({ v:c.id, t:`${c.name}${c.phone ? ' · ' + c.phone : ''}` })));
+const sellPrice = pn => Number(S.master.find(p => p.part_no === pn)?.sell_price) || 0;
+const stockOf   = pn => Number(S.stock.find(s => s.part_no === pn)?.qty) || 0;
+
+
+/* =====================================================================
+   หน้า 1 — ภาพรวม
+   ===================================================================== */
+function renderOverview(){
+  const ym  = new Date().toISOString().slice(0, 7);
+  const cur = S.byMonth.find(m => m.ym === ym)
+              || { orders:0, qty_total:0, revenue:0, cost:0, profit:0 };
+  const wait = S.orders.filter(o => o.status === 'confirmed');
+  const draft = S.orders.filter(o => o.status === 'draft');
+  const margin = Number(cur.revenue) ? Math.round(Number(cur.profit) / Number(cur.revenue) * 100) : 0;
+  const outOfStock = S.stock.filter(s => Number(s.qty) <= 0).length;
+
+  $('ovKpi').innerHTML = [
+    ['na','🧾','ออเดอร์เดือนนี้', money(cur.orders), money(cur.qty_total) + ' ชิ้น'],
+    ['ne','💰','ยอดขายเดือนนี้', '฿' + money(cur.revenue), 'ไม่รวมค่าส่ง'],
+    ['nc','📈','กำไรขั้นต้น', '฿' + money(cur.profit), margin + '% ของยอดขาย'],
+    ['nb','💸','ต้นทุนของที่ขาย', '฿' + money(cur.cost), 'ราคาทุน ณ วันขาย'],
+    [wait.length ? 'nb' : 'nc','📮','ยืนยันแล้ว รอส่ง', money(wait.length),
+      wait.length ? 'ใบ' : 'ส่งครบแล้ว'],
+    [draft.length ? 'nd' : 'nc','📝','ใบร่างค้าง', money(draft.length),
+      draft.length ? 'ยังไม่ตัดสต๊อก' : 'ไม่มีค้าง']
+  ].map(([cl,e,l,n,u]) => `<div class="kpi ${cl}">
+      <div class="t"><span class="l">${l}</span><span class="e">${e}</span></div>
+      <div class="n">${n}</div><div class="sub2">${esc(u)}</div></div>`).join('');
+
+  $('topTbl').innerHTML = S.top.length ? `<div class="tw"><table>
+    <thead><tr><th>อะไหล่</th><th class="num">ขายไป</th><th class="num">ออเดอร์</th>
+      <th class="num">ยอดขาย</th><th class="num">กำไร</th><th class="num">เหลือในคลังขาย</th></tr></thead>
+    <tbody>${S.top.slice(0, 20).map(t => `<tr>
+      <td><b class="mono">${esc(t.part_no)}</b><div class="sub2">${esc(t.part_name)}</div></td>
+      <td class="num"><b>${money(t.qty_sold)}</b> ${esc(t.unit || '')}</td>
+      <td class="num">${money(t.order_count)}</td>
+      <td class="money">฿${money(t.revenue)}</td>
+      <td class="money">${pf(t.profit)}</td>
+      <td class="qcell ${Number(t.qty_left) <= 0 ? 'qneg' : ''}">${money(t.qty_left)}</td>
+    </tr>`).join('')}</tbody></table></div>`
+    : '<div class="empty">ยังไม่มียอดขายใน 90 วันที่ผ่านมา</div>';
+
+  if (outOfStock && S.stock.length)
+    console.info('[ขาย] อะไหล่ที่หมดในคลังขาย', outOfStock, 'รายการ');
+
+  drawCharts();
+}
+
+function drawCharts(){
+  const mons = S.byMonth.slice(0, 8).reverse();
+  $('monChart').innerHTML = mons.length
+    ? groupedBarSVG(mons.map(m => m.ym.slice(2).replace('-', '/')), [
+        { name:'ยอดขาย', data:mons.map(m => Math.round(Number(m.revenue) || 0)), color:'#2E75B6' },
+        { name:'ต้นทุน',  data:mons.map(m => Math.round(Number(m.cost)    || 0)), color:'#C98A12' },
+        { name:'กำไร',    data:mons.map(m => Math.round(Number(m.profit)  || 0)), color:'#12875C' }
+      ], boxW('monChart'), 220)
+    : '<div class="empty">ยังไม่มียอดขาย</div>';
+
+  const items = S.byPlat.map(p => ({
+    label: p.platform,
+    value: Math.round(Number(p.revenue) || 0),
+    sub:  '฿' + money(p.revenue) + ' · ' + money(p.orders) + ' ใบ'
+  }));
+  $('platChart').innerHTML = items.length
+    ? hBarsSVG(items, boxW('platChart'))
+    : '<div class="empty">ยังไม่มียอดขาย</div>';
+}
+
+
+/* =====================================================================
+   หน้า 2 — ใบขาย
+   ===================================================================== */
+function orderRows(){
+  const q  = (val('oSearch') || '').toLowerCase();
+  const st = val('oStatus'), pl = val('oPlat');
+  return S.orders.filter(o => {
+    if (st && o.status !== st) return false;
+    if (pl && o.platform !== pl) return false;
+    if (!q) return true;
+    return [o.so_no, o.cust_name, o.cust_phone, o.order_ref, o.tracking_no]
+      .filter(Boolean).join(' ').toLowerCase().includes(q);
+  });
+}
+
+function renderOrders(){
+  const rows = orderRows();
+  const m = paginate(rows, 'so');
+
+  $('soTbl').innerHTML = rows.length ? `<div class="tw"><table>
+    <thead><tr><th>เลขที่ / วันที่</th><th>ลูกค้า</th><th>ช่องทาง</th>
+      <th class="num">รายการ</th><th class="num">ยอดลูกค้าจ่าย</th><th class="num">กำไร</th>
+      <th>สถานะ</th><th></th></tr></thead>
+    <tbody>${m.slice.map(o => `<tr>
+      <td><b class="mono">${esc(o.so_no)}</b>
+        <div class="sub2">${esc(dth(o.order_date))} · ${esc(o.created_by || '')}</div></td>
+      <td>${esc(o.cust_name)}${o.cust_phone ? `<div class="sub2">${esc(o.cust_phone)}</div>` : ''}</td>
+      <td>${esc(o.platform || '—')}${o.order_ref ? `<div class="sub2 mono">${esc(o.order_ref)}</div>` : ''}</td>
+      <td class="num">${money(o.line_count)} <span class="sub2">(${money(o.qty_total)} ชิ้น)</span></td>
+      <td class="money">฿${money(o.total)}
+        ${Number(o.discount) ? `<div class="sub2">ลด ฿${money(o.discount)}</div>` : ''}</td>
+      <td class="money">${o.status === 'cancelled' ? '<span class="sub2">—</span>' : pf(o.profit)}</td>
+      <td><span class="pill ${SO_PILL[o.status] || 'st0'}">${SO_LABEL[o.status] || esc(o.status)}</span>
+        ${o.tracking_no ? `<div class="sub2 mono">${esc(o.tracking_no)}</div>` : ''}</td>
+      <td class="num" style="white-space:nowrap">
+        <button class="btn ic" title="ดูรายการ" onclick="peekOrder('${esc(o.so_no)}')">👀</button>
+        ${o.status === 'draft' ? `
+          <button class="btn sm p" onclick="soAct('${esc(o.so_no)}','confirm')">✅ ยืนยัน</button>` : ''}
+        ${o.status === 'confirmed' ? `
+          <button class="btn sm g" onclick="soAct('${esc(o.so_no)}','deliver')">🚚 ส่งของ</button>` : ''}
+        ${o.status !== 'cancelled' ? `
+          <button class="btn ic dn" title="ยกเลิก" onclick="soAct('${esc(o.so_no)}','cancel')">✕</button>` : ''}
+      </td></tr>`).join('')}</tbody></table></div>${pagerHTML(m, 'so')}`
+    : '<div class="empty">ยังไม่มีใบขายที่ตรงกับที่กรอง</div>';
+}
+
+async function peekOrder(no){
+  const o = S.orders.find(x => x.so_no === no);
+  if (!o) return;
+  try {
+    const { data, error } = await sb.from('v_sales_order_lines')
+      .select('*').eq('order_id', o.id);
+    if (error) throw error;
+    const ls = data || [];
+    const shipTxt = Number(o.ship_fee)
+      ? `฿${money(o.ship_fee)} (${esc(o.ship_by)}ออก)` : 'ไม่มี';
+
+    await infoModal('🧾 ใบขาย ' + no,
+      `${o.cust_name} · ${SO_LABEL[o.status] || o.status}`,
+      `<div class="tw"><table>
+        <thead><tr><th>อะไหล่</th><th class="num">จำนวน</th><th class="num">ราคา/หน่วย</th>
+          <th class="num">รวม</th><th class="num">กำไร</th></tr></thead>
+        <tbody>${ls.length ? ls.map(l => `<tr>
+          <td><b class="mono">${esc(l.part_no)}</b><div class="sub2">${esc(l.part_name)}</div></td>
+          <td class="num">${money(l.qty)} ${esc(l.unit || '')}</td>
+          <td class="money">฿${money2(l.unit_price)}</td>
+          <td class="money">฿${money(l.line_total)}</td>
+          <td class="money">${pf(l.line_profit)}</td></tr>`).join('')
+          : '<tr><td colspan="5" class="empty">ไม่มีรายการ</td></tr>'}</tbody></table></div>
+
+      <div style="max-width:380px;margin:16px 0 0 auto">
+        <div class="sumrow"><span>ค่าสินค้า</span><b>฿${money(o.subtotal)}</b></div>
+        <div class="sumrow"><span>ส่วนลด</span><b>−฿${money(o.discount)}</b></div>
+        <div class="sumrow"><span>ค่าส่ง</span><b>${shipTxt}</b></div>
+        <div class="sumrow big"><span>ลูกค้าจ่ายทั้งสิ้น</span><span>฿${money(o.total)}</span></div>
+        <div class="sumrow" style="margin-top:8px"><span>ต้นทุนสินค้า</span>
+          <b>฿${money(o.cost_total)}</b></div>
+        ${Number(o.ship_cost_company) ? `<div class="sumrow"><span>ค่าส่งที่บริษัทออก</span>
+          <b>฿${money(o.ship_cost_company)}</b></div>` : ''}
+        <div class="sumrow big"><span>กำไรขั้นต้น</span><span>${pf(o.profit)}</span></div>
+      </div>
+
+      <div class="box-info" style="margin-top:14px;font-size:12.5px">
+        ออกใบ ${esc(dtth(o.created_at))} โดย ${esc(o.created_by || '—')}<br>
+        ${o.confirmed_at ? 'ยืนยัน ' + esc(dtth(o.confirmed_at)) + ' โดย ' + esc(o.confirmed_by || '—') + '<br>' : ''}
+        ${o.delivered_at ? 'ส่งของ ' + esc(dtth(o.delivered_at)) + ' โดย ' + esc(o.delivered_by || '—') + '<br>' : ''}
+        ${o.cancelled_at ? 'ยกเลิก ' + esc(dtth(o.cancelled_at)) + ' โดย ' + esc(o.cancelled_by || '—') + '<br>' : ''}
+        ${o.note ? 'หมายเหตุ: ' + esc(o.note) : ''}
+      </div>`);
+  } catch(e){ fail(e); }
+}
+
+async function soAct(no, act){
+  const o = S.orders.find(x => x.so_no === no);
+  if (!o) return;
+
+  if (act === 'confirm'){
+    const okGo = await confirmModal('ยืนยันออเดอร์',
+      `${no} · ${o.cust_name}\nยอด ฿${money(o.total)} · ${money(o.qty_total)} ชิ้น\n\n` +
+      'ระบบจะตัดของออกจากคลังฝ่ายขายทันที', { ok:'ยืนยันและตัดสต๊อก', danger:false });
+    if (!okGo) return;
+    return runRpc('so_confirm', { p_no:no, p_by:who() }, '✅ ยืนยันแล้ว — ตัดของออกจากคลังเรียบร้อย');
+  }
+
+  if (act === 'deliver'){
+    const f = await formModal({
+      title:'🚚 ส่งของแล้ว', subtitle:no + ' · ' + o.cust_name, ok:'บันทึกการส่ง',
+      fields:[{ k:'track', label:'เลขพัสดุ (ถ้ามี)', value:o.tracking_no || '',
+                placeholder:'เช่น TH1234567890' }]});
+    if (!f) return;
+    return runRpc('so_deliver', { p_no:no, p_by:who(), p_tracking:f.track || null },
+                  '✅ บันทึกการส่งแล้ว');
+  }
+
+  if (act === 'cancel'){
+    const willReturn = o.status !== 'draft';
+    const f = await formModal({
+      title:'ยกเลิกใบขาย', subtitle:no + ' · ' + o.cust_name,
+      ok:'ยืนยันยกเลิก', danger:true,
+      fields:[{ k:'reason', label:'เหตุผลที่ยกเลิก', type:'textarea', required:true,
+        placeholder:'เช่น ลูกค้าเปลี่ยนใจ / กดผิดใบ',
+        hint: willReturn ? 'ใบนี้ตัดของไปแล้ว ระบบจะคืนของเข้าคลังให้อัตโนมัติ'
+                         : 'ใบร่างยังไม่ได้ตัดของ ยกเลิกได้เลย' }]});
+    if (!f) return;
+    return runRpc('so_cancel', { p_no:no, p_by:who(), p_reason:f.reason },
+                  willReturn ? '✅ ยกเลิกแล้ว — คืนของเข้าคลังเรียบร้อย' : '✅ ยกเลิกใบร่างแล้ว');
+  }
+}
+
+async function runRpc(fn, args, okMsg){
+  try {
+    const { error } = await sb.rpc(fn, args);
+    if (error) throw error;
+    toast(okMsg);
+    reloadAll();
+  } catch(e){ fail(e); }
+}
+
+
+/* ---------- ออกใบขายใหม่ ---------- */
+async function newOrder(){
+  S.cart = [];
+
+  const h = await formModal({
+    title:'🧾 ออกใบขาย', subtitle:'กรอกหัวใบก่อน แล้วค่อยใส่รายการทีละบรรทัด',
+    ok:'ถัดไป — ใส่รายการ',
+    fields:[
+      { k:'cust', label:'ลูกค้า', type:'select', options:custOptions() },
+      { k:'name', label:'ชื่อลูกค้า (ถ้าไม่ได้เลือกจากทะเบียน)', half:true,
+        placeholder:'เช่น ลูกค้าหน้าร้าน' },
+      { k:'phone', label:'เบอร์โทร', half:true, placeholder:'08xxxxxxxx' },
+      { k:'platform', label:'ช่องทางขาย', type:'select', half:true, value:'หน้าร้าน',
+        options:PLATFORMS.map(p => ({ v:p, t:p })) },
+      { k:'ref', label:'เลขออเดอร์ในแพลตฟอร์ม', half:true, placeholder:'เช่น 25091100XXXX' },
+      { k:'discount', label:'ส่วนลดทั้งใบ (บาท)', type:'number', min:0, value:0, half:true },
+      { k:'ship_fee', label:'ค่าส่ง (บาท)', type:'number', min:0, value:0, half:true },
+      { k:'ship_by', label:'ใครออกค่าส่ง', type:'select', value:'ลูกค้า',
+        options:[{ v:'ลูกค้า', t:'ลูกค้าออก — เก็บผ่านมือ ไม่นับเป็นกำไร' },
+                 { v:'บริษัท', t:'บริษัทออก — เป็นต้นทุน หักจากกำไร' }] },
+      { k:'note', label:'หมายเหตุ' }
+    ]});
+  if (!h) return;
+
+  /* ใส่รายการทีละบรรทัด จนกว่าจะกดพอ */
+  for(;;){
+    const sum = S.cart.reduce((s,c) => s + c.qty * c.price, 0);
+    const line = await formModal({
+      title: S.cart.length ? `เพิ่มรายการ (มีแล้ว ${S.cart.length} บรรทัด · ฿${money(sum)})`
+                           : 'เพิ่มรายการแรก',
+      subtitle:'กด "ยกเลิก" เมื่อใส่ครบแล้ว · ไม่ใส่ราคา = ใช้ราคาขายในทะเบียน',
+      ok:'เพิ่มรายการนี้',
+      fields:[
+        { k:'part',  label:'อะไหล่', type:'select', required:true, options:partOptions() },
+        { k:'qty',   label:'จำนวน', type:'number', required:true, min:1, value:1, half:true },
+        { k:'price', label:'ราคาขาย/หน่วย (เว้นว่าง = ราคาในทะเบียน)', type:'number', min:0, half:true },
+        { k:'note',  label:'หมายเหตุบรรทัดนี้' }
+      ]});
+    if (!line) break;
+
+    const have = stockOf(line.part);
+    const already = S.cart.filter(c => c.part_no === line.part)
+                          .reduce((s,c) => s + c.qty, 0);
+    if (have < Number(line.qty) + already)
+      toast(`⚠️ ${line.part} ในคลังขายเหลือ ${money(have)} ชิ้น — ใส่ไว้ก่อนได้ แต่ตอนยืนยันจะติด`, true);
+
+    const price = (line.price === null || line.price === undefined || line.price === 0)
+      ? sellPrice(line.part) : Number(line.price);
+    const dup = S.cart.find(c => c.part_no === line.part);
+    if (dup){ dup.qty += Number(line.qty); dup.price = price; }
+    else S.cart.push({ part_no:line.part, qty:Number(line.qty), price, note:line.note || null });
+  }
+
+  if (!S.cart.length) return toast('ยกเลิก — ไม่มีรายการในใบขาย');
+
+  const sub  = S.cart.reduce((s,c) => s + c.qty * c.price, 0);
+  const disc = Number(h.discount) || 0;
+  const ship = Number(h.ship_fee) || 0;
+  const pay  = Math.max(0, sub - disc) + (h.ship_by === 'ลูกค้า' ? ship : 0);
+
+  const okGo = await confirmModal('ยืนยันออกใบขาย',
+    `${h.cust ? (S.custs.find(c => c.id === h.cust)?.name || '') : (h.name || 'ลูกค้าหน้าร้าน')}` +
+    ` · ${h.platform}\n\n` +
+    S.cart.map(c => `• ${c.part_no} × ${c.qty} = ฿${money(c.qty * c.price)}`).join('\n') +
+    `\n\nค่าสินค้า ฿${money(sub)}` +
+    (disc ? `\nส่วนลด −฿${money(disc)}` : '') +
+    (ship ? `\nค่าส่ง ฿${money(ship)} (${h.ship_by}ออก)` : '') +
+    `\nลูกค้าจ่าย ฿${money(pay)}` +
+    `\n\nจะบันทึกเป็น "ใบร่าง" — ของยังไม่ถูกตัดจนกว่าจะกดยืนยัน`,
+    { ok:'ออกใบขาย', danger:false });
+  if (!okGo) return;
+
+  try {
+    const { data, error } = await sb.rpc('create_sales_order', {
+      p_lines:    S.cart,
+      p_customer: h.cust || null,
+      p_name:     h.name || null,
+      p_phone:    h.phone || null,
+      p_platform: h.platform || null,
+      p_ref:      h.ref || null,
+      p_discount: disc,
+      p_ship_fee: ship,
+      p_ship_by:  h.ship_by || 'ลูกค้า',
+      p_note:     h.note || null,
+      p_by:       who()
+    });
+    if (error) throw error;
+    S.cart = [];
+    toast('✅ ออกใบขาย ' + data + ' แล้ว — กด "ยืนยัน" เมื่อพร้อมตัดของ');
+    goPage('so');
+    reloadAll();
+  } catch(e){ fail(e); }
+}
+
+
+/* =====================================================================
+   หน้า 3 — ของพร้อมขาย
+   ===================================================================== */
+function renderStock(){
+  const q    = (val('sSearch') || '').toLowerCase();
+  const only = $('sHas')?.checked;
+  const rows = S.stock.filter(s => {
+    if (only && Number(s.qty) <= 0) return false;
+    if (!q) return true;
+    return (s.part_no + ' ' + s.name).toLowerCase().includes(q);
+  }).sort((a,b) => Number(b.qty) - Number(a.qty));
+  const m = paginate(rows, 'stock');
+
+  $('stockTbl').innerHTML = rows.length ? `<div class="tw"><table>
+    <thead><tr><th>อะไหล่</th><th class="num">คงเหลือ</th><th class="num">ราคาทุน</th>
+      <th class="num">ราคาขาย</th><th class="num">กำไร/ชิ้น</th><th class="num">มูลค่าคงคลัง</th></tr></thead>
+    <tbody>${m.slice.map(s => {
+      const gain = (Number(s.sell_price) || 0) - (Number(s.cost_price) || 0);
+      return `<tr>
+        <td><b class="mono">${esc(s.part_no)}</b><div class="sub2">${esc(s.name)} · ${esc(s.unit)}</div></td>
+        ${qCell(s.qty)}
+        <td class="money">฿${money(s.cost_price)}</td>
+        <td class="money">฿${money(s.sell_price)}</td>
+        <td class="money">${pf(gain)}</td>
+        <td class="money">฿${money(s.stock_value)}</td>
+      </tr>`;
+    }).join('')}</tbody></table></div>${pagerHTML(m, 'stock')}`
+    : '<div class="empty">ยังไม่มีของในคลังฝ่ายขาย — ไปโอนจากคลังกลางที่โมดูล "คลังอะไหล่"</div>';
+}
+
+
+/* =====================================================================
+   หน้า 4 — ลูกค้า
+   ===================================================================== */
+function renderCust(){
+  const q = (val('cSearch') || '').toLowerCase();
+  const rows = S.custs.filter(c => !q ||
+    (c.name + ' ' + (c.phone || '') + ' ' + (c.email || '')).toLowerCase().includes(q));
+  const m = paginate(rows, 'cust');
+
+  $('custTbl').innerHTML = rows.length ? `<div class="tw"><table>
+    <thead><tr><th>ชื่อ</th><th>เบอร์โทร</th><th>ประเภท</th>
+      <th class="num">เคยซื้อ</th><th class="num">ยอดสะสม</th><th></th></tr></thead>
+    <tbody>${m.slice.map(c => {
+      const mine = S.orders.filter(o => o.customer_id === c.id && o.status !== 'cancelled');
+      const spent = mine.reduce((s,o) => s + (Number(o.total) || 0), 0);
+      return `<tr>
+        <td><b>${esc(c.name)}</b>${c.email ? `<div class="sub2">${esc(c.email)}</div>` : ''}</td>
+        <td class="mono">${esc(c.phone || '—')}</td>
+        <td><span class="pill st1">${esc(CUST_TYPE[c.customer_type] || c.customer_type)}</span></td>
+        <td class="num">${money(mine.length)} ใบ</td>
+        <td class="money">฿${money(spent)}</td>
+        <td class="num"><button class="btn ic" title="แก้ไข" onclick="editCust('${c.id}')">✏️</button></td>
+      </tr>`;
+    }).join('')}</tbody></table></div>${pagerHTML(m, 'cust')}`
+    : '<div class="empty">ยังไม่มีลูกค้าในทะเบียน</div>';
+}
+
+async function editCust(id){
+  const c = id ? S.custs.find(x => x.id === id) : null;
+  const f = await formModal({
+    title: c ? '✏️ แก้ไขลูกค้า' : '➕ เพิ่มลูกค้า',
+    subtitle: c ? c.name : 'ทะเบียนนี้ใช้ร่วมกับระบบรับซ่อม',
+    ok:'บันทึก',
+    fields:[
+      { k:'name',  label:'ชื่อลูกค้า / ร้าน', required:true, value:c?.name || '' },
+      { k:'phone', label:'เบอร์โทร', half:true, value:c?.phone || '' },
+      { k:'email', label:'อีเมล', type:'email', half:true, value:c?.email || '' },
+      { k:'customer_type', label:'ประเภท', type:'select', value:c?.customer_type || 'end_user',
+        options:Object.entries(CUST_TYPE).map(([v,t]) => ({ v, t })) },
+      { k:'tax_id',  label:'เลขผู้เสียภาษี (ถ้าออกใบกำกับ)', value:c?.tax_id || '' },
+      { k:'address', label:'ที่อยู่จัดส่ง', type:'textarea', value:c?.address || '' },
+      { k:'note',    label:'หมายเหตุ', value:c?.note || '' }
+    ]});
+  if (!f) return;
+  const row = {
+    name: f.name.trim(), phone: f.phone || null, email: f.email || null,
+    customer_type: f.customer_type, tax_id: f.tax_id || null,
+    address: f.address || null, note: f.note || null
+  };
+  try {
+    const { error } = c
+      ? await sb.from('repair_customers').update(row).eq('id', c.id)
+      : await sb.from('repair_customers').insert(row);
+    if (error) throw error;
+    toast('✅ บันทึกแล้ว');
+    reloadAll();
+  } catch(e){ fail(e); }
+}
+</script>
+</body>
+</html>
