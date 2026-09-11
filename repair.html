@@ -65,6 +65,9 @@
       <button data-p="report"><span class="e">📈</span>รายงาน</button>
       <button data-p="setting"><span class="e">⚙️</span>ตั้งค่า</button>
     </nav>
+    <nav style="margin-top:16px">
+      <button onclick="location.href='index.html'"><span class="e">🏠</span>กลับหน้าหลัก</button>
+    </nav>
     <div class="sidefoot">
       <div class="k" id="roleLbl">ผู้ใช้งาน</div>
       <div class="v" id="userName">—</div>
@@ -817,11 +820,11 @@ const PGT = {
   setting:['ตั้งค่าระบบ','ช่างซ่อม · ผู้ใช้งาน · โค้ดเชิญ · หมวดอาการ'],
   job:    ['ใบงานซ่อม','รายละเอียดและบันทึกงานตามขั้นตอน']
 };
-document.querySelectorAll('aside nav button').forEach(b => b.onclick = () => goPage(b.dataset.p));
+document.querySelectorAll('aside nav button[data-p]').forEach(b => b.onclick = () => goPage(b.dataset.p));
 function goPage(p){
   const allow = ROLE_PAGES[ME.role] || ROLE_PAGES.staff;
   if (ME.id && !allow.includes(p)) { toast('ไม่มีสิทธิ์เข้าหน้านี้', true); return; }
-  document.querySelectorAll('aside nav button').forEach(b => b.classList.toggle('on', b.dataset.p === p));
+  document.querySelectorAll('aside nav button[data-p]').forEach(b => b.classList.toggle('on', b.dataset.p === p));
   document.querySelectorAll('.page').forEach(el => el.classList.toggle('on', el.id === 'p-' + p));
   $('pgTitle').textContent = PGT[p][0]; $('pgSub').textContent = PGT[p][1];
   $('side').classList.remove('open');
@@ -1136,7 +1139,7 @@ async function startApp(session){
 
   // เมนูตามตำแหน่ง
   const allow = ROLE_PAGES[ME.role] || ROLE_PAGES.staff;
-  document.querySelectorAll('aside nav button').forEach(b => { b.hidden = !allow.includes(b.dataset.p); });
+  document.querySelectorAll('aside nav button[data-p]').forEach(b => { b.hidden = !allow.includes(b.dataset.p); });
 
   $('userName').innerHTML = esc(ME.name) + `<span class="rolepill">${ROLE_LABEL[ME.role] || ME.role}</span>`;
   $('roleLbl').textContent = ME.email;
