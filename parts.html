@@ -1109,9 +1109,19 @@ function impSetHeader(i){ IMP.hrow = Number(i); IMP.map = {}; impApplyHeader(); 
 /* ---------- ขั้น 2: จับคู่คอลัมน์ ---------- */
 function impRenderMap(){
   IMP.map = guessMap(IMP_FIELDS, IMP.head);
+  /* ชีทที่ไม่มีหัวตาราง ชื่อคอลัมน์จะเป็น "คอลัมน์ 1/2/3" ซึ่งดูไม่ออกว่าคืออะไร
+     เลยเอาค่าจริงแถวแรก ๆ มาต่อท้ายให้ เลือกได้ถูกตั้งแต่ครั้งแรก */
+  const sampleOf = j => {
+    for (let i = 0; i < Math.min(20, IMP.rows.length); i++){
+      const v = cleanCell(IMP.rows[i][j]);
+      if (v) return '  (' + v.slice(0, 18) + ')';
+    }
+    return '';
+  };
   const opts = i => ['<option value="-1">— ไม่ใช้ —</option>']
     .concat(IMP.head.map((h, j) =>
-      `<option value="${j}" ${j === i ? 'selected' : ''}>${esc(h || 'คอลัมน์ ' + (j+1))}</option>`))
+      `<option value="${j}" ${j === i ? 'selected' : ''}>${
+        esc((h || 'คอลัมน์ ' + (j+1)) + sampleOf(j))}</option>`))
     .join('');
 
   const rowOpts = `<option value="-1" ${IMP.hrow < 0 ? 'selected' : ''}>
@@ -1182,6 +1192,16 @@ function impRenderMap(){
   impPreview();
 }
 
+/** แถบปุ่มนำเข้า — ต้องโผล่ทุกกรณี แม้ตอนที่ยังกดไม่ได้
+    ไม่งั้นคนใช้จะหาปุ่มไม่เจอแล้วไม่รู้ว่าต้องทำอะไรต่อ */
+function impBar(n, why){
+  return `<div class="impbar">
+    <button class="btn g" onclick="impRun()" ${n ? '' : 'disabled'}>
+      🚀 ${n ? 'นำเข้า ' + money(n) + ' รายการ' : 'ยังนำเข้าไม่ได้'}</button>
+    <span class="why">${why}</span>
+  </div>`;
+}
+
 /* ---------- ขั้น 3: ตรวจก่อนนำเข้า ---------- */
 function impPreview(){
   /* val() คืน '' ถ้าไม่เจอช่อง — ต้องกลายเป็น -1 ไม่ใช่ 0 ไม่งั้นจะไปหยิบคอลัมน์แรกผิด ๆ */
@@ -1191,10 +1211,16 @@ function impPreview(){
 
   $('impS3').hidden = false;
   if (cName < 0 || (cPart < 0 && !autoCode)){
+    const need = [];
+    if (cName < 0) need.push('<b>ชื่ออะไหล่</b>');
+    if (cPart < 0 && !autoCode) need.push('<b>รหัสอะไหล่</b>');
     $('impS3').innerHTML = `<div class="box-warn" style="margin-top:16px">
-      เลือก <b>ชื่ออะไหล่</b> และ <b>รหัสอะไหล่</b> ให้ครบก่อน<br>
-      ถ้าชีทนี้ไม่มีคอลัมน์รหัสเลย ให้ติ๊ก
-      <b>"ตั้งรหัสให้อัตโนมัติ"</b> ข้างบนแทน</div>`;
+      ยังไม่ได้เลือกว่า ${need.join(' และ ')} อยู่คอลัมน์ไหน<br>
+      <span class="sub2">ดูตัวอย่างข้อมูลในวงเล็บท้ายแต่ละตัวเลือกได้ว่าคอลัมน์นั้นมีอะไรอยู่</span>
+      ${cPart < 0 && !autoCode ? `<div style="margin-top:8px">
+        ถ้าชีทนี้<b>ไม่มีคอลัมน์รหัสเลย</b> ให้ติ๊ก
+        <b>"ตั้งรหัสให้อัตโนมัติ"</b> ที่มุมขวาล่างของกล่องข้างบนแทน</div>` : ''}
+    </div>` + impBar(0, 'เลือกคอลัมน์ให้ครบก่อน แล้วปุ่มนี้จะกดได้');
     return;
   }
 
@@ -1347,15 +1373,11 @@ function impPreview(){
     <div class="sub2" style="margin-top:6px">แสดง ${Math.min(5, ready.length)} แถวแรกจาก ${money(ready.length)} แถวที่จะนำเข้า</div>`
     : `<div class="empty" style="padding:22px">ยังไม่มีแถวที่นำเข้าได้</div>`}
 
-    <div class="impbar">
-      <button class="btn g" onclick="impRun()" ${ready.length ? '' : 'disabled'}>
-        🚀 ${ready.length ? 'นำเข้า ' + money(ready.length) + ' รายการ' : 'ยังนำเข้าไม่ได้'}</button>
-      <span class="why">${ready.length
+    ` + impBar(ready.length, ready.length
         ? 'ตรวจตัวอย่างข้างบนให้เรียบร้อยก่อนกด'
         : (noCode
             ? 'ชีทนี้ไม่มีรหัสอะไหล่ ' + money(noCode) + ' แถว — ติ๊ก <b>"ตั้งรหัสให้อัตโนมัติ"</b> ข้างบน'
-            : 'ลองเปลี่ยนชีท แถวหัวตาราง หรือการจับคู่คอลัมน์ข้างบน')}</span>
-    </div>`;
+            : 'ลองเปลี่ยนชีท แถวหัวตาราง หรือการจับคู่คอลัมน์ข้างบน'));
 }
 
 /* ---------- ขั้น 4: ส่งเข้าฐานข้อมูล ---------- */
