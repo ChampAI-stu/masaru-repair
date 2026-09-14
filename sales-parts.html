@@ -57,6 +57,7 @@
       <button data-p="ov"   class="on"><span class="e">📊</span>ภาพรวมยอดขาย</button>
       <button data-p="so"><span class="e">🧾</span>ใบขาย</button>
       <button data-p="stock"><span class="e">📦</span>ของพร้อมขาย</button>
+      <button data-p="whreq"><span class="e">🔁</span>เบิก / คืน คลังกลาง</button>
       <button data-p="cust"><span class="e">👥</span>ลูกค้า</button>
       <button data-p="hist"><span class="e">📜</span>ประวัติเดิม</button>
     </nav>
@@ -147,6 +148,10 @@
       </div>
 
       <!-- ============ ประวัติเดิม ============ -->
+      <div class="page" id="p-whreq">
+        <div id="whRoot"></div>
+      </div>
+
       <div class="page" id="p-hist">
 
         <div class="card" id="hImpCard" style="scroll-margin-top:86px" hidden>
@@ -253,13 +258,15 @@ window.PAGERS = {
   so:    () => renderOrders(),
   stock: () => renderStock(),
   cust:  () => renderCust(),
-  hist:  () => renderHist()
+  hist:  () => renderHist(),
+  mywh:  () => mywhRender()          // หน้าเบิก/คืน คลังกลาง (repair-ui.js)
 };
 
 const PAGE_META = {
   ov:    ['ภาพรวมยอดขาย', 'ยอดขาย กำไร และสินค้าขายดี'],
   so:    ['ใบขาย',        'ออกใบ · ยืนยันตัดสต๊อก · ส่งของ · ยกเลิกคืนของ'],
   stock: ['ของพร้อมขาย',  'ยอดคงเหลือในคลังฝ่ายขาย'],
+  whreq: ['เบิก / คืน คลังกลาง', 'ขอของชุดใหญ่จากคลังกลาง แล้วบริหารในคลังฝ่ายขายเอง'],
   cust:  ['ลูกค้า',        'ฐานลูกค้าเดียวกับระบบรับซ่อม'],
   hist:  ['ประวัติเดิม',    'ขาย/เคลมอะไหล่ที่ยกมาจากชีท — อ่านอย่างเดียว ไม่กระทบสต๊อก']
 };
@@ -398,6 +405,7 @@ function goPage(p){
   window.scrollTo({ top:0 });
   /* กราฟที่อยู่ในแท็บซ่อน วัดความกว้างไม่ได้ ต้องวาดใหม่ตอนโผล่ */
   if (p === 'ov') requestAnimationFrame(() => drawCharts());
+  if (p === 'whreq'){ mywhSetup({ wh:'SALES', label:'คลังอะไหล่ฝ่ายขาย', mount:'whRoot' }); mywhLoad(); }
 }
 
 function bindFilters(){
