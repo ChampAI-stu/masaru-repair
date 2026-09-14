@@ -430,6 +430,29 @@ function guessHeaderRow(rows){
   return best;
 }
 
+/** ดูว่าคอลัมน์นั้น "หน้าตาข้อมูล" เป็นแบบไหน — ใช้ตอนชีทไม่มีหัวตารางให้เดา
+    คืนอาร์เรย์ตามลำดับคอลัมน์ แต่ละตัวบอกสัดส่วน 0-1 ว่าเป็นไทย / ตัวเลข / รหัส */
+function profileColumns(rows, cols){
+  const out = [];
+  for (let j = 0; j < cols; j++){
+    const vals = [];
+    for (let i = 0; i < rows.length && vals.length < 30; i++){
+      const v = cleanCell(rows[i][j]);
+      if (v) vals.push(v);
+    }
+    if (!vals.length){ out.push(null); continue; }
+    const pct = f => vals.filter(f).length / vals.length;
+    out.push({
+      j,
+      n:    vals.length,
+      thai: pct(v => /[฀-๿]/.test(v)),
+      num:  pct(v => /^[\d.,\s฿+\-]+$/.test(v)),
+      code: pct(v => /^[A-Za-z][A-Za-z0-9\-\/*.\s]*$/.test(v) && /\d/.test(v))
+    });
+  }
+  return out;
+}
+
 /** เดาว่าคอลัมน์ไหนคือช่องอะไร — 1 คอลัมน์จับได้ช่องเดียว ห้ามซ้ำ
     fields: [{ k, hints:[...] }] · head: ชื่อคอลัมน์จากไฟล์ */
 function guessMap(fields, head){
