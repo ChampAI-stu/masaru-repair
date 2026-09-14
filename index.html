@@ -80,6 +80,32 @@ input:focus{border-color:var(--blue);box-shadow:0 0 0 3px var(--blue-l)}
   border-radius:9px;padding:10px 13px;font-size:13.5px;margin-bottom:14px}
 .err[hidden]{display:none}
 
+/* ---------- แท็บเข้าสู่ระบบ / สมัคร ---------- */
+.gtabs{display:flex;gap:6px;background:#f1f4f9;padding:4px;border-radius:10px;margin:0 0 18px}
+.gtab{flex:1;border:0;background:none;padding:9px;border-radius:8px;cursor:pointer;
+  font:700 14px "Sarabun",sans-serif;color:var(--ink2)}
+.gtab.on{background:#fff;color:var(--navy);box-shadow:0 1px 3px rgba(26,36,54,.12)}
+.gok{margin:-8px 0 14px;background:var(--good-l);border:1px solid #b6ddca;color:var(--good);
+  border-radius:8px;padding:8px 11px;font-size:13px;line-height:1.5}
+.gok[hidden]{display:none}
+.gok.bad{background:var(--crit-l);border-color:#f0cbc8;color:var(--crit)}
+.req{color:var(--crit)}
+
+/* ---------- กล่องตั้งค่าสิทธิ์ (เห็นเฉพาะแอดมิน) ---------- */
+.card{background:#fff;border:1px solid var(--line);border-radius:var(--r);
+  padding:20px 22px;box-shadow:var(--sh);margin-top:26px}
+.card h3{margin:0 0 4px;font-size:16px;font-weight:800;color:var(--navy)}
+.card .hint{font-size:13px;color:var(--ink2);margin:0 0 15px;line-height:1.6}
+.ptbl{width:100%;border-collapse:collapse;font-size:14px}
+.ptbl th,.ptbl td{padding:10px;border-bottom:1px solid var(--line2);text-align:left;vertical-align:middle}
+.ptbl th{font-size:12.5px;color:var(--ink2);font-weight:600}
+.ptbl th.c,.ptbl td.c{text-align:center}
+.ptbl input[type=checkbox]{width:17px;height:17px;margin:0;cursor:pointer}
+.ptbl input:disabled{cursor:not-allowed;opacity:.55}
+.ptbl .cd{font-size:11.5px;color:var(--ink3);font-family:ui-monospace,monospace}
+.ptbl tr.off{background:#fafbfd;color:var(--ink3)}
+.pwrap{overflow-x:auto}
+
 /* ---------- แถบผู้ใช้ ---------- */
 .me{display:flex;align-items:center;gap:11px;background:#fff;border:1px solid var(--line);
   border-radius:12px;padding:11px 15px;box-shadow:var(--sh)}
@@ -103,7 +129,13 @@ input:focus{border-color:var(--blue);box-shadow:0 0 0 3px var(--blue-l)}
   <div class="logo">🏭</div>
   <h1>MASARU · ระบบคลัง</h1>
   <div class="sub">เข้าสู่ระบบครั้งเดียว ใช้ได้ทุกโมดูล</div>
+  <div class="gtabs">
+    <button type="button" class="gtab on" data-t="login">เข้าสู่ระบบ</button>
+    <button type="button" class="gtab" data-t="signup">สมัครสมาชิก</button>
+  </div>
+
   <div id="err" class="err" hidden></div>
+
   <form id="loginForm">
     <label for="em">อีเมล</label>
     <input type="email" id="em" placeholder="you@masaru.co.th" autocomplete="username" required>
@@ -111,9 +143,24 @@ input:focus{border-color:var(--blue);box-shadow:0 0 0 3px var(--blue-l)}
     <input type="password" id="pw" placeholder="••••••••" autocomplete="current-password" required>
     <button class="btn" id="btn" type="submit">เข้าสู่ระบบ</button>
   </form>
-  <div class="foot" style="margin-top:18px">
-    ยังไม่มีบัญชี — ขอโค้ดเชิญจากผู้ดูแลระบบ<br>
-    แล้วสมัครที่ <a href="repair.html" style="color:var(--blue)">หน้าระบบซ่อม</a>
+
+  <form id="signForm" hidden>
+    <label for="suCode">โค้ดเชิญ <span class="req">*</span></label>
+    <input type="text" id="suCode" required placeholder="MASARU-XXXX-XXXX"
+           style="text-transform:uppercase" autocomplete="off">
+    <div id="suCodeMsg" class="gok" hidden></div>
+    <label for="suName">ชื่อ-สกุล / ชื่อเล่น <span class="req">*</span></label>
+    <input type="text" id="suName" required placeholder="เช่น แชมป์">
+    <label for="suEmail">อีเมล <span class="req">*</span></label>
+    <input type="email" id="suEmail" required autocomplete="username" placeholder="you@masaru.co.th">
+    <label for="suPass">รหัสผ่าน <span class="req">*</span>
+      <span style="font-weight:400;color:var(--ink3)">(อย่างน้อย 6 ตัว)</span></label>
+    <input type="password" id="suPass" required minlength="6" autocomplete="new-password" placeholder="••••••••">
+    <button class="btn" id="suBtn" type="submit">สมัครและเข้าใช้งาน</button>
+  </form>
+
+  <div class="foot" id="gFoot" style="margin-top:18px">
+    ยังไม่มีบัญชี — ขอโค้ดเชิญจากผู้ดูแลระบบ แล้วกดแท็บ "สมัครสมาชิก"
   </div>
 </div>
 
@@ -138,6 +185,14 @@ input:focus{border-color:var(--blue);box-shadow:0 0 0 3px var(--blue-l)}
 
   <div class="mods" id="mods"></div>
 
+  <div class="card" id="permCard" hidden>
+    <h3>⚙️ สิทธิ์เข้าโมดูล</h3>
+    <p class="hint">ติ๊กว่าตำแหน่งไหนเข้าโมดูลไหนได้ — มีผลทันทีกับทุกคน ·
+      ผู้ดูแลระบบเข้าได้ทุกโมดูลเสมอ แก้ไม่ได้<br>
+      เอาเครื่องหมายถูกออกจากช่อง "เปิดใช้" = ซ่อนโมดูลจากทุกคน (เหลือแอดมินเข้าดูได้)</p>
+    <div class="pwrap"><div id="permBody"></div></div>
+  </div>
+
   <div class="foot">
     บริษัท มาซารุ มาร์เก็ตติ้ง จำกัด · ระบบภายในองค์กร<br>
     <span id="conn">กำลังโหลดข้อมูล…</span>
@@ -161,6 +216,8 @@ const esc = s => (s ?? '').toString()
 
 const ROLE_LABEL = { staff:'พนักงานรับเครื่อง', tech:'ช่างซ่อม',
                      head:'หัวหน้าศูนย์บริการ', admin:'ผู้ดูแลระบบ' };
+const ROLES = ['staff','tech','head','admin'];
+const MOD_CLS = { repair:'m1', parts:'m2', sales:'m3' };
 
 /* ---------- นิยามโมดูล ----------
    roles = ตำแหน่งที่เข้าได้ · ready = สร้างเสร็จแล้วหรือยัง */
@@ -184,6 +241,7 @@ const MODULES = [
 let sb = null;
 let ME = { id:null, email:'', name:'', role:'staff' };
 const STAT = {};
+let MODS = [];              // โมดูล + สิทธิ์ที่อ่านมาจากฐานข้อมูล
 
 /* ---------- เริ่มระบบ ---------- */
 (async function boot(){
@@ -220,6 +278,95 @@ $('loginForm').addEventListener('submit', async e => {
   } finally { b.disabled = false; b.textContent = 'เข้าสู่ระบบ'; }
 });
 
+/* ---------- สลับแท็บ เข้าสู่ระบบ / สมัครสมาชิก ---------- */
+document.querySelectorAll('.gtab').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.gtab').forEach(x => x.classList.toggle('on', x === b));
+  const su = b.dataset.t === 'signup';
+  $('loginForm').hidden = su;
+  $('signForm').hidden  = !su;
+  $('err').hidden = true;
+  $('gFoot').textContent = su
+    ? 'ต้องมีโค้ดเชิญจากผู้ดูแลระบบก่อนถึงจะสมัครได้'
+    : 'ยังไม่มีบัญชี — ขอโค้ดเชิญจากผู้ดูแลระบบ แล้วกดแท็บ "สมัครสมาชิก"';
+  $(su ? 'suCode' : 'em')?.focus();
+});
+
+/* ---------- ตรวจโค้ดเชิญทันทีที่พิมพ์ครบ ---------- */
+let codeOk = false;
+$('suCode').addEventListener('blur', checkCode);
+$('suCode').addEventListener('change', checkCode);
+
+async function checkCode(){
+  const box = $('suCodeMsg'), code = $('suCode').value.trim().toUpperCase();
+  $('suCode').value = code;
+  codeOk = false;
+  if (!code){ box.hidden = true; return; }
+  try {
+    const { data, error } = await sb.rpc('check_invite', { p_code: code });
+    if (error) throw error;
+    const r = Array.isArray(data) ? data[0] : data;
+    box.hidden = false;
+    if (r && r.valid){
+      codeOk = true;
+      box.className = 'gok';
+      box.textContent = '✅ โค้ดถูกต้อง — สิทธิ์: ' +
+        (r.label || ROLE_LABEL[r.role] || r.role);
+    } else {
+      box.className = 'gok bad';
+      box.textContent = '❌ โค้ดไม่ถูกต้อง หมดอายุ หรือถูกใช้ครบแล้ว';
+    }
+  } catch(e){
+    box.hidden = false; box.className = 'gok bad';
+    box.textContent = 'ตรวจโค้ดไม่สำเร็จ: ' + (e.message || e);
+  }
+}
+
+/* ---------- สมัครสมาชิก ---------- */
+$('signForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const btn = $('suBtn');
+  $('err').hidden = true;
+  if (!codeOk){ await checkCode(); if (!codeOk){ $('suCode').focus(); return; } }
+
+  btn.disabled = true; btn.textContent = 'กำลังสมัคร…';
+  try {
+    const email = $('suEmail').value.trim();
+    const pass  = $('suPass').value;
+    const name  = $('suName').value.trim();
+
+    const { data, error } = await sb.auth.signUp({ email, password: pass });
+    if (error) throw error;
+
+    /* ถ้าตั้งให้ยืนยันอีเมล จะยังไม่มี session ต้องเข้าระบบเองอีกที */
+    let sess = data.session;
+    if (!sess){
+      const r = await sb.auth.signInWithPassword({ email, password: pass });
+      if (r.error) throw new Error('สมัครแล้วแต่เข้าระบบอัตโนมัติไม่ได้ — ผู้ดูแลต้องปิด "Confirm email" ใน Supabase');
+      sess = r.data.session;
+    }
+
+    const { error: rErr } = await sb.rpc('redeem_invite', {
+      p_code: $('suCode').value.trim(), p_name: name });
+    if (rErr){ await sb.auth.signOut(); throw rErr; }
+
+    const { data: fresh } = await sb.auth.refreshSession();   // ดึง role เข้า token
+    $('gate').hidden = true;
+    await start(fresh?.session || sess);
+  } catch(err){
+    const m = (err?.message || '').toLowerCase();
+    $('err').textContent =
+      m.includes('already registered') || m.includes('already been registered')
+        ? 'อีเมลนี้สมัครไว้แล้ว — กดแท็บ "เข้าสู่ระบบ" แทน' :
+      m.includes('signups not allowed') || m.includes('signup is disabled')
+        ? 'ยังปิดการสมัครอยู่ — ผู้ดูแลต้องเปิด Enable email signups ใน Supabase' :
+      m.includes('password')
+        ? 'รหัสผ่านสั้นเกินไป — ต้องอย่างน้อย 6 ตัวอักษร' :
+      (err?.message || 'สมัครไม่สำเร็จ');
+    $('err').hidden = false;
+  } finally { btn.disabled = false; btn.textContent = 'สมัครและเข้าใช้งาน'; }
+});
+
+
 async function start(session){
   ME.id = session.user.id;
   ME.email = session.user.email || '';
@@ -247,30 +394,108 @@ async function start(session){
   $('urole').textContent = (ROLE_LABEL[ME.role] || ME.role) + ' · ' + ME.email;
   $('app').hidden = false;
 
-  renderModules();
+  loadModules();
   loadStats();
 }
 
-/* ---------- การ์ดโมดูล ---------- */
+
+/* ---------- โมดูล + สิทธิ์ อ่านจากฐานข้อมูล ---------- */
+async function loadModules(){
+  try {
+    const { data, error } = await sb.from('v_my_modules').select('*');
+    if (error) throw error;
+    if (!data || !data.length) throw new Error('ตารางโมดูลยังว่าง');
+    MODS = data;
+  } catch(e){
+    /* ยังไม่ได้รัน 20_access.sql — ใช้รายการในไฟล์ไปก่อน จะได้ไม่ค้างทั้งหน้า */
+    console.warn('อ่านสิทธิ์โมดูลจากฐานข้อมูลไม่ได้ — ใช้ค่าในไฟล์แทน', e);
+    MODS = MODULES.map(m => ({
+      module:m.k, name:m.name, icon:m.ico, href:m.href, descr:m.desc,
+      roles:m.roles, is_active:m.ready,
+      allowed: m.ready && (ME.role === 'admin' || m.roles.includes(ME.role))
+    }));
+  }
+  renderModules();
+  renderPerm();
+}
+
+/* ---------- การ์ดโมดูล ----------
+   โมดูลที่เข้าไม่ได้ยังโชว์อยู่แต่กดไม่ได้ — คนจะได้รู้ว่ามีอะไรให้ขอสิทธิ์บ้าง */
 function renderModules(){
-  const allow = MODULES.filter(m => m.roles.includes(ME.role));
-  $('mods').innerHTML = allow.length ? allow.map(m => {
-    const s = STAT[m.k];
+  const list = MODS;
+  const anyAllowed = list.some(m => m.allowed);
+
+  $('mods').innerHTML = list.length ? list.map(m => {
+    const s = STAT[m.module];
+    const cls = MOD_CLS[m.module] || 'm1';
+    const tag = !m.is_active ? ['', 'กำลังพัฒนา']
+              : m.allowed    ? ['on', 'พร้อมใช้งาน']
+                             : ['', 'ไม่มีสิทธิ์'];
     const inner = `
-      <span class="tag ${m.ready ? 'on' : ''}">${m.ready ? 'พร้อมใช้งาน' : 'กำลังพัฒนา'}</span>
-      <div class="ico">${m.ico}</div>
+      <span class="tag ${tag[0]}">${tag[1]}</span>
+      <div class="ico">${esc(m.icon || '📁')}</div>
       <h2>${esc(m.name)}</h2>
-      <div class="d">${esc(m.desc)}</div>
-      ${s ? `<div class="stat">${s.map(x =>
+      <div class="d">${esc(m.descr || '')}</div>
+      ${m.allowed && s ? `<div class="stat">${s.map(x =>
         `<div>${esc(x.l)}<b class="${x.c || ''}">${esc(x.v)}</b></div>`).join('')}</div>` : ''}
-      <div class="go">${m.ready ? 'เข้าใช้งาน →' : 'ยังเปิดไม่ได้'}</div>`;
-    return m.ready
-      ? `<a class="mod ${m.cls}" href="${m.href}">${inner}</a>`
-      : `<div class="mod ${m.cls} soon">${inner}</div>`;
-  }).join('')
-    : `<div class="mod soon"><div class="ico">🔒</div><h2>ยังไม่มีโมดูลที่เข้าได้</h2>
-       <div class="d">ตำแหน่ง "${esc(ROLE_LABEL[ME.role] || ME.role)}" ยังไม่ได้รับสิทธิ์เข้าโมดูลใด —
-         ติดต่อผู้ดูแลระบบ</div></div>`;
+      <div class="go">${m.allowed ? 'เข้าใช้งาน →'
+        : (m.is_active ? 'ขอสิทธิ์จากผู้ดูแลระบบ' : 'ยังเปิดไม่ได้')}</div>`;
+    return m.allowed
+      ? `<a class="mod ${cls}" href="${esc(m.href)}">${inner}</a>`
+      : `<div class="mod ${cls} soon">${inner}</div>`;
+  }).join('') : '';
+
+  if (list.length && !anyAllowed)
+    $('mods').insertAdjacentHTML('beforeend',
+      `<div class="mod soon"><div class="ico">🔒</div><h2>ยังไม่มีโมดูลที่เข้าได้</h2>
+       <div class="d">ตำแหน่ง "${esc(ROLE_LABEL[ME.role] || ME.role)}"
+         ยังไม่ได้รับสิทธิ์เข้าโมดูลใด — ติดต่อผู้ดูแลระบบ</div></div>`);
+}
+
+
+/* ---------- ตารางสิทธิ์ (เฉพาะแอดมิน) ---------- */
+function renderPerm(){
+  if (ME.role !== 'admin' || !MODS.length){ $('permCard').hidden = true; return; }
+  $('permCard').hidden = false;
+  $('permBody').innerHTML = `<table class="ptbl">
+    <thead><tr><th>โมดูล</th>
+      ${ROLES.map(r => `<th class="c">${esc(ROLE_LABEL[r])}</th>`).join('')}
+      <th class="c">เปิดใช้</th></tr></thead>
+    <tbody>${MODS.map(m => `<tr class="${m.is_active ? '' : 'off'}">
+      <td><b>${esc(m.icon || '')} ${esc(m.name)}</b><div class="cd">${esc(m.module)}</div></td>
+      ${ROLES.map(r => `<td class="c"><input type="checkbox"
+        data-m="${esc(m.module)}" data-r="${r}"
+        ${(m.roles || []).includes(r) || r === 'admin' ? 'checked' : ''}
+        ${r === 'admin' ? 'disabled title="ผู้ดูแลระบบเข้าได้ทุกโมดูลเสมอ"' : ''}></td>`).join('')}
+      <td class="c"><input type="checkbox" data-m="${esc(m.module)}" data-act="1"
+        ${m.is_active ? 'checked' : ''}></td>
+    </tr>`).join('')}</tbody></table>
+    <div style="margin-top:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <button class="lnk" id="permSave" onclick="savePerm()">💾 บันทึกสิทธิ์</button>
+      <span id="permMsg" style="font-size:13px;color:var(--ink2)"></span>
+    </div>`;
+}
+
+async function savePerm(){
+  const msg = $('permMsg'), btn = $('permSave');
+  btn.disabled = true; msg.textContent = 'กำลังบันทึก…';
+  try {
+    for (const m of MODS){
+      const roles = ROLES.filter(r => r === 'admin' ||
+        $('permBody').querySelector(`input[data-m="${m.module}"][data-r="${r}"]`)?.checked);
+      const act = !!$('permBody').querySelector(`input[data-m="${m.module}"][data-act]`)?.checked;
+      const { error } = await sb.rpc('set_module_roles', {
+        p_module: m.module, p_roles: roles, p_active: act, p_by: ME.name });
+      if (error) throw error;
+    }
+    /* วาดตารางใหม่ก่อน แล้วค่อยเขียนข้อความ — ไม่งั้นข้อความโดนวาดทับหายไปเลย */
+    await loadModules();
+    const m2 = $('permMsg');
+    if (m2) m2.textContent = '✅ บันทึกแล้ว — คนที่เปิดหน้าค้างไว้ต้องรีเฟรช 1 ครั้ง';
+  } catch(e){
+    const m2 = $('permMsg') || msg;
+    if (m2) m2.textContent = '❌ ' + (e.message || e);
+  } finally { const b2 = $('permSave'); if (b2) b2.disabled = false; }
 }
 
 /** ตัวเลขจริงบนการ์ด — อ่านอย่างเดียว พังก็ไม่กระทบการเข้าใช้งาน */
