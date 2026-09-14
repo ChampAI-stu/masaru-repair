@@ -44,6 +44,7 @@
       <button data-p="intake"><span class="e">➕</span>รับเครื่อง / บันทึกงาน</button>
       <button data-p="cust"><span class="e">👥</span>ลูกค้า</button>
       <button data-p="parts"><span class="e">📦</span>คลังอะไหล่</button>
+      <button data-p="whreq"><span class="e">🔁</span>เบิก / คืน คลังกลาง</button>
       <button data-p="report"><span class="e">📈</span>รายงาน</button>
       <button data-p="setting"><span class="e">⚙️</span>ตั้งค่า</button>
     </nav>
@@ -389,6 +390,10 @@
       </div>
 
       <!-- ============ รายงาน ============ -->
+      <div class="page" id="p-whreq">
+        <div id="whRoot"></div>
+      </div>
+
       <div class="page" id="p-report">
 
         <!-- แท็บ: ผลงาน (ทุกคนดูได้) / การเงิน (หัวหน้า) / คุณภาพสินค้า -->
@@ -772,7 +777,8 @@ const S = { jobs:[], techs:[], cats:[], parts:[], custs:[], stock:[], job:null, 
 window.PAGERS = {
   jobs:  () => renderJobs(),
   cust:  () => renderCust(),
-  parts: () => renderParts()
+  parts: () => renderParts(),
+  mywh:  () => mywhRender()          // หน้าเบิก/คืน คลังกลาง (repair-ui.js)
 };
 
 /* ---------- ผู้ใช้ที่ล็อกอินอยู่ ---------- */
@@ -782,9 +788,9 @@ const isBoss = () => ME.role === 'head' || ME.role === 'admin';
 const ROLE_LABEL = { staff:'พนักงานรับเครื่อง', tech:'ช่างซ่อม', head:'หัวหน้าช่าง', admin:'ผู้ดูแลระบบ' };
 const ROLE_PAGES = {
   staff: ['dash','jobs','intake','cust','job'],
-  tech:  ['dash','jobs','dispatch','parts','report','job'],
-  head:  ['dash','jobs','dispatch','intake','cust','parts','report','setting','job'],
-  admin: ['dash','jobs','dispatch','intake','cust','parts','report','setting','job']
+  tech:  ['dash','jobs','dispatch','parts','whreq','report','job'],
+  head:  ['dash','jobs','dispatch','intake','cust','parts','whreq','report','setting','job'],
+  admin: ['dash','jobs','dispatch','intake','cust','parts','whreq','report','setting','job']
 };
 
 
@@ -798,6 +804,7 @@ const PGT = {
   intake: ['รับเครื่อง / บันทึกงาน','ขั้นตอนที่ 1/6 — สร้างใบงานซ่อมและ QR Code'],
   cust:   ['ลูกค้า','ประวัติลูกค้าและการซ่อม'],
   parts:  ['คลังอะไหล่','สต็อกและการเบิกใช้'],
+  whreq:  ['เบิก / คืน คลังกลาง','ขอของชุดใหญ่จากคลังกลาง แล้วบริหารในคลังช่างเอง'],
   report: ['รายงาน','ผลงานช่าง · การเงิน · คุณภาพสินค้า'],
   setting:['ตั้งค่าระบบ','ช่างซ่อม · ผู้ใช้งาน · โค้ดเชิญ · หมวดอาการ'],
   job:    ['ใบงานซ่อม','รายละเอียดและบันทึกงานตามขั้นตอน']
@@ -814,6 +821,7 @@ function goPage(p){
   if (p === 'cust')   { closeCust(); renderCust(); }
   if (p === 'dispatch') loadDispatch();
   if (p === 'parts')  loadParts();
+  if (p === 'whreq')  { mywhSetup({ wh:'REPAIR', label:'คลังอะไหล่ช่าง', mount:'whRoot' }); mywhLoad(); }
   if (p === 'report') loadReport();
   if (p === 'setting') loadSettings();
 }
