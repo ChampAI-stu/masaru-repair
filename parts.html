@@ -1421,6 +1421,35 @@ function impPreview(){
             : 'ลองเปลี่ยนชีท แถวหัวตาราง หรือการจับคู่คอลัมน์ข้างบน'));
 }
 
+/* คอลัมน์ที่เพิ่มทีหลังด้วย 19_parts_fields.sql — ถ้ายังไม่ได้รัน ฐานข้อมูลจะไม่มี */
+const IMP_EXTRA = ['category', 'fits_models', 'note'];
+
+/** ถามฐานข้อมูลว่ามีคอลัมน์เสริมตัวไหนบ้าง — คืนรายชื่อตัวที่ "ไม่มี"
+    ยิงทีละคอลัมน์เพราะ PostgREST บอกชื่อที่หายทีละตัวเท่านั้น */
+async function impMissingCols(){
+  const miss = [];
+  for (const c of IMP_EXTRA){
+    try {
+      const { error } = await sb.from('parts_master').select(c).limit(1);
+      if (error && /could not find|schema cache|does not exist/i.test(error.message || '')) miss.push(c);
+    } catch(e){ /* เน็ตล่ม — ปล่อยให้ไปพังตอนส่งจริงแล้วค่อยตัดคอลัมน์ */ }
+  }
+  return miss;
+}
+
+/** ตัดคอลัมน์ที่ฐานข้อมูลไม่มีออกจากทุกแถว (แก้ในที่เดิม) */
+function impDropCols(rows, cols){
+  if (!cols.length) return;
+  rows.forEach(r => cols.forEach(c => { delete r[c]; }));
+}
+
+/** ดึงชื่อคอลัมน์ออกจากข้อความ error ของ PostgREST
+    ตัวอย่าง: Could not find the 'fits_models' column of 'parts_master' in the schema cache */
+function impColFromErr(msg){
+  const m = /could not find the '([^']+)' column/i.exec(msg || '');
+  return m ? m[1] : null;
+}
+
 /* ---------- ขั้น 4: ส่งเข้าฐานข้อมูล ---------- */
 async function impRun(){
   if (!bossOnly() || !IMP.ready.length) return;
@@ -1433,6 +1462,7 @@ async function impRun(){
 
   const rows = IMP.ready, CH = 400;
   const errs = [];
+  const dropped = [];
   let done = 0, okRows = 0;
 
   $('impS4').hidden = false;
@@ -1446,11 +1476,30 @@ async function impRun(){
   };
   draw();
 
+  /* ฐานข้อมูลที่ยังไม่ได้รัน 19_parts_fields.sql จะไม่มี กลุ่มสินค้า/รุ่นที่ใช้ร่วม/หมายเหตุ
+     ตัดออกก่อนส่ง จะได้นำเข้าข้อมูลหลักเข้าไปได้ ไม่ใช่พังทั้งชุด */
+  const miss = await impMissingCols();
+  if (miss.length){ impDropCols(rows, miss); dropped.push(...miss); }
+
+  const send = async chunk => {
+    const { error } = await sb.from('parts_master').upsert(chunk, { onConflict:'part_no' });
+    return error;
+  };
+
   for (let i = 0; i < rows.length; i += CH){
     const chunk = rows.slice(i, i + CH);
     try {
-      const { error } = await sb.from('parts_master')
-        .upsert(chunk, { onConflict:'part_no' });
+      let error = await send(chunk);
+
+      /* เผื่อ schema cache ยังไม่อัปเดตตอนที่เช็ค — ตัดคอลัมน์ที่มันบ่นแล้วลองใหม่ */
+      let guard = 0;
+      while (error && impColFromErr(error.message) && guard++ < IMP_EXTRA.length + 2){
+        const bad = impColFromErr(error.message);
+        impDropCols(rows, [bad]);
+        if (!dropped.includes(bad)) dropped.push(bad);
+        error = await send(rows.slice(i, i + CH));
+      }
+
       if (error) throw error;
       okRows += chunk.length;
     } catch(e){
@@ -1460,17 +1509,29 @@ async function impRun(){
     draw();
   }
 
-  $('impS4').innerHTML = errs.length
+  const dropNote = dropped.length ? `
+    <div class="box-warn" style="margin-top:12px">
+      ⚠️ ฐานข้อมูลยังไม่มีช่อง
+      <b>${dropped.map(c => esc((IMP_FIELDS.find(f => f.k === c) || {}).label || c)).join(' · ')}</b>
+      — ข้ามไป ข้อมูลส่วนอื่นนำเข้าครบ
+      <div class="sub2" style="margin-top:5px">
+        วิธีเปิดใช้: Supabase → SQL Editor → รัน <b class="mono">19_parts_fields.sql</b>
+        แล้วนำเข้าไฟล์เดิมซ้ำอีกรอบ โดยตั้ง "ถ้ารหัสซ้ำ" เป็น
+        <b>อัปเดตทับด้วยข้อมูลในไฟล์</b> ระบบจะเติมช่องที่ขาดให้เอง ไม่สร้างรายการซ้ำ</div>
+    </div>` : '';
+
+  $('impS4').innerHTML = (errs.length
     ? `<div class="box-crit" style="margin-top:18px">
         <b>นำเข้าไม่ครบ</b> — สำเร็จ ${money(okRows)} จาก ${money(rows.length)} รายการ
         <div class="sub2" style="margin-top:6px">${errs.slice(0, 5).map(esc).join('<br>')}</div>
         <div class="sub2" style="margin-top:6px">
-          สาเหตุที่เจอบ่อย: ไม่ได้เป็นหัวหน้า/แอดมิน · ยังไม่ได้รัน 19_parts_fields.sql ·
-          รหัสอะไหล่ยาวเกิน</div></div>`
+          สาเหตุที่เจอบ่อย: ไม่ได้เป็นหัวหน้า/แอดมิน · รหัสอะไหล่ยาวเกิน ·
+          ยังไม่ได้รัน SQL ตัวล่าสุด</div></div>`
     : `<div class="box-ok" style="margin-top:18px">
         ✅ <b>นำเข้าสำเร็จ ${money(rows.length)} รายการ</b>
         <div class="sub2" style="margin-top:4px">ตัวที่นำเข้ายอดคงเหลือยังเป็น 0 —
-          ไปที่ "สต๊อกอะไหล่" แล้วรับของเข้าคลัง หรือใช้ "ตรวจนับ" ใส่ยอดตั้งต้น</div></div>`;
+          ไปที่ "สต๊อกอะไหล่" แล้วรับของเข้าคลัง หรือใช้ "ตรวจนับ" ใส่ยอดตั้งต้น</div></div>`)
+    + dropNote;
 
   toast(errs.length ? '⚠️ นำเข้าไม่ครบ ดูรายละเอียดด้านล่าง' : '✅ นำเข้าเรียบร้อย', !!errs.length);
   await reloadAll();
