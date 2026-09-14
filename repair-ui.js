@@ -299,6 +299,161 @@ function renderStaged(){
 }
 
 /* =====================================================================
+   อ่านไฟล์ตาราง (CSV / Excel) — ของกลาง ใช้ร่วมทุกโมดูลที่มีตัวนำเข้า
+   อ่านในเบราว์เซอร์ทั้งหมด ไฟล์ไม่ถูกส่งขึ้นเซิร์ฟเวอร์
+   ===================================================================== */
+
+/** โหลดตัวอ่าน Excel เมื่อจำเป็นเท่านั้น หน้าปกติจะได้ไม่ต้องแบกไลบรารี */
+function loadXLSX(){
+  if (window.XLSX) return Promise.resolve();
+  return new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload = () => res();
+    s.onerror = () => rej(new Error('โหลดตัวอ่านไฟล์ Excel ไม่สำเร็จ — ตรวจอินเทอร์เน็ต หรือ Save As เป็น CSV แล้วลองใหม่'));
+    document.head.appendChild(s);
+  });
+}
+
+/** ไฟล์ไทยจาก JST มีทั้ง UTF-8 และ windows-874 ถ้าถอดผิดจะได้ภาษาต่างดาว */
+function decodeText(buf){
+  try { return new TextDecoder('utf-8', { fatal:true }).decode(buf); } catch(e){}
+  for (const enc of ['windows-874','tis-620','utf-8']){
+    try { return new TextDecoder(enc).decode(buf); } catch(e){}
+  }
+  return '';
+}
+
+/** แยก CSV เอง — รองรับเครื่องหมายคำพูด คอมมาในข้อความ และตัวคั่น , ; แท็บ | */
+function parseCSV(text){
+  text = text.replace(/^﻿/, '');
+  const head = text.slice(0, 4000);
+  const sep = [',', ';', '\t', '|'].reduce((b, c) =>
+    (head.split(c).length > head.split(b).length ? c : b), ',');
+
+  const rows = []; let row = [], cell = '', q = false;
+  for (let i = 0; i < text.length; i++){
+    const ch = text[i];
+    if (q){
+      if (ch === '"'){ if (text[i+1] === '"'){ cell += '"'; i++; } else q = false; }
+      else cell += ch;
+      continue;
+    }
+    if (ch === '"'){ q = true; continue; }
+    if (ch === sep){ row.push(cell); cell = ''; continue; }
+    if (ch === '\r') continue;
+    if (ch === '\n'){ row.push(cell); rows.push(row); row = []; cell = ''; continue; }
+    cell += ch;
+  }
+  if (cell !== '' || row.length){ row.push(cell); rows.push(row); }
+  return rows;
+}
+
+/** ล้างค่าในเซลล์ — สูตรพังใน Excel (#REF! #N/A …) ต้องกลายเป็นช่องว่าง ไม่ใช่ข้อมูล */
+function cleanCell(v){
+  const s = (v ?? '').toString().trim();
+  return /^#(REF|N\/A|VALUE|DIV\/0|NAME|NULL|NUM)\b/i.test(s) ? '' : s;
+}
+
+const cellCount = r => (r || []).filter(c => cleanCell(c) !== '').length;
+const normKey   = s => (s ?? '').toString().toLowerCase().replace(/[\s_\-.()]/g, '');
+
+/** แปลงข้อความเป็นตัวเลขแบบทนสกปรก
+    "1,180.50" → 1180.5 · "250.-" → 250 · "฿350" → 350 · "(500)" → -500 · "-" → 0
+    ระวัง: ถ้าปล่อยขีดท้ายไว้ Number("250.-") จะเป็น NaN แล้วราคากลายเป็น 0 ทั้งไฟล์ */
+function numOf(v){
+  let s = (v ?? '').toString().trim();
+  const neg = /^-/.test(s) || /^\(.*\)$/.test(s);
+  s = s.replace(/[^0-9.]/g, '');
+  const seg = s.split('.');
+  if (seg.length > 2) s = seg[0] + '.' + seg.slice(1).join('');
+  const n = Number(s);
+  return Number.isFinite(n) ? (neg ? -n : n) : 0;
+}
+
+/** หัวตาราง = แถวที่มีเซลล์ไม่ว่างมากที่สุดใน 6 แถวแรก
+    (บางชีทมีหัวเรื่องลอยอยู่แถว 1 หัวตารางจริงอยู่แถว 2) */
+function guessHeaderRow(rows){
+  let best = 0;
+  for (let i = 0; i < Math.min(6, rows.length); i++)
+    if (cellCount(rows[i]) > cellCount(rows[best])) best = i;
+  return best;
+}
+
+/** เดาว่าคอลัมน์ไหนคือช่องอะไร — 1 คอลัมน์จับได้ช่องเดียว ห้ามซ้ำ
+    fields: [{ k, hints:[...] }] · head: ชื่อคอลัมน์จากไฟล์ */
+function guessMap(fields, head){
+  const map = {}, used = new Set();
+  const cols = head.map(normKey);
+  fields.forEach(fd => {
+    let best = -1, bestScore = 0;
+    cols.forEach((c, i) => {
+      if (!c || used.has(i)) return;
+      let sc = 0;
+      (fd.hints || []).forEach((h, hi) => {
+        const hn = normKey(h);
+        if (c === hn)            sc = Math.max(sc, 100 - hi);
+        else if (c.includes(hn)) sc = Math.max(sc, 60 - hi);
+      });
+      if (sc > bestScore){ bestScore = sc; best = i; }
+    });
+    if (best >= 0){ map[fd.k] = best; used.add(best); }
+    else map[fd.k] = -1;
+  });
+  return map;
+}
+
+/** ลายนิ้วมือของแถว — ใช้กันนำเข้าซ้ำเวลาอัปไฟล์เดิมอีกรอบ (FNV-1a) */
+function rowHash(parts){
+  const s = parts.map(v => (v ?? '').toString().trim()).join('|');
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++){
+    h ^= s.charCodeAt(i);
+    h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+  }
+  return h.toString(16).padStart(8, '0') + '-' + s.length.toString(36);
+}
+
+/** วันที่ในชีทไทยมีทุกแบบ: 26/2/2026 · 9/14/2026 · 24/02/2569 · เลข serial ของ Excel
+    คืน 'YYYY-MM-DD' หรือ null ถ้าอ่านไม่ออก — อ่านไม่ออกก็ยังนำเข้าได้ แค่ไม่มีวันที่
+    dayFirst: true = อ่านแบบ วัน/เดือน/ปี (ค่าปกติของไทย) */
+function dateOf(v, dayFirst = true){
+  const raw = (v ?? '').toString().trim();
+  if (!raw) return null;
+
+  /* เลขล้วน 5 หลัก = serial ของ Excel (นับจาก 30/12/1899) */
+  if (/^\d{5}$/.test(raw)){
+    const d = new Date(Date.UTC(1899, 11, 30) + Number(raw) * 86400000);
+    return d.toISOString().slice(0, 10);
+  }
+
+  const m = raw.match(/^(\d{1,4})[\/\-.](\d{1,2})[\/\-.](\d{1,4})$/);
+  if (!m){
+    const t = Date.parse(raw);
+    return Number.isNaN(t) ? null : new Date(t).toISOString().slice(0, 10);
+  }
+
+  const a = Number(m[1]), b = Number(m[2]), c = Number(m[3]);
+  const yearFirst = m[1].length === 4;
+
+  let y = yearFirst ? a : c;
+  if (y > 2400) y -= 543;                       // พ.ศ. → ค.ศ.
+  if (y < 100)  y += 2000;
+
+  let day, mon;
+  if (yearFirst)      { mon = b; day = c; }
+  else if (a > 12)    { day = a; mon = b; }
+  else if (b > 12)    { day = b; mon = a; }
+  else                { day = dayFirst ? a : b; mon = dayFirst ? b : a; }
+
+  if (!(mon >= 1 && mon <= 12)) return null;
+  if (!(day >= 1 && day <= 31)) return null;
+  if (!(y >= 1990 && y <= 2100)) return null;
+  return y + '-' + String(mon).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+}
+
+
+/* =====================================================================
    แบ่งหน้า — ใช้ร่วมกันทุกตาราง
    ===================================================================== */
 function paginate(rows, key){
@@ -456,4 +611,3 @@ function hBarsSVG(items, w = 640){
   }).join('');
   return svgBox(w, { h, body: rows }, 'กราฟแท่งแนวนอน', Math.min(w, 340));
 }
-
