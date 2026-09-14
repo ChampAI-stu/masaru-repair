@@ -368,24 +368,26 @@ async function reloadAll(){
   if (!sb || !ME.id) return;
   $('connSt').textContent = '● กำลังโหลด…';
   try {
-    const [orders, stock, custs, master, top, mon, plat] = await Promise.all([
-      sb.from('v_sales_orders').select('*').limit(2000),
-      sb.from('v_stock_by_wh').select('*').eq('wh_code', 'SALES'),
-      sb.from('repair_customers').select('*').order('name').limit(3000),
-      sb.from('parts_master').select('*').eq('is_active', true).order('part_no'),
+    /* ⚠️ Supabase คืนสูงสุด 1,000 แถวต่อคำขอ — ตารางที่โตเกินนั้นต้องดึงเป็นหน้า ๆ
+       (__pageAll อยู่ใน repair-ui.js) ไม่งั้นอะไหล่/ใบขายตัวที่ 1,001 ขึ้นไปจะหายเงียบ ๆ */
+    const [top, mon, plat, orders, stock, custs, master] = await Promise.all([
       sb.from('v_top_sell_parts').select('*').limit(50),
       sb.from('v_sales_by_month').select('*').limit(24),
-      sb.from('v_sales_by_platform').select('*')
+      sb.from('v_sales_by_platform').select('*'),
+      __pageAll(() => sb.from('v_sales_orders').select('*')),
+      __pageAll(() => sb.from('v_stock_by_wh').select('*').eq('wh_code', 'SALES')),
+      __pageAll(() => sb.from('repair_customers').select('*').order('name')),
+      __pageAll(() => sb.from('parts_master').select('*').eq('is_active', true).order('part_no'))
     ]);
-    for (const r of [orders, stock, custs, master, top, mon, plat]) if (r.error) throw r.error;
+    for (const r of [top, mon, plat]) if (r.error) throw r.error;
 
-    S.orders  = orders.data || [];
-    S.stock   = stock.data  || [];
-    S.custs   = custs.data  || [];
-    S.master  = master.data || [];
-    S.top     = top.data    || [];
-    S.byMonth = mon.data    || [];
-    S.byPlat  = plat.data   || [];
+    S.top     = top.data  || [];
+    S.byMonth = mon.data  || [];
+    S.byPlat  = plat.data || [];
+    S.orders  = orders    || [];
+    S.stock   = stock     || [];
+    S.custs   = custs     || [];
+    S.master  = master    || [];
 
     renderOverview(); renderOrders(); renderStock(); renderCust();
     $('connSt').textContent = '● เชื่อมต่อแล้ว';
