@@ -385,6 +385,9 @@ async function startApp(session){
     authNotice('⚠️ อ่านข้อมูลผู้ใช้ไม่ได้ — บางเมนูอาจใช้ไม่ได้ · ' + esc(e.message || ''), 'warn');
   }
 
+  /* ด่านตรวจสิทธิ์ — ต้องผ่านก่อนถึงจะเห็นอะไรในหน้านี้ */
+  if (!await canModule(sb, 'parts')) return blockModule('คลังอะไหล่');
+
   $('gate').hidden = true; $('app').hidden = false;
   $('userName').textContent = ME.name;
   $('roleLbl').textContent  = ROLE_LABEL[ME.role] || ME.role;
