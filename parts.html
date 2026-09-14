@@ -859,7 +859,10 @@ function renderMaster(){
         <td class="num">${money(p.reorder_point)}</td>
         ${qCell(st?.qty_total ?? 0)}
         <td>${p.is_active ? '<span class="pill tag-good">ใช้งาน</span>' : '<span class="pill st0">ปิดใช้งาน</span>'}</td>
-        ${canEdit ? `<td class="num"><button class="btn ic" title="แก้ไข" onclick="editPart('${p.id}')">✏️</button></td>` : ''}
+        ${canEdit ? `<td class="num" style="white-space:nowrap">
+          <button class="btn ic" title="แก้ไข" onclick="editPart('${p.id}')">✏️</button>
+          <button class="btn ic dn" title="ลบออกจากทะเบียน"
+            onclick="askDeletePart('${p.id}')">🗑️</button></td>` : ''}
       </tr>`;
     }).join('')}</tbody></table></div>${pagerHTML(m, 'master')}`
     : '<div class="empty">ไม่พบอะไหล่ — กด "เพิ่มอะไหล่" เพื่อสร้างใหม่</div>';
@@ -915,6 +918,72 @@ async function editPart(id){
     if (/duplicate|unique/i.test(e.message || '')) toast('❌ รหัสอะไหล่นี้มีอยู่แล้ว', true);
     else fail(e);
   }
+}
+
+
+/* ---------- ลบอะไหล่ออกจากทะเบียน ----------
+   ลบได้เฉพาะตัวที่ยังไม่เคยถูกใช้ที่ไหนเลย
+   ตัวที่เคยใช้แล้วลบไม่ได้ เพราะใบงาน/ใบขายเก่าจะอ่านไม่ออก → ให้ปิดใช้งานแทน */
+async function askDeletePart(id){
+  if (!bossOnly()) return;
+  const p = S.master.find(x => x.id === id);
+  if (!p) return;
+
+  let u = null;
+  try {
+    const { data, error } = await sb.rpc('part_usage', { p_part_id: id });
+    if (error) throw error;
+    u = Array.isArray(data) ? data[0] : data;
+  } catch(e){
+    if (/does not exist|not exist|schema cache/i.test(e.message || ''))
+      return toast('❌ ยังไม่ได้รัน 21_delete_part.sql ในฐานข้อมูล', true);
+    return fail(e);
+  }
+
+  const used = [
+    [u?.stock_qty,     'มีของในคลัง ' + money(u?.stock_qty) + ' ชิ้น'],
+    [u?.moves,         'เคลื่อนไหวในคลัง ' + money(u?.moves) + ' ครั้ง'],
+    [u?.repair_used,   'เบิกใช้ในใบงานซ่อม ' + money(u?.repair_used) + ' ครั้ง'],
+    [u?.sales_used,    'อยู่ในใบขาย ' + money(u?.sales_used) + ' รายการ'],
+    [u?.transfer_used, 'อยู่ในใบโอน ' + money(u?.transfer_used) + ' รายการ'],
+    [u?.pr_used,       'อยู่ในใบขอซื้อ ' + money(u?.pr_used) + ' รายการ'],
+    [u?.shortage,      'เคยแจ้งของขาด ' + money(u?.shortage) + ' ครั้ง']
+  ].filter(([n]) => Number(n)).map(([, t]) => t);
+
+  /* เคยถูกใช้แล้ว — เสนอทางออกที่ถูกต้องแทนการปฏิเสธเฉย ๆ */
+  if (used.length){
+    const ok = await confirmModal('ลบไม่ได้ — แต่ปิดใช้งานได้',
+      `${p.part_no} · ${p.name}\n\nอะไหล่ตัวนี้ถูกใช้ไปแล้ว:\n` +
+      used.map(t => '• ' + t).join('\n') +
+      '\n\nถ้าลบทิ้ง ใบงานและใบขายเก่าจะอ่านไม่ออก' +
+      '\n\nแนะนำให้ "ปิดใช้งาน" แทน — จะหายจากรายการเลือก' +
+      '\nแต่ประวัติเก่ายังอยู่ครบ และเปิดกลับมาใช้ได้ทุกเมื่อ',
+      { ok: p.is_active ? 'ปิดใช้งานตัวนี้' : 'เปิดใช้งานกลับ', danger:false });
+    if (!ok) return;
+    return togglePart(id, !p.is_active);
+  }
+
+  const ok = await confirmModal('ลบออกจากทะเบียนถาวร',
+    `${p.part_no} · ${p.name}\n\nอะไหล่ตัวนี้ยังไม่เคยถูกใช้ที่ไหนเลย ลบได้ปลอดภัย\n\nลบแล้วเอากลับไม่ได้`,
+    { ok:'ลบถาวร', danger:true });
+  if (!ok) return;
+
+  try {
+    const { data, error } = await sb.rpc('delete_part', { p_part_id:id, p_by:who() });
+    if (error) throw error;
+    toast('🗑️ ' + (data || 'ลบแล้ว'));
+    reloadAll();
+  } catch(e){ fail(e); }
+}
+
+async function togglePart(id, active){
+  try {
+    const { data, error } = await sb.rpc('set_part_active',
+      { p_part_id:id, p_active:active, p_by:who() });
+    if (error) throw error;
+    toast('✅ ' + (data || 'บันทึกแล้ว'));
+    reloadAll();
+  } catch(e){ fail(e); }
 }
 
 
