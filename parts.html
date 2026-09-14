@@ -1084,6 +1084,12 @@ function impLoadSheet(){
 
   IMP.hrow = guessHeaderRow(rows);
 
+  /* แถวที่เดาว่าเป็นหัวตาราง แต่จับคู่ไม่ได้สักช่อง = มันไม่ใช่หัวตาราง เป็นข้อมูล
+     (ชีทราคาอะไหล่ 3 คอลัมน์เป็นแบบนี้ — แถวแรกคือ SCG-605 | หัวกระโหลก | 250.-)
+     ถ้าไม่ดักไว้ แถวแรกจะถูกกินไปเป็นหัวตารางแล้วข้อมูลหายไป 1 แถว */
+  const probe = guessMap(IMP_FIELDS, (rows[IMP.hrow] || []).map(x => cleanCell(x)));
+  if (probe.part_no < 0 && probe.name < 0) IMP.hrow = -1;
+
   impApplyHeader();
 }
 
@@ -1109,6 +1115,31 @@ function impSetHeader(i){ IMP.hrow = Number(i); IMP.map = {}; impApplyHeader(); 
 /* ---------- ขั้น 2: จับคู่คอลัมน์ ---------- */
 function impRenderMap(){
   IMP.map = guessMap(IMP_FIELDS, IMP.head);
+  IMP.sniffed = false;
+
+  /* เดาจากชื่อหัวตารางไม่ได้เลย → เดาจาก "หน้าตาข้อมูล" ในคอลัมน์แทน
+     คอลัมน์ที่เป็นภาษาไทย = ชื่ออะไหล่ · เป็นรหัสอังกฤษ+ตัวเลข = รุ่น · เป็นตัวเลขล้วน = ราคา */
+  if (IMP.map.name < 0 && IMP.map.part_no < 0){
+    const prof = profileColumns(IMP.rows, IMP.head.length).filter(Boolean);
+    const used = new Set();
+    const take = test => {
+      const c = prof.find(x => !used.has(x.j) && test(x));
+      if (c) used.add(c.j);
+      return c ? c.j : -1;
+    };
+    const nameC = take(c => c.thai >= 0.5);
+    if (nameC >= 0){
+      IMP.map.name        = nameC;
+      IMP.map.fits_models = take(c => c.code >= 0.6);
+      IMP.map.sell_price  = take(c => c.num  >= 0.7);
+      IMP.sniffed = true;
+    }
+  }
+
+  /* มีคอลัมน์ "SKU" อยู่ในหัวตาราง แต่ว่างทั้งแผ่น — ชีทฝ่ายการช่างเป็นแบบนี้
+     ถือว่าไม่มีรหัส ติ๊กตั้งรหัสอัตโนมัติให้เลย จะได้ไม่ต้องมานั่งงงว่าทำไมนำเข้าไม่ได้ */
+  IMP.emptyCode = IMP.map.part_no >= 0 &&
+                  !IMP.rows.some(r => cleanCell(r[IMP.map.part_no]));
   /* ชีทที่ไม่มีหัวตาราง ชื่อคอลัมน์จะเป็น "คอลัมน์ 1/2/3" ซึ่งดูไม่ออกว่าคืออะไร
      เลยเอาค่าจริงแถวแรก ๆ มาต่อท้ายให้ เลือกได้ถูกตั้งแต่ครั้งแรก */
   const sampleOf = j => {
@@ -1144,9 +1175,17 @@ function impRenderMap(){
         <select id="impHrow" onchange="impSetHeader(this.value)">${rowOpts}</select></div>
     </div>
 
-    <div class="sub2" style="margin-bottom:10px">
+    ${IMP.sniffed ? `<div class="box-info" style="margin-bottom:12px">
+      ชีทนี้ไม่มีหัวตาราง — ระบบเดาให้จาก<b>หน้าตาข้อมูลในแต่ละคอลัมน์</b>
+      แล้วติ๊ก "เซลล์ผสาน" กับ "ตั้งรหัสอัตโนมัติ" ให้ด้วย<br>
+      <b>ตรวจตัวอย่างข้างล่างให้ชัวร์ก่อนกดนำเข้า</b> ถ้าเดาผิดเปลี่ยนได้ทุกช่อง
+    </div>` : IMP.emptyCode ? `<div class="box-info" style="margin-bottom:12px">
+      ชีทนี้มีคอลัมน์ <b>${esc(IMP.head[IMP.map.part_no] || 'รหัส')}</b> อยู่ แต่<b>ว่างทั้งแผ่น</b> —
+      ระบบติ๊ก "ตั้งรหัสให้อัตโนมัติ" ให้แล้ว จะตั้งรหัสจาก รุ่น + เลขรัน<br>
+      <b>ดูตัวอย่างรหัสข้างล่างก่อนกดนำเข้า</b>
+    </div>` : `<div class="sub2" style="margin-bottom:10px">
       ระบบเดาการจับคู่ให้แล้วจากหัวตาราง ถ้าเดาผิดเปลี่ยนได้เลย ·
-      ช่องที่มี <span class="req">*</span> ต้องเลือก</div>
+      ช่องที่มี <span class="req">*</span> ต้องเลือก</div>`}
     <div class="grid g3">
       ${IMP_FIELDS.map(fd => `<div class="f">
         <label>${esc(fd.label)}${fd.req ? ' <span class="req">*</span>' : ''}</label>
@@ -1177,13 +1216,15 @@ function impRenderMap(){
         </select></div>
       <div class="f"><label>เซลล์ผสาน (merged)</label>
         <label style="display:flex;gap:7px;align-items:flex-start;font-weight:400;font-size:13px">
-          <input type="checkbox" id="impFill" onchange="impPreview()" style="margin-top:3px">
+          <input type="checkbox" id="impFill" onchange="impPreview()" style="margin-top:3px"
+                 ${IMP.sniffed ? 'checked' : ''}>
           <span>เติมค่าจากแถวบนเมื่อเซลล์ว่าง<br>
             <span class="sub2">ใช้กับ รหัส · กลุ่มสินค้า · รุ่นที่ใช้ร่วม เท่านั้น
             (ราคาและชื่อไม่เติมให้ เดี๋ยวได้ราคาผิด)</span></span></label></div>
       <div class="f"><label>ชีทนี้ไม่มีคอลัมน์รหัส</label>
         <label style="display:flex;gap:7px;align-items:flex-start;font-weight:400;font-size:13px">
-          <input type="checkbox" id="impAuto" onchange="impPreview()" style="margin-top:3px">
+          <input type="checkbox" id="impAuto" onchange="impPreview()" style="margin-top:3px"
+                 ${IMP.sniffed || IMP.emptyCode ? 'checked' : ''}>
           <span>ตั้งรหัสให้อัตโนมัติจาก <b>รุ่น + เลขรัน</b><br>
             <span class="sub2">เช่น DR-14-01 · DR-14-02 · SCM-530-07 ·
             ต้องจับคู่ช่อง "รุ่นที่ใช้ร่วม" ก่อน<br>
