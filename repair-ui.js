@@ -299,6 +299,45 @@ function renderStaged(){
 }
 
 /* =====================================================================
+   สิทธิ์เข้าโมดูล — ของกลาง ใช้ร่วมทุกโมดูล
+   "โมดูลเป็นคนกำหนดว่า role ไหนเข้าได้" เก็บไว้ในตาราง module_access
+   ===================================================================== */
+
+/** เข้าโมดูลนี้ได้ไหม
+    ถ้ายังไม่ได้รัน 20_access.sql จะปล่อยผ่าน — กันเคสอัปไฟล์เว็บก่อนรัน SQL
+    แล้วล็อกคนทั้งบริษัทออกจากระบบ */
+async function canModule(sb, key){
+  try {
+    const { data, error } = await sb.rpc('can_module', { p_module: key });
+    if (error){
+      if (/does not exist|not exist|schema cache/i.test(error.message || '')) return true;
+      throw error;
+    }
+    return data !== false;
+  } catch(e){
+    console.warn('[สิทธิ์] เช็คสิทธิ์โมดูลไม่สำเร็จ — ปล่อยผ่านไว้ก่อน', e);
+    return true;
+  }
+}
+
+/** ไม่มีสิทธิ์ = ปิดทั้งหน้า ไม่ให้เห็นข้อมูลอะไรเลย */
+function blockModule(name){
+  document.title = 'ไม่มีสิทธิ์เข้าใช้งาน · MASARU';
+  document.body.innerHTML = `<div class="gate">
+    <div class="gbox" style="text-align:center">
+      <div style="font-size:46px;line-height:1;margin-bottom:10px">🔒</div>
+      <h3 style="color:var(--navy);margin:0 0 8px;font-size:19px">ไม่มีสิทธิ์เข้าโมดูลนี้</h3>
+      <p style="color:var(--ink2);font-size:14px;line-height:1.7;margin:0 0 22px">
+        บัญชีของคุณยังไม่ได้รับสิทธิ์เข้า <b>${esc(name)}</b><br>
+        ขอสิทธิ์ได้ที่ผู้ดูแลระบบ
+      </p>
+      <a class="btn g" href="index.html"
+         style="display:inline-block;text-decoration:none;padding:11px 24px">← กลับหน้าหลัก</a>
+    </div></div>`;
+}
+
+
+/* =====================================================================
    อ่านไฟล์ตาราง (CSV / Excel) — ของกลาง ใช้ร่วมทุกโมดูลที่มีตัวนำเข้า
    อ่านในเบราว์เซอร์ทั้งหมด ไฟล์ไม่ถูกส่งขึ้นเซิร์ฟเวอร์
    ===================================================================== */
