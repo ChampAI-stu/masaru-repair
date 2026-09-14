@@ -1081,8 +1081,15 @@ function impLoadSheet(){
 }
 
 function impApplyHeader(){
-  IMP.head = (IMP.raw[IMP.hrow] || []).map(h => (h ?? '').toString().trim());
-  IMP.rows = IMP.raw.slice(IMP.hrow + 1);
+  if (IMP.hrow < 0){
+    /* ชีทที่ไม่มีหัวตาราง — ตั้งชื่อคอลัมน์ให้เอง แถวแรกจะได้ไม่ถูกกินไปเป็นหัว */
+    const w = IMP.raw.reduce((m, r) => Math.max(m, r.length), 0);
+    IMP.head = Array.from({ length:w }, (_, i) => 'คอลัมน์ ' + (i + 1));
+    IMP.rows = IMP.raw;
+  } else {
+    IMP.head = (IMP.raw[IMP.hrow] || []).map(h => (h ?? '').toString().trim());
+    IMP.rows = IMP.raw.slice(IMP.hrow + 1);
+  }
   $('impName').textContent =
     `📄 ${IMP.fileName} · ${IMP.wb ? 'ชีท "' + IMP.sheets[IMP.sheet] + '" · ' : ''}` +
     `${money(IMP.rows.length)} แถว · ${IMP.head.length} คอลัมน์`;
@@ -1100,10 +1107,12 @@ function impRenderMap(){
       `<option value="${j}" ${j === i ? 'selected' : ''}>${esc(h || 'คอลัมน์ ' + (j+1))}</option>`))
     .join('');
 
-  const rowOpts = IMP.raw.slice(0, 8).map((r, i) =>
-    `<option value="${i}" ${i === IMP.hrow ? 'selected' : ''}>แถว ${i+1}: ${
-      esc(r.filter(c => (c ?? '').toString().trim()).slice(0, 4).join(' | ').slice(0, 48) || '(ว่าง)')
-    }</option>`).join('');
+  const rowOpts = `<option value="-1" ${IMP.hrow < 0 ? 'selected' : ''}>
+      — ชีทนี้ไม่มีหัวตาราง (แถว 1 เป็นข้อมูลเลย) —</option>` +
+    IMP.raw.slice(0, 8).map((r, i) =>
+      `<option value="${i}" ${i === IMP.hrow ? 'selected' : ''}>แถว ${i+1}: ${
+        esc(r.filter(c => (c ?? '').toString().trim()).slice(0, 4).join(' | ').slice(0, 48) || '(ว่าง)')
+      }</option>`).join('');
 
   $('impS2').hidden = false;
   $('impS2').innerHTML = `
@@ -1155,6 +1164,13 @@ function impRenderMap(){
           <span>เติมค่าจากแถวบนเมื่อเซลล์ว่าง<br>
             <span class="sub2">ใช้กับ รหัส · กลุ่มสินค้า · รุ่นที่ใช้ร่วม เท่านั้น
             (ราคาและชื่อไม่เติมให้ เดี๋ยวได้ราคาผิด)</span></span></label></div>
+      <div class="f"><label>ชีทนี้ไม่มีคอลัมน์รหัส</label>
+        <label style="display:flex;gap:7px;align-items:flex-start;font-weight:400;font-size:13px">
+          <input type="checkbox" id="impAuto" onchange="impPreview()" style="margin-top:3px">
+          <span>ตั้งรหัสให้อัตโนมัติจาก <b>รุ่น + เลขรัน</b><br>
+            <span class="sub2">เช่น DR-14-01 · DR-14-02 · SCM-530-07 ·
+            ต้องจับคู่ช่อง "รุ่นที่ใช้ร่วม" ก่อน<br>
+            นำเข้าไฟล์เดิมซ้ำจะใช้รหัสเดิม ไม่สร้างรหัสใหม่ทับ</span></span></label></div>
     </div>`;
   impPreview();
 }
@@ -1164,11 +1180,14 @@ function impPreview(){
   /* val() คืน '' ถ้าไม่เจอช่อง — ต้องกลายเป็น -1 ไม่ใช่ 0 ไม่งั้นจะไปหยิบคอลัมน์แรกผิด ๆ */
   IMP_FIELDS.forEach(fd => { IMP.map[fd.k] = Number(val('impm_' + fd.k) || -1); });
   const cPart = IMP.map.part_no, cName = IMP.map.name;
+  const autoCode = !!$('impAuto')?.checked;
 
   $('impS3').hidden = false;
-  if (cPart < 0 || cName < 0){
+  if (cName < 0 || (cPart < 0 && !autoCode)){
     $('impS3').innerHTML = `<div class="box-warn" style="margin-top:16px">
-      เลือก <b>รหัสอะไหล่</b> และ <b>ชื่ออะไหล่</b> ให้ครบก่อน ถึงจะนำเข้าได้</div>`;
+      เลือก <b>ชื่ออะไหล่</b> และ <b>รหัสอะไหล่</b> ให้ครบก่อน<br>
+      ถ้าชีทนี้ไม่มีคอลัมน์รหัสเลย ให้ติ๊ก
+      <b>"ตั้งรหัสให้อัตโนมัติ"</b> ข้างบนแทน</div>`;
     return;
   }
 
@@ -1194,16 +1213,47 @@ function impPreview(){
   const have = new Set(S.master.map(p => p.part_no));
   const seen = new Set();
   const bad = [];
-  let dupFile = 0, exist = 0, filtered = 0, noCode = 0, noName = 0;
+  let dupFile = 0, exist = 0, filtered = 0, noCode = 0, noName = 0, oddPrice = 0;
   const ready = [];
+
+  /* ---------- ตั้งรหัสอัตโนมัติ ----------
+     รหัส = <รุ่น>-<เลขรัน>  เช่น DR-14-01
+     กติกาที่ทำให้นำเข้าซ้ำได้โดยไม่สร้างรหัสซ้อน:
+       จำคู่ (รุ่น + ชื่ออะไหล่) ของที่มีอยู่แล้ว ถ้าเจอคู่เดิมให้ใช้รหัสเดิม
+       คู่ใหม่เท่านั้นถึงจะได้เลขรันถัดไป */
+  const mKey = s => String(s || '').split(/[\/\n,]/)[0]
+                      .replace(/\s+/g, ' ').trim().toUpperCase()
+                      .replace(/[^A-Z0-9\-]/g, '');
+  const nKey = s => String(s || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  const knownKey = new Map();     // "รุ่น|ชื่อ" → รหัสที่เคยตั้งไว้
+  const maxNo    = new Map();     // "รุ่น" → เลขรันสูงสุดที่ใช้ไปแล้ว
+  if (autoCode) S.master.forEach(pm => {
+    /* ต้องใช้สูตรคีย์เดียวกับตอนสร้างรหัส (รวม fallback 'RP')
+       ไม่งั้นแถวที่ไม่มีรุ่นจะจำไม่ได้ แล้วได้รหัสใหม่ทุกครั้งที่นำเข้าซ้ำ */
+    if (pm.name) knownKey.set((mKey(pm.fits_models) || 'RP') + '|' + nKey(pm.name), pm.part_no);
+    const mm = /^(.+)-(\d+)$/.exec(pm.part_no || '');
+    if (mm) maxNo.set(mm[1], Math.max(maxNo.get(mm[1]) || 0, Number(mm[2])));
+  });
+  const makeCode = (model, name) => {
+    const pre = mKey(model) || 'RP';
+    const k = pre + '|' + nKey(name);
+    if (knownKey.has(k)) return knownKey.get(k);
+    const n = (maxNo.get(pre) || 0) + 1;
+    maxNo.set(pre, n);
+    const code = pre + '-' + String(n).padStart(2, '0');
+    knownKey.set(k, code);
+    return code;
+  };
 
   IMP.rows.forEach((r, i) => {
     if (cellCount(r) === 0) return;                            // แถวว่างล้วน ไม่นับเป็นปัญหา
-    const pn = cell(r, cPart), nm = cell(r, cName);
+    let pn = cell(r, cPart), nm = cell(r, cName);
+    const fits = cell(r, IMP.map.fits_models);
     if (!pn && !nm) return;
+    if (!nm){ noName++; if (bad.length < 8) bad.push({ line:IMP.hrow + 2 + i, why:'ไม่มีชื่อ', what:pn }); return; }
+    if (!pn && autoCode) pn = makeCode(fits, nm);
     if (q && !pn.toLowerCase().includes(q)){ filtered++; return; }
     if (!pn){ noCode++; if (bad.length < 8) bad.push({ line:IMP.hrow + 2 + i, why:'ไม่มีรหัส', what:nm }); return; }
-    if (!nm){ noName++; if (bad.length < 8) bad.push({ line:IMP.hrow + 2 + i, why:'ไม่มีชื่อ', what:pn }); return; }
     if (seen.has(pn)){ dupFile++; return; }
     seen.add(pn);
     const already = have.has(pn);
@@ -1213,8 +1263,11 @@ function impPreview(){
     [['unit','unit'], ['jst_sku','jst_sku'], ['category','category'],
      ['fits_models','fits_models'], ['note','note']].forEach(([k, col]) => {
       const v = cell(r, IMP.map[col]);
-      if (v) row[k] = v;
+      /* เซลล์ "รุ่นที่ใช้ร่วม" ในชีทจริงขึ้นบรรทัดใหม่แทนการคั่น — ทำให้เป็นบรรทัดเดียว */
+      if (v) row[k] = k === 'fits_models' ? v.replace(/\s*\n\s*/g, ' / ') : v;
     });
+    if (priceLooksOdd(cell(r, IMP.map.sell_price)) ||
+        priceLooksOdd(cell(r, IMP.map.cost_price))) oddPrice++;
     if (IMP.map.cost_price    >= 0) row.cost_price    = numOf(cell(r, IMP.map.cost_price));
     if (IMP.map.sell_price    >= 0) row.sell_price    = numOf(cell(r, IMP.map.sell_price));
     if (IMP.map.reorder_point >= 0) row.reorder_point = Math.round(numOf(cell(r, IMP.map.reorder_point)));
@@ -1244,6 +1297,15 @@ function impPreview(){
           <div class="sub2">${esc(u)}</div></div>`).join('')}
     </div>
     ${filtered ? `<div class="box-info">ตัวกรองคัดออก ${money(filtered)} แถว</div>` : ''}
+    ${autoCode && IMP.map.fits_models < 0 ? `<div class="box-warn" style="margin-top:10px">
+      ยังไม่ได้จับคู่ช่อง <b>"รุ่นที่ใช้ร่วม"</b> — รหัสที่ได้จะเป็น RP-01, RP-02 … เรียงกันไปเฉย ๆ<br>
+      จับคู่ก่อนจะได้รหัสที่อ่านออก เช่น DR-14-01
+    </div>` : ''}
+    ${oddPrice ? `<div class="box-warn" style="margin-top:10px">
+      มี <b>${money(oddPrice)} แถว</b> ที่ช่องราคาเขียนเป็นประโยค เช่น
+      "ตัวข้างบน40 ข้างล่าง10บาท" — ระบบหยิบ<b>ตัวเลขก้อนแรก</b>มาใช้<br>
+      นำเข้าได้ แต่ควรไล่ตรวจราคาพวกนี้อีกรอบหลังนำเข้าเสร็จ
+    </div>` : ''}
     ${noCode > 3 && !$('impFill')?.checked ? `<div class="box-warn" style="margin-top:10px">
       มี ${money(noCode)} แถวที่ <b>ไม่มีรหัสอะไหล่</b> จะถูกข้าม<br>
       ถ้าชีทนี้ใช้เซลล์ผสาน (รหัสเดียวครอบหลายแถว) ให้ติ๊ก
