@@ -201,7 +201,7 @@
             <button class="btn p sm" onclick="editPart(null)">➕ เพิ่มอะไหล่</button>
           </h3>
           <div class="toolbar">
-            <input type="text" id="pmSearch" placeholder="🔍 ค้นหา รหัส / ชื่อ / SKU (JST)">
+            <input type="text" id="pmSearch" placeholder="🔍 ค้นหา รหัส / ชื่อ / กลุ่ม / รุ่นเครื่อง เช่น SCDW-165">
             <label style="display:flex;align-items:center;gap:6px;font-size:13.5px">
               <input type="checkbox" id="pmOff"> แสดงตัวที่ปิดใช้งานด้วย</label>
           </div>
@@ -834,20 +834,22 @@ function renderMaster(){
   const rows = S.master.filter(p => {
     if (!off && !p.is_active) return false;
     if (!q) return true;
-    return (p.part_no + ' ' + p.name + ' ' + (p.jst_sku || '')).toLowerCase().includes(q);
+    return [p.part_no, p.name, p.jst_sku, p.category, p.fits_models]
+      .filter(Boolean).join(' ').toLowerCase().includes(q);
   });
   const m = paginate(rows, 'master');
   const canEdit = isBoss();
 
   $('pmTbl').innerHTML = rows.length ? `<div class="tw"><table>
-    <thead><tr><th>รหัส</th><th>ชื่ออะไหล่</th><th>หน่วย</th>
+    <thead><tr><th>รหัส</th><th>ชื่ออะไหล่</th><th>ใส่รุ่นไหนได้</th><th>หน่วย</th>
       <th class="num">ทุน</th><th class="num">ขาย</th><th class="num">จุดสั่ง</th>
       <th class="num">คงเหลือรวม</th><th>สถานะ</th>${canEdit ? '<th></th>' : ''}</tr></thead>
     <tbody>${m.slice.map(p => {
       const st = S.stock.find(s => s.part_id === p.id);
       return `<tr>
         <td><b class="mono">${esc(p.part_no)}</b>${p.jst_sku ? `<div class="sub2">JST ${esc(p.jst_sku)}</div>` : ''}</td>
-        <td>${esc(p.name)}</td>
+        <td>${esc(p.name)}${p.category ? `<div class="sub2">${esc(p.category)}</div>` : ''}</td>
+        <td class="sub2" style="max-width:190px">${esc(p.fits_models || '—')}</td>
         <td>${esc(p.unit)}</td>
         <td class="num">฿${money(p.cost_price)}</td>
         <td class="num">฿${money(p.sell_price)}</td>
@@ -871,12 +873,19 @@ async function editPart(id){
       { k:'part_no', label:'รหัสอะไหล่', required:true, value:p?.part_no || '',
         placeholder:'เช่น BR-00124' },
       { k:'name',    label:'ชื่ออะไหล่', required:true, value:p?.name || '' },
-      { k:'unit',    label:'หน่วยนับ', value:p?.unit || 'ชิ้น' },
+      { k:'category', label:'กลุ่มสินค้า', half:true, value:p?.category || '',
+        placeholder:'เช่น สว่าน, มอเตอร์' },
+      { k:'unit',    label:'หน่วยนับ', half:true, value:p?.unit || 'ชิ้น' },
+      { k:'fits_models', label:'ใส่รุ่นไหนได้บ้าง', value:p?.fits_models || '',
+        placeholder:'เช่น SCS-405/SCS-410/SCS-455',
+        hint:'ใช้ค้นตอนหาอะไหล่ให้เครื่อง — คั่นรุ่นด้วย / หรือเว้นวรรค' },
       { k:'cost_price', label:'ราคาทุน (บาท)', type:'number', min:0, value:p?.cost_price ?? 0 },
       { k:'sell_price', label:'ราคาขาย (บาท)', type:'number', min:0, value:p?.sell_price ?? 0 },
       { k:'reorder_point', label:'จุดสั่งซื้อ — เหลือเท่านี้ให้เตือน', type:'number', min:0,
         value:p?.reorder_point ?? 0 },
-      { k:'jst_sku', label:'SKU ใน JST', value:p?.jst_sku || '' },
+      { k:'jst_sku', label:'SKU ใน JST', half:true, value:p?.jst_sku || '' },
+      { k:'note',    label:'หมายเหตุ', half:true, value:p?.note || '',
+        placeholder:'เช่น ขนาด 1/4' },
       { k:'is_active', label:'เปิดใช้งาน', type:'select',
         value: p ? String(p.is_active) : 'true',
         options:[{ v:'true', t:'ใช้งาน' }, { v:'false', t:'ปิดใช้งาน' }] }
@@ -886,7 +895,11 @@ async function editPart(id){
     part_no: f.part_no.trim(), name: f.name.trim(), unit: (f.unit || 'ชิ้น').trim(),
     cost_price: Number(f.cost_price) || 0, sell_price: Number(f.sell_price) || 0,
     reorder_point: Number(f.reorder_point) || 0,
-    jst_sku: f.jst_sku?.trim() || null, is_active: f.is_active === 'true'
+    jst_sku: f.jst_sku?.trim() || null,
+    category: f.category?.trim() || null,
+    fits_models: f.fits_models?.trim() || null,
+    note: f.note?.trim() || null,
+    is_active: f.is_active === 'true'
   };
   try {
     const { error } = p
@@ -908,34 +921,38 @@ async function editPart(id){
      · จับคู่คอลัมน์เองได้ เพราะไฟล์จาก JST แต่ละงวดหัวตารางไม่เหมือนกัน
      · ส่งเข้าฐานข้อมูลทีละ 400 แถว พร้อมแถบความคืบหน้า
    ===================================================================== */
-const IMP = { head:[], rows:[], map:{}, ready:[], fileName:'' };
+const IMP = {
+  wb:null, sheets:[], sheet:0, raw:[], head:[], rows:[],
+  hrow:0, map:{}, ready:[], fileName:''
+};
 
 const IMP_FIELDS = [
-  { k:'part_no',       label:'รหัสอะไหล่',  req:true,
-    hints:['รหัสสินค้า','รหัสอะไหล่','รหัส','partno','part_no','itemcode','item','code','barcode','商品编码'] },
+  { k:'part_no',       label:'รหัสอะไหล่',  req:true,  fill:true,
+    hints:['รหัสสินค้า','รหัสอะไหล่','sku','รหัส','partno','part_no','itemcode','item','code','barcode','商品编码'] },
   { k:'name',          label:'ชื่ออะไหล่',  req:true,
     hints:['ชื่อสินค้า','ชื่ออะไหล่','ชื่อ','name','productname','description','desc','品名','商品名称'] },
+  { k:'category',      label:'กลุ่มสินค้า',  req:false, fill:true,
+    hints:['กลุ่มสินค้า','กลุ่ม','หมวด','ประเภท','category','group','type'] },
+  { k:'fits_models',   label:'รุ่นที่ใช้ร่วม', req:false, fill:true,
+    hints:['สินค้าที่ใช้ร่วม','รุ่นที่ใช้ร่วม','ใช้ร่วม','รุ่น','model','fits','compatible'] },
   { k:'unit',          label:'หน่วยนับ',    req:false,
     hints:['หน่วยนับ','หน่วย','unit','uom','单位'] },
   { k:'cost_price',    label:'ราคาทุน',     req:false,
     hints:['ราคาทุน','ต้นทุน','ทุน','cost','costprice','purchaseprice','成本'] },
   { k:'sell_price',    label:'ราคาขาย',     req:false,
-    hints:['ราคาขาย','ขายปลีก','ขาย','sellprice','price','retail','售价','零售价'] },
+    hints:['ราคาปรับใหม่','ราคาขาย','ขายปลีก','ราคา','ขาย','sellprice','price','retail','售价'] },
   { k:'reorder_point', label:'จุดสั่งซื้อ',  req:false,
     hints:['จุดสั่งซื้อ','จุดสั่ง','ขั้นต่ำ','reorder','minqty','safetystock'] },
   { k:'jst_sku',       label:'SKU ใน JST',  req:false,
-    hints:['jstsku','jst','skuid','sku'] }
+    hints:['jstsku','jst','skuid'] },
+  { k:'note',          label:'หมายเหตุ',    req:false,
+    hints:['หมายเหตุ','remark','note','comment'] }
 ];
-
-const impNorm = s => (s ?? '').toString().toLowerCase().replace(/[\s_\-\.()]/g, '');
-const impNum  = v => {
-  const n = Number((v ?? '').toString().replace(/[^0-9.\-]/g, ''));
-  return Number.isFinite(n) ? n : 0;
-};
 
 function impOpen(){
   if (!bossOnly()) return;
-  Object.assign(IMP, { head:[], rows:[], map:{}, ready:[], fileName:'' });
+  Object.assign(IMP, { wb:null, sheets:[], sheet:0, raw:[], head:[], rows:[],
+                       hrow:0, map:{}, ready:[], fileName:'' });
   $('impCard').hidden = false;
   $('impS1').hidden = false;
   ['impS2','impS3','impS4'].forEach(id => { $(id).hidden = true; $(id).innerHTML = ''; });
@@ -946,52 +963,6 @@ function impOpen(){
 function impClose(){ $('impCard').hidden = true; }
 
 /* ---------- ขั้น 1: อ่านไฟล์ ---------- */
-function loadXLSX(){
-  if (window.XLSX) return Promise.resolve();
-  return new Promise((res, rej) => {
-    const s = document.createElement('script');
-    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-    s.onload = () => res();
-    s.onerror = () => rej(new Error('โหลดตัวอ่านไฟล์ Excel ไม่สำเร็จ — ตรวจอินเทอร์เน็ต หรือ Save As เป็น CSV แล้วลองใหม่'));
-    document.head.appendChild(s);
-  });
-}
-
-/** ไฟล์ไทยจาก JST มีทั้ง UTF-8 และ windows-874 ถ้าถอดผิดจะได้ภาษาต่างดาว */
-function impDecode(buf){
-  try { return new TextDecoder('utf-8', { fatal:true }).decode(buf); } catch(e){}
-  for (const enc of ['windows-874','tis-620','utf-8']){
-    try { return new TextDecoder(enc).decode(buf); } catch(e){}
-  }
-  return '';
-}
-
-/** แยก CSV เอง — รองรับเครื่องหมายคำพูด คอมมาในข้อความ และตัวคั่น , ; แท็บ */
-function impParseCSV(text){
-  text = text.replace(/^﻿/, '');
-  const head = text.slice(0, 4000);
-  const cand = [',',';','\t','|'];
-  const sep = cand.reduce((b,c) =>
-    (head.split(c).length > head.split(b).length ? c : b), ',');
-
-  const rows = []; let row = [], cell = '', q = false;
-  for (let i = 0; i < text.length; i++){
-    const ch = text[i];
-    if (q){
-      if (ch === '"'){ if (text[i+1] === '"'){ cell += '"'; i++; } else q = false; }
-      else cell += ch;
-      continue;
-    }
-    if (ch === '"'){ q = true; continue; }
-    if (ch === sep){ row.push(cell); cell = ''; continue; }
-    if (ch === '\r') continue;
-    if (ch === '\n'){ row.push(cell); rows.push(row); row = []; cell = ''; continue; }
-    cell += ch;
-  }
-  if (cell !== '' || row.length){ row.push(cell); rows.push(row); }
-  return rows.filter(r => r.some(c => (c ?? '').toString().trim() !== ''));
-}
-
 async function impPick(input){
   const f = input.files?.[0];
   if (!f) return;
@@ -999,64 +970,85 @@ async function impPick(input){
   IMP.fileName = f.name;
 
   try {
-    let rows;
     if (/\.(xlsx|xls)$/i.test(f.name)){
       await loadXLSX();
-      const wb = XLSX.read(await f.arrayBuffer(), { type:'array' });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      rows = XLSX.utils.sheet_to_json(ws, { header:1, raw:false, defval:'' })
-                       .filter(r => r.some(c => (c ?? '').toString().trim() !== ''));
+      IMP.wb = XLSX.read(await f.arrayBuffer(), { type:'array' });
+      IMP.sheets = IMP.wb.SheetNames || [];
+      if (!IMP.sheets.length) throw new Error('ไฟล์นี้ไม่มีชีทข้อมูล');
+      IMP.sheet = 0;
     } else {
-      rows = impParseCSV(impDecode(await f.arrayBuffer()));
+      IMP.wb = null;
+      IMP.sheets = ['(ไฟล์ CSV)'];
+      IMP.sheet = 0;
+      IMP.csv = parseCSV(decodeText(await f.arrayBuffer()));
     }
-
-    if (rows.length < 2) throw new Error('ไฟล์นี้ไม่มีข้อมูล หรืออ่านไม่ออก');
-    IMP.head = rows[0].map(h => (h ?? '').toString().trim());
-    IMP.rows = rows.slice(1);
-    $('impName').textContent =
-      `📄 ${f.name} · ${money(IMP.rows.length)} แถว · ${IMP.head.length} คอลัมน์`;
-    impRenderMap();
+    impLoadSheet();
   } catch(e){
     $('impName').textContent = '📄 ' + f.name;
     fail(e);
   }
 }
 
-/* ---------- ขั้น 2: จับคู่คอลัมน์ ---------- */
-function impGuess(){
-  const used = new Set();
-  const cols = IMP.head.map(impNorm);
-  IMP_FIELDS.forEach(fd => {
-    let best = -1, bestScore = 0;
-    cols.forEach((c, i) => {
-      if (!c || used.has(i)) return;
-      let sc = 0;
-      fd.hints.forEach((h, hi) => {
-        const hn = impNorm(h);
-        if (c === hn)          sc = Math.max(sc, 100 - hi);
-        else if (c.includes(hn)) sc = Math.max(sc, 60 - hi);
-      });
-      if (sc > bestScore){ bestScore = sc; best = i; }
-    });
-    if (best >= 0){ IMP.map[fd.k] = best; used.add(best); }
-    else IMP.map[fd.k] = -1;
-  });
+/** ดึงข้อมูลของชีทที่เลือก แล้วเดาว่าหัวตารางอยู่แถวไหน */
+function impLoadSheet(){
+  let rows;
+  if (IMP.wb){
+    const ws = IMP.wb.Sheets[IMP.sheets[IMP.sheet]];
+    rows = XLSX.utils.sheet_to_json(ws, { header:1, raw:false, defval:'' });
+  } else {
+    rows = IMP.csv || [];
+  }
+  /* ตัดแถวว่างท้ายไฟล์ทิ้ง แต่เก็บแถวว่างต้น ๆ ไว้ เพราะหัวตารางอาจไม่ได้อยู่แถวแรก */
+  while (rows.length && cellCount(rows[rows.length - 1]) === 0) rows.pop();
+  IMP.raw = rows;
+  if (rows.length < 2) { toast('ชีทนี้ไม่มีข้อมูล หรืออ่านไม่ออก', true); return; }
+
+  IMP.hrow = guessHeaderRow(rows);
+
+  impApplyHeader();
 }
 
+function impApplyHeader(){
+  IMP.head = (IMP.raw[IMP.hrow] || []).map(h => (h ?? '').toString().trim());
+  IMP.rows = IMP.raw.slice(IMP.hrow + 1);
+  $('impName').textContent =
+    `📄 ${IMP.fileName} · ${IMP.wb ? 'ชีท "' + IMP.sheets[IMP.sheet] + '" · ' : ''}` +
+    `${money(IMP.rows.length)} แถว · ${IMP.head.length} คอลัมน์`;
+  impRenderMap();
+}
+
+function impSetSheet(i){ IMP.sheet = Number(i); IMP.map = {}; impLoadSheet(); }
+function impSetHeader(i){ IMP.hrow = Number(i); IMP.map = {}; impApplyHeader(); }
+
+/* ---------- ขั้น 2: จับคู่คอลัมน์ ---------- */
 function impRenderMap(){
-  impGuess();
+  IMP.map = guessMap(IMP_FIELDS, IMP.head);
   const opts = i => ['<option value="-1">— ไม่ใช้ —</option>']
     .concat(IMP.head.map((h, j) =>
       `<option value="${j}" ${j === i ? 'selected' : ''}>${esc(h || 'คอลัมน์ ' + (j+1))}</option>`))
     .join('');
 
-  const sample = IMP.rows.slice(0, 3);
+  const rowOpts = IMP.raw.slice(0, 8).map((r, i) =>
+    `<option value="${i}" ${i === IMP.hrow ? 'selected' : ''}>แถว ${i+1}: ${
+      esc(r.filter(c => (c ?? '').toString().trim()).slice(0, 4).join(' | ').slice(0, 48) || '(ว่าง)')
+    }</option>`).join('');
+
   $('impS2').hidden = false;
   $('impS2').innerHTML = `
-    <div style="font-weight:700;color:var(--navy);margin:18px 0 4px">ขั้น 2 · จับคู่คอลัมน์</div>
-    <div class="sub2" style="margin-bottom:12px">
-      ระบบเดาให้แล้วจากหัวตาราง ถ้าเดาผิดเปลี่ยนได้เลย · ช่องที่มี
-      <span class="req">*</span> ต้องเลือก</div>
+    <div style="font-weight:700;color:var(--navy);margin:18px 0 8px">ขั้น 2 · บอกว่าข้อมูลอยู่ตรงไหน</div>
+    <div class="grid g2" style="margin-bottom:14px">
+      ${IMP.wb ? `<div class="f"><label>ชีทที่จะนำเข้า</label>
+        <select id="impSheet" onchange="impSetSheet(this.value)">
+          ${IMP.sheets.map((s, i) =>
+            `<option value="${i}" ${i === IMP.sheet ? 'selected' : ''}>${esc(s)}</option>`).join('')}
+        </select></div>` : ''}
+      <div class="f"><label>หัวตารางอยู่แถวไหน</label>
+        <select id="impHrow" onchange="impSetHeader(this.value)">${rowOpts}</select></div>
+    </div>
+
+    <div class="sub2" style="margin-bottom:10px">
+      ระบบเดาการจับคู่ให้แล้วจากหัวตาราง ถ้าเดาผิดเปลี่ยนได้เลย ·
+      ช่องที่มี <span class="req">*</span> ต้องเลือก</div>
     <div class="grid g3">
       ${IMP_FIELDS.map(fd => `<div class="f">
         <label>${esc(fd.label)}${fd.req ? ' <span class="req">*</span>' : ''}</label>
@@ -1064,14 +1056,15 @@ function impRenderMap(){
       </div>`).join('')}
     </div>
 
-    <div style="font-weight:700;color:var(--navy);margin:16px 0 6px">ตัวอย่าง 3 แถวแรกในไฟล์</div>
+    <div style="font-weight:700;color:var(--navy);margin:16px 0 6px">
+      ตัวอย่าง 3 แถวแรกที่จะนำเข้า</div>
     <div class="tw"><table>
       <thead><tr>${IMP.head.map(h => `<th>${esc(h || '—')}</th>`).join('')}</tr></thead>
-      <tbody>${sample.map(r => `<tr>${IMP.head.map((_, j) =>
+      <tbody>${IMP.rows.slice(0, 3).map(r => `<tr>${IMP.head.map((_, j) =>
         `<td>${esc((r[j] ?? '').toString().slice(0, 40))}</td>`).join('')}</tr>`).join('')}</tbody>
     </table></div>
 
-    <div class="grid g3" style="margin-top:16px">
+    <div class="grid g2" style="margin-top:16px">
       <div class="f"><label>ถ้ารหัสซ้ำกับที่มีอยู่แล้ว</label>
         <select id="impMode" onchange="impPreview()">
           <option value="skip">ข้ามไป ไม่แตะของเดิม</option>
@@ -1080,10 +1073,16 @@ function impRenderMap(){
       <div class="f"><label>เอาเฉพาะรหัสที่มีคำว่า</label>
         <input type="text" id="impFilter" placeholder="เว้นว่าง = เอาทั้งหมด" oninput="impPreview()"></div>
       <div class="f"><label>สถานะที่นำเข้า</label>
-        <select id="impActive">
+        <select id="impActive" onchange="impPreview()">
           <option value="true">เปิดใช้งานทันที</option>
           <option value="false">นำเข้าแบบปิดใช้งานไว้ก่อน</option>
         </select></div>
+      <div class="f"><label>เซลล์ผสาน (merged)</label>
+        <label style="display:flex;gap:7px;align-items:flex-start;font-weight:400;font-size:13px">
+          <input type="checkbox" id="impFill" onchange="impPreview()" style="margin-top:3px">
+          <span>เติมค่าจากแถวบนเมื่อเซลล์ว่าง<br>
+            <span class="sub2">ใช้กับ รหัส · กลุ่มสินค้า · รุ่นที่ใช้ร่วม เท่านั้น
+            (ราคาและชื่อไม่เติมให้ เดี๋ยวได้ราคาผิด)</span></span></label></div>
     </div>`;
   impPreview();
 }
@@ -1104,71 +1103,102 @@ function impPreview(){
   const q      = (val('impFilter') || '').toLowerCase();
   const mode   = val('impMode') || 'skip';
   const active = (val('impActive') || 'true') === 'true';
-  const cell   = (r, c) => c >= 0 ? (r[c] ?? '').toString().trim() : '';
+  const fill   = !!$('impFill')?.checked;
+
+  /* เซลล์ผสานใน Excel อ่านออกมาได้ค่าแค่แถวแรก ที่เหลือว่าง — เติมลงมาให้เฉพาะคอลัมน์จัดกลุ่ม */
+  const fillCols = fill
+    ? IMP_FIELDS.filter(f => f.fill && IMP.map[f.k] >= 0).map(f => IMP.map[f.k])
+    : [];
+  const carry = {};
+  const cell = (r, c) => {
+    if (c < 0) return '';
+    let v = cleanCell(r[c]);
+    if (fillCols.includes(c)){
+      if (v) carry[c] = v; else v = carry[c] || '';
+    }
+    return v;
+  };
 
   const have = new Set(S.master.map(p => p.part_no));
   const seen = new Set();
   const bad = [];
-  let dupFile = 0, exist = 0, filtered = 0;
+  let dupFile = 0, exist = 0, filtered = 0, noCode = 0, noName = 0;
   const ready = [];
 
   IMP.rows.forEach((r, i) => {
+    if (cellCount(r) === 0) return;                            // แถวว่างล้วน ไม่นับเป็นปัญหา
     const pn = cell(r, cPart), nm = cell(r, cName);
-    if (!pn && !nm) return;                                  // แถวว่าง ไม่นับเป็นปัญหา
+    if (!pn && !nm) return;
     if (q && !pn.toLowerCase().includes(q)){ filtered++; return; }
-    if (!pn || !nm){
-      if (bad.length < 8) bad.push({ line:i + 2, pn, nm });
-      return;
-    }
+    if (!pn){ noCode++; if (bad.length < 8) bad.push({ line:IMP.hrow + 2 + i, why:'ไม่มีรหัส', what:nm }); return; }
+    if (!nm){ noName++; if (bad.length < 8) bad.push({ line:IMP.hrow + 2 + i, why:'ไม่มีชื่อ', what:pn }); return; }
     if (seen.has(pn)){ dupFile++; return; }
     seen.add(pn);
     const already = have.has(pn);
     if (already){ exist++; if (mode === 'skip') return; }
 
     const row = { part_no:pn, name:nm, is_active:active };
-    const u = cell(r, IMP.map.unit);           if (u) row.unit = u;
-    const j = cell(r, IMP.map.jst_sku);        if (j) row.jst_sku = j;
-    if (IMP.map.cost_price    >= 0) row.cost_price    = impNum(cell(r, IMP.map.cost_price));
-    if (IMP.map.sell_price    >= 0) row.sell_price    = impNum(cell(r, IMP.map.sell_price));
-    if (IMP.map.reorder_point >= 0) row.reorder_point = Math.round(impNum(cell(r, IMP.map.reorder_point)));
+    [['unit','unit'], ['jst_sku','jst_sku'], ['category','category'],
+     ['fits_models','fits_models'], ['note','note']].forEach(([k, col]) => {
+      const v = cell(r, IMP.map[col]);
+      if (v) row[k] = v;
+    });
+    if (IMP.map.cost_price    >= 0) row.cost_price    = numOf(cell(r, IMP.map.cost_price));
+    if (IMP.map.sell_price    >= 0) row.sell_price    = numOf(cell(r, IMP.map.sell_price));
+    if (IMP.map.reorder_point >= 0) row.reorder_point = Math.round(numOf(cell(r, IMP.map.reorder_point)));
     ready.push(row);
   });
 
   IMP.ready = ready;
-  const isNew = ready.filter(r => !have.has(r.part_no)).length;
-  const upd   = ready.length - isNew;
+  const isNew    = ready.filter(r => !have.has(r.part_no)).length;
+  const upd      = ready.length - isNew;
+  const badCount = noCode + noName + dupFile;
 
   $('impS3').innerHTML = `
     <div style="font-weight:700;color:var(--navy);margin:18px 0 8px">ขั้น 3 · ตรวจก่อนนำเข้า</div>
     <div class="kpis" style="margin-bottom:12px">
-      ${[['na','📄','แถวในไฟล์', money(IMP.rows.length), ''],
+      ${[['na','📄','แถวในชีท', money(IMP.rows.length), ''],
          ['nc','🆕','อะไหล่ตัวใหม่', money(isNew), 'จะถูกเพิ่ม'],
          [upd ? 'nb' : 'nc','♻️','มีอยู่แล้ว', money(exist),
            mode === 'skip' ? 'จะข้ามทั้งหมด' : 'จะอัปเดตทับ ' + money(upd) + ' ตัว'],
-         [bad.length || dupFile ? 'nd' : 'nc','⚠️','แถวที่ใช้ไม่ได้', money(bad.length + dupFile),
-           dupFile ? 'รหัสซ้ำในไฟล์ ' + money(dupFile) : (bad.length ? 'ข้อมูลไม่ครบ' : 'ไม่มี')]
+         [badCount ? 'nd' : 'nc','⚠️','แถวที่ใช้ไม่ได้', money(badCount),
+           [noCode ? 'ไม่มีรหัส ' + money(noCode) : '',
+            noName ? 'ไม่มีชื่อ ' + money(noName) : '',
+            dupFile ? 'รหัสซ้ำในไฟล์ ' + money(dupFile) : ''
+           ].filter(Boolean).join(' · ') || 'ไม่มี']
         ].map(([cl,e,l,n,u]) => `<div class="kpi ${cl}" style="padding:11px 13px">
           <div class="t"><span class="l" style="font-size:11.5px">${l}</span><span class="e">${e}</span></div>
           <div class="n" style="font-size:21px">${n}</div>
           <div class="sub2">${esc(u)}</div></div>`).join('')}
     </div>
     ${filtered ? `<div class="box-info">ตัวกรองคัดออก ${money(filtered)} แถว</div>` : ''}
+    ${noCode > 3 && !$('impFill')?.checked ? `<div class="box-warn" style="margin-top:10px">
+      มี ${money(noCode)} แถวที่ <b>ไม่มีรหัสอะไหล่</b> จะถูกข้าม<br>
+      ถ้าชีทนี้ใช้เซลล์ผสาน (รหัสเดียวครอบหลายแถว) ให้ติ๊ก
+      <b>"เติมค่าจากแถวบน"</b> ข้างบน · ถ้าชีทนี้ไม่มีคอลัมน์รหัสเลย ต้องไปเติมในชีทก่อน
+    </div>` : ''}
+    ${fill && dupFile > 2 ? `<div class="box-warn" style="margin-top:10px">
+      เติมค่าจากแถวบนแล้วได้ <b>รหัสซ้ำ ${money(dupFile)} แถว</b><br>
+      ถ้าคอลัมน์ที่ผสานคือ <b>รุ่นเครื่อง</b> (เช่น SCDR-170 ครอบอะไหล่หลายตัว)
+      ไม่ใช่รหัสอะไหล่ ให้จับคู่คอลัมน์นั้นไปที่ <b>"รุ่นที่ใช้ร่วม"</b> แทน
+      แล้วหา/เติมคอลัมน์รหัสอะไหล่จริง ๆ
+    </div>` : ''}
     ${bad.length ? `<div class="box-warn" style="margin-top:10px">
       <b>แถวที่ข้อมูลไม่ครบ</b> (แสดง ${bad.length} ตัวอย่างแรก) — จะไม่ถูกนำเข้า
       <div class="sub2" style="margin-top:5px">${bad.map(b =>
-        `บรรทัด ${b.line}: ${b.pn ? 'ไม่มีชื่อ' : 'ไม่มีรหัส'} (${esc(b.pn || b.nm || 'ว่าง')})`).join(' · ')}</div>
+        `บรรทัด ${b.line}: ${esc(b.why)}${b.what ? ' (' + esc(String(b.what).slice(0,24)) + ')' : ''}`).join(' · ')}</div>
     </div>` : ''}
 
     ${ready.length ? `<div class="tw" style="margin-top:12px"><table>
-      <thead><tr><th>รหัส</th><th>ชื่อ</th><th>หน่วย</th>
-        <th class="num">ทุน</th><th class="num">ขาย</th><th class="num">จุดสั่ง</th><th></th></tr></thead>
+      <thead><tr><th>รหัส</th><th>ชื่อ</th><th>กลุ่ม</th><th>รุ่นที่ใช้ร่วม</th>
+        <th class="num">ทุน</th><th class="num">ขาย</th><th></th></tr></thead>
       <tbody>${ready.slice(0, 5).map(r => `<tr>
         <td><b class="mono">${esc(r.part_no)}</b></td>
         <td>${esc(r.name)}</td>
-        <td>${esc(r.unit || 'ชิ้น')}</td>
+        <td class="sub2">${esc(r.category || '—')}</td>
+        <td class="sub2">${esc((r.fits_models || '—').slice(0, 28))}</td>
         <td class="num">฿${money(r.cost_price ?? 0)}</td>
         <td class="num">฿${money(r.sell_price ?? 0)}</td>
-        <td class="num">${money(r.reorder_point ?? 0)}</td>
         <td>${have.has(r.part_no)
           ? '<span class="pill tag-warn">อัปเดต</span>'
           : '<span class="pill tag-good">ใหม่</span>'}</td></tr>`).join('')}</tbody>
@@ -1176,21 +1206,22 @@ function impPreview(){
     <div class="sub2" style="margin-top:6px">แสดง ${Math.min(5, ready.length)} แถวแรกจาก ${money(ready.length)} แถวที่จะนำเข้า</div>
     <button class="btn g" style="margin-top:14px" onclick="impRun()">
       🚀 นำเข้า ${money(ready.length)} รายการ</button>`
-    : `<div class="empty">ไม่มีแถวที่นำเข้าได้ — ลองเปลี่ยนการจับคู่คอลัมน์ หรือล้างตัวกรอง</div>`}`;
+    : `<div class="empty">ไม่มีแถวที่นำเข้าได้ — ลองเปลี่ยนชีท แถวหัวตาราง หรือการจับคู่คอลัมน์</div>`}`;
 }
 
 /* ---------- ขั้น 4: ส่งเข้าฐานข้อมูล ---------- */
 async function impRun(){
   if (!bossOnly() || !IMP.ready.length) return;
   const okGo = await confirmModal('ยืนยันนำเข้า',
-    `จะนำเข้า ${money(IMP.ready.length)} รายการจากไฟล์\n${IMP.fileName}\n\n` +
+    `จะนำเข้า ${money(IMP.ready.length)} รายการ\n` +
+    `จากไฟล์ ${IMP.fileName}${IMP.wb ? ' ชีท "' + IMP.sheets[IMP.sheet] + '"' : ''}\n\n` +
     'ทำแล้วย้อนกลับอัตโนมัติไม่ได้ — ถ้ายังไม่แน่ใจให้กดยกเลิกแล้วตรวจการจับคู่คอลัมน์อีกรอบ',
     { ok:'นำเข้าเลย', danger:false });
   if (!okGo) return;
 
   const rows = IMP.ready, CH = 400;
   const errs = [];
-  let done = 0;
+  let done = 0, okRows = 0;
 
   $('impS4').hidden = false;
   const draw = () => {
@@ -1209,6 +1240,7 @@ async function impRun(){
       const { error } = await sb.from('parts_master')
         .upsert(chunk, { onConflict:'part_no' });
       if (error) throw error;
+      okRows += chunk.length;
     } catch(e){
       errs.push(`แถว ${i + 1}–${i + chunk.length}: ${e.message || e}`);
     }
@@ -1216,13 +1248,13 @@ async function impRun(){
     draw();
   }
 
-  const okCount = rows.length - errs.length * CH;
   $('impS4').innerHTML = errs.length
     ? `<div class="box-crit" style="margin-top:18px">
-        <b>นำเข้าไม่ครบ</b> — สำเร็จประมาณ ${money(Math.max(0, okCount))} รายการ
+        <b>นำเข้าไม่ครบ</b> — สำเร็จ ${money(okRows)} จาก ${money(rows.length)} รายการ
         <div class="sub2" style="margin-top:6px">${errs.slice(0, 5).map(esc).join('<br>')}</div>
         <div class="sub2" style="margin-top:6px">
-          สาเหตุที่เจอบ่อย: ไม่ได้เป็นหัวหน้า/แอดมิน · รหัสอะไหล่ยาวเกิน · ไฟล์มีอักขระแปลก</div></div>`
+          สาเหตุที่เจอบ่อย: ไม่ได้เป็นหัวหน้า/แอดมิน · ยังไม่ได้รัน 19_parts_fields.sql ·
+          รหัสอะไหล่ยาวเกิน</div></div>`
     : `<div class="box-ok" style="margin-top:18px">
         ✅ <b>นำเข้าสำเร็จ ${money(rows.length)} รายการ</b>
         <div class="sub2" style="margin-top:4px">ตัวที่นำเข้ายอดคงเหลือยังเป็น 0 —
@@ -1231,7 +1263,6 @@ async function impRun(){
   toast(errs.length ? '⚠️ นำเข้าไม่ครบ ดูรายละเอียดด้านล่าง' : '✅ นำเข้าเรียบร้อย', !!errs.length);
   await reloadAll();
 }
-
 
 /* =====================================================================
    หน้า 6 — ตั้งค่าคลัง
