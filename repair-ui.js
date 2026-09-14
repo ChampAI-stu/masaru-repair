@@ -684,3 +684,381 @@ function hBarsSVG(items, w = 640){
   }).join('');
   return svgBox(w, { h, body: rows }, 'กราฟแท่งแนวนอน', Math.min(w, 340));
 }
+
+
+
+/* =====================================================================
+   คลังของฉัน — โมดูลใช้ร่วม (ช่าง = REPAIR · ขาย = SALES)
+   ---------------------------------------------------------------------
+   แต่ละฝ่ายเบิกของชุดใหญ่จากคลังกลาง แล้วมาบริหารสต๊อกตัวเองต่อ
+     ทำใบเบิก  → คลังกลางอนุมัติ+จ่าย → ฝ่ายกดรับเข้า → ยอดขึ้นคลังตัวเอง
+     ตรวจนับ   → ปรับยอดของตัวเองได้ ระบบคิดส่วนต่างให้
+     คืนของ    → ตัดของออกจากคลังตัวเองทันที คลังกลางกดรับ
+   หน้าจอเดียว 2 โมดูลใช้ร่วมกัน จึงห้ามอ้างชื่อฟังก์ชันของโมดูลใดโมดูลหนึ่ง
+   ===================================================================== */
+const MYWH = {
+  wh:'REPAIR', label:'คลังอะไหล่ช่าง', mount:'whRoot',
+  all:[], docs:[], cart:[], tab:'stock', q:'', lowOnly:false, loaded:false
+};
+
+const WH_ST = {
+  requested:['st1','⏳ รออนุมัติ'], sent:['st3','🚚 จ่ายแล้ว รอรับ'],
+  received:['tag-good','✅ รับเข้าแล้ว'], rejected:['tag-crit','✕ ไม่อนุมัติ'],
+  cancelled:['st0','ยกเลิก'], draft:['st0','ร่าง']
+};
+
+function mywhSetup(cfg){ Object.assign(MYWH, cfg); }
+
+/** ยอดในคลังตัวเอง — v_stock_all เก็บเป็นคอลัมน์ qty_main / qty_repair / qty_sales */
+const mywhQty  = r => Number(r['qty_' + MYWH.wh.toLowerCase()]) || 0;
+const mywhMain = r => Number(r.qty_main) || 0;
+
+async function mywhLoad(){
+  try {
+    const [all, docs] = await Promise.all([
+      __pageAll(() => sb.from('v_stock_all').select('*')),
+      sb.from('v_transfers').select('*')
+        .or(`from_code.eq.${MYWH.wh},to_code.eq.${MYWH.wh}`).limit(300)
+    ]);
+    if (docs.error) throw docs.error;
+    MYWH.all    = all || [];
+    MYWH.docs   = docs.data || [];
+    MYWH.loaded = true;
+  } catch(e){
+    // ยังไม่ได้รัน 22_requisition.sql → ยังดูยอดได้ แค่ทำใบเบิกไม่ได้
+    if (/does not exist|schema cache|column/i.test(e?.message || '')){
+      MYWH.docs = null;
+      try { MYWH.all = await __pageAll(() => sb.from('v_stock_all').select('*')); } catch(e2){}
+      MYWH.loaded = true;
+    } else fail(e);
+  }
+  mywhRender();
+}
+
+function mywhTab(t){ MYWH.tab = t; mywhRender(); }
+function mywhFind(){ MYWH.q = val('mywhQ'); S.pg.mywh = 1; mywhRender(); }
+function mywhLow(el){ MYWH.lowOnly = el.checked; S.pg.mywh = 1; mywhRender(); }
+
+function mywhRender(){
+  const root = $(MYWH.mount);
+  if (!root) return;
+  if (!MYWH.loaded) return root.innerHTML = '<div class="empty">กำลังโหลด…</div>';
+
+  const mine   = MYWH.all.filter(r => mywhQty(r) !== 0);
+  const low    = MYWH.all.filter(r => r.reorder_point > 0 && mywhQty(r) < r.reorder_point);
+  const neg    = MYWH.all.filter(r => mywhQty(r) < 0);
+  const docs   = MYWH.docs || [];
+  const waitMe = docs.filter(d => d.status === 'sent' && d.to_code === MYWH.wh);
+  const waitHQ = docs.filter(d => d.status === 'requested');
+
+  root.innerHTML = `
+    <div class="kpis">
+      ${[['na','📦','อะไหล่ที่มีในคลัง', money(mine.length), 'รายการที่ยอดไม่เป็น 0'],
+         [low.length ? 'nb' : 'nc','⚠️','ต่ำกว่าจุดสั่ง', money(low.length),
+           low.length ? 'ควรทำใบเบิกเพิ่ม' : 'ยังพอใช้'],
+         [waitMe.length ? 'ne' : 'nc','📥','ของรอรับเข้า', money(waitMe.length),
+           waitMe.length ? 'คลังกลางจ่ายแล้ว กดรับได้เลย' : 'ไม่มีของค้างทาง'],
+         [waitHQ.length ? 'nb' : 'nc','⏳','ใบเบิกรออนุมัติ', money(waitHQ.length),
+           waitHQ.length ? 'รอคลังกลางอนุมัติ' : 'ไม่มีใบค้าง']
+        ].map(([cl,e,l,n,u]) => `<div class="kpi ${cl}">
+          <div class="t"><span class="l">${l}</span><span class="e">${e}</span></div>
+          <div class="n">${n}</div><div class="sub2">${esc(u)}</div></div>`).join('')}
+    </div>
+
+    ${neg.length ? `<div class="box-crit" style="margin-bottom:14px">
+      ⚠️ มี ${money(neg.length)} รายการที่ยอด<b>ติดลบ</b> —
+      แปลว่าเบิกใช้ไปโดยไม่ได้รับเข้า ให้กด 🔢 ตรวจนับใส่ยอดจริง
+      <div class="sub2" style="margin-top:4px">${neg.slice(0,6).map(r =>
+        esc(r.part_no) + ' (' + mywhQty(r) + ')').join(' · ')}</div></div>` : ''}
+
+    ${MYWH.docs === null ? `<div class="box-warn" style="margin-bottom:14px">
+      ยังใช้ใบเบิก/ใบคืนไม่ได้ — ให้รัน <b class="mono">22_requisition.sql</b>
+      ที่ Supabase → SQL Editor ก่อน (ตอนนี้ดูยอดคงเหลือได้อย่างเดียว)</div>` : ''}
+
+    <div class="card"><h3>🏬 ${esc(MYWH.label)}<span class="sp"></span>
+      ${MYWH.docs !== null ? `
+        <button class="btn p sm" onclick="mywhAskReq()">📝 ทำใบเบิก</button>
+        <button class="btn sm" onclick="mywhAskReturn()">↩️ คืนของกลับคลังกลาง</button>` : ''}
+    </h3>
+    <div class="cb">
+      <div class="gtabs" style="margin-bottom:14px">
+        <button class="gtab ${MYWH.tab==='stock'?'on':''}" onclick="mywhTab('stock')">
+          📦 ยอดคงเหลือ</button>
+        <button class="gtab ${MYWH.tab==='doc'?'on':''}" onclick="mywhTab('doc')">
+          📄 ใบเบิก / ใบคืน ${docs.length ? '(' + money(docs.length) + ')' : ''}</button>
+      </div>
+      ${MYWH.tab === 'stock' ? mywhStockHTML() : mywhDocHTML()}
+    </div></div>`;
+}
+
+function mywhStockHTML(){
+  const q = (MYWH.q || '').toLowerCase();
+  const rows = MYWH.all.filter(r => {
+    if (MYWH.lowOnly){
+      if (!(r.reorder_point > 0 && mywhQty(r) < r.reorder_point)) return false;
+    } else if (mywhQty(r) === 0) return false;
+    if (!q) return true;
+    return [r.part_no, r.name, r.fits_models, r.category]
+      .filter(Boolean).join(' ').toLowerCase().includes(q);
+  }).sort((a,b) => a.part_no.localeCompare(b.part_no, 'th'));
+
+  const m = paginate(rows, 'mywh');
+  const can = isBoss();
+
+  return `<div class="search" style="margin-bottom:12px">
+      <input type="text" id="mywhQ" placeholder="ค้นหารหัส ชื่อ หรือรุ่นที่ใช้ร่วม"
+             value="${esc(MYWH.q)}" oninput="mywhFind()">
+      <label style="display:flex;gap:6px;align-items:center;font-size:13px;white-space:nowrap">
+        <input type="checkbox" ${MYWH.lowOnly?'checked':''} onchange="mywhLow(this)">
+        เฉพาะที่ต่ำกว่าจุดสั่ง</label>
+    </div>
+    ${rows.length ? `<div class="tw"><table>
+      <thead><tr><th>รหัส</th><th>ชื่ออะไหล่</th><th>ใส่รุ่นไหนได้</th>
+        <th class="num">มีในคลังนี้</th><th class="num">จุดสั่ง</th>
+        <th class="num">คลังกลางมี</th>${can?'<th></th>':''}</tr></thead>
+      <tbody>${m.slice.map(r => {
+        const n = mywhQty(r), lo = r.reorder_point > 0 && n < r.reorder_point;
+        return `<tr>
+          <td><b class="mono">${esc(r.part_no)}</b></td>
+          <td>${esc(r.name)}</td>
+          <td class="sub2">${esc(r.fits_models || '—')}</td>
+          <td class="num"><b style="color:${n < 0 ? 'var(--crit)' : lo ? 'var(--warn)' : 'inherit'}">
+            ${money(n)}</b> <span class="sub2">${esc(r.unit || '')}</span></td>
+          <td class="num sub2">${r.reorder_point > 0 ? money(r.reorder_point) : '—'}</td>
+          <td class="num sub2">${money(mywhMain(r))}</td>
+          ${can ? `<td class="num" style="white-space:nowrap">
+            <button class="btn ic" title="ตรวจนับ / ปรับยอด"
+                    onclick="mywhCount('${esc(r.part_no)}')">🔢</button>
+            ${MYWH.docs !== null ? `<button class="btn ic" title="เบิกตัวนี้เพิ่ม"
+                    onclick="mywhAskReq('${esc(r.part_no)}')">📝</button>` : ''}
+          </td>` : ''}</tr>`;
+      }).join('')}</tbody></table></div>${pagerHTML(m, 'mywh')}`
+      : `<div class="empty">${MYWH.lowOnly
+          ? 'ไม่มีรายการที่ต่ำกว่าจุดสั่ง 👍'
+          : 'ยังไม่มีของในคลังนี้ — กด "ทำใบเบิก" เพื่อขอของจากคลังกลาง'}</div>`}`;
+}
+
+function mywhDocHTML(){
+  const docs = MYWH.docs || [];
+  if (!docs.length) return '<div class="empty">ยังไม่มีใบเบิกหรือใบคืน</div>';
+  return `<div class="tw"><table>
+    <thead><tr><th>เลขที่</th><th>ชนิด</th><th>จาก → ไป</th><th class="num">จำนวน</th>
+      <th>สถานะ</th><th>ล่าสุด</th><th></th></tr></thead>
+    <tbody>${docs.map(d => {
+      const [cl, lb] = WH_ST[d.status] || ['st0', d.status];
+      const mineIn   = d.to_code === MYWH.wh;
+      return `<tr>
+        <td><b class="mono">${esc(d.transfer_no)}</b>
+          <div class="sub2">${esc(d.req_by || d.created_by || '')}</div></td>
+        <td>${esc(d.kind_label || '')}</td>
+        <td class="sub2">${esc(d.from_name)} <b>→</b> ${esc(d.to_name)}
+          ${d.note ? `<div class="sub2">${esc(d.note)}</div>` : ''}
+          ${d.reject_reason ? `<div class="sub2" style="color:var(--crit)">
+            เหตุผล: ${esc(d.reject_reason)}</div>` : ''}</td>
+        <td class="num">${money(d.qty_total)} <span class="sub2">/ ${money(d.line_count)} รายการ</span></td>
+        <td><span class="pill ${cl}">${esc(lb)}</span></td>
+        <td class="sub2" style="white-space:nowrap">${esc(dtth(d.received_at || d.sent_at || d.created_at))}</td>
+        <td class="num" style="white-space:nowrap">
+          <button class="btn ic" title="ดูรายการ" onclick="mywhPeek('${esc(d.transfer_no)}')">👀</button>
+          ${mineIn && d.status === 'sent'
+            ? `<button class="btn sm g" onclick="mywhAct('${esc(d.transfer_no)}','receive')">📥 รับเข้า</button>` : ''}
+          ${d.status === 'requested'
+            ? `<button class="btn ic dn" title="ยกเลิกใบเบิก"
+                       onclick="mywhAct('${esc(d.transfer_no)}','cancel')">✕</button>` : ''}
+        </td></tr>`;
+    }).join('')}</tbody></table></div>`;
+}
+
+/* ---------- ตัวเลือกอะไหล่ในฟอร์ม ---------- */
+function mywhPartOptions(showMain){
+  return MYWH.all
+    .slice()
+    .sort((a,b) => a.part_no.localeCompare(b.part_no, 'th'))
+    .map(r => ({ v:r.part_no,
+      t: r.part_no + ' · ' + (r.name || '') +
+         (showMain ? '  (คลังกลางมี ' + money(mywhMain(r)) + ')'
+                   : '  (มี ' + money(mywhQty(r)) + ')') }));
+}
+
+/* ---------- ใบเบิก ---------- */
+async function mywhAskReq(preset){
+  if (!isBoss()) return toast('ทำใบเบิกได้เฉพาะหัวหน้าฝ่าย', true);
+  if (MYWH.docs === null) return toast('ยังไม่ได้รัน 22_requisition.sql', true);
+  MYWH.cart = [];
+
+  const head = await formModal({
+    title:'📝 ทำใบเบิกจากคลังกลาง',
+    subtitle:'ใส่รายการให้ครบก่อน แล้วส่งเป็นใบเดียว — คลังกลางอนุมัติแล้วของถึงจะถูกตัด',
+    ok:'ใส่รายการต่อ →',
+    fields:[{ k:'note', label:'เบิกไปทำอะไร',
+              placeholder:'เช่น เติมของประจำเดือน / งานซ่อมด่วนรุ่น SCDR-170' }]
+  });
+  if (!head) return;
+
+  for(;;){
+    const line = await formModal({
+      title:'เพิ่มรายการ (ใส่แล้ว ' + MYWH.cart.length + ' บรรทัด)',
+      subtitle:'กด "ยกเลิก" เมื่อใส่ครบ แล้วระบบจะสรุปให้ตรวจอีกที',
+      ok:'เพิ่มรายการนี้',
+      fields:[
+        { k:'part', label:'อะไหล่', type:'select', required:true,
+          value:preset && !MYWH.cart.length ? preset : '', options:mywhPartOptions(true) },
+        { k:'qty',  label:'จำนวนที่ขอเบิก', type:'number', required:true, min:1, value:1 }
+      ]});
+    if (!line) break;
+    const r = MYWH.all.find(x => x.part_no === line.part);
+    if (mywhMain(r) < Number(line.qty))
+      toast(`⚠️ คลังกลางมี ${esc(line.part)} แค่ ${money(mywhMain(r))} — ใส่ไว้ได้ แต่อาจถูกปฏิเสธ`, true);
+    const dup = MYWH.cart.find(c => c.part_no === line.part);
+    if (dup) dup.qty += Number(line.qty);
+    else MYWH.cart.push({ part_no:line.part, qty:Number(line.qty) });
+  }
+  if (!MYWH.cart.length) return toast('ยกเลิก — ใบเบิกไม่มีรายการ');
+
+  const ok = await confirmModal('ยืนยันส่งใบเบิก',
+    `ขอเบิกเข้า ${MYWH.label}\n${MYWH.cart.length} รายการ · รวม ` +
+    `${money(MYWH.cart.reduce((s,c) => s + c.qty, 0))} ชิ้น\n\n` +
+    MYWH.cart.map(c => `• ${c.part_no} × ${c.qty}`).join('\n') +
+    '\n\nส่งแล้วรอคลังกลางอนุมัติ ของยังไม่ถูกตัดตอนนี้',
+    { ok:'ส่งใบเบิก', danger:false });
+  if (!ok) return;
+
+  try {
+    const { data, error } = await sb.rpc('create_request', {
+      p_to:MYWH.wh, p_lines:MYWH.cart, p_note:head.note || null, p_by:who() });
+    if (error) throw error;
+    toast('✅ ส่งใบเบิก ' + data + ' แล้ว — รอคลังกลางอนุมัติ');
+    MYWH.cart = []; MYWH.tab = 'doc';
+    mywhLoad();
+  } catch(e){ fail(e); }
+}
+
+/* ---------- ใบคืน ---------- */
+async function mywhAskReturn(){
+  if (!isBoss()) return toast('คืนของได้เฉพาะหัวหน้าฝ่าย', true);
+  if (MYWH.docs === null) return toast('ยังไม่ได้รัน 22_requisition.sql', true);
+  MYWH.cart = [];
+
+  const head = await formModal({
+    title:'↩️ คืนของกลับคลังกลาง',
+    subtitle:'ของจะถูกตัดออกจากคลังนี้ทันทีที่ส่งใบ คลังกลางกดรับเมื่อของไปถึง',
+    ok:'ใส่รายการต่อ →',
+    fields:[{ k:'note', label:'คืนเพราะอะไร', placeholder:'เช่น เบิกมาเกิน / ใช้ไม่ตรงรุ่น' }]
+  });
+  if (!head) return;
+
+  for(;;){
+    const line = await formModal({
+      title:'เพิ่มรายการที่จะคืน (ใส่แล้ว ' + MYWH.cart.length + ' บรรทัด)',
+      subtitle:'กด "ยกเลิก" เมื่อใส่ครบ', ok:'เพิ่มรายการนี้',
+      fields:[
+        { k:'part', label:'อะไหล่', type:'select', required:true, options:mywhPartOptions(false) },
+        { k:'qty',  label:'จำนวนที่คืน', type:'number', required:true, min:1, value:1 }
+      ]});
+    if (!line) break;
+    const r = MYWH.all.find(x => x.part_no === line.part);
+    if (mywhQty(r) < Number(line.qty))
+      toast(`⚠️ ในคลังนี้มี ${esc(line.part)} แค่ ${money(mywhQty(r))} — คืนเกินที่มีไม่ได้`, true);
+    const dup = MYWH.cart.find(c => c.part_no === line.part);
+    if (dup) dup.qty += Number(line.qty);
+    else MYWH.cart.push({ part_no:line.part, qty:Number(line.qty) });
+  }
+  if (!MYWH.cart.length) return toast('ยกเลิก — ใบคืนไม่มีรายการ');
+
+  const ok = await confirmModal('ยืนยันคืนของ',
+    `คืนจาก ${MYWH.label} → คลังกลาง\n${MYWH.cart.length} รายการ · รวม ` +
+    `${money(MYWH.cart.reduce((s,c) => s + c.qty, 0))} ชิ้น\n\n` +
+    MYWH.cart.map(c => `• ${c.part_no} × ${c.qty}`).join('\n') +
+    '\n\nกดยืนยันแล้วของจะออกจากคลังนี้ทันที ยกเลิกไม่ได้',
+    { ok:'คืนของเลย', danger:true });
+  if (!ok) return;
+
+  try {
+    const { data, error } = await sb.rpc('create_return', {
+      p_from:MYWH.wh, p_lines:MYWH.cart, p_note:head.note || null, p_by:who() });
+    if (error) throw error;
+    toast('✅ ส่งใบคืน ' + data + ' แล้ว — ของออกจากคลังนี้ รอคลังกลางรับ');
+    MYWH.cart = []; MYWH.tab = 'doc';
+    mywhLoad();
+  } catch(e){ fail(e); }
+}
+
+/* ---------- ตรวจนับ ---------- */
+async function mywhCount(partNo){
+  if (!isBoss()) return toast('ปรับยอดได้เฉพาะหัวหน้าฝ่าย', true);
+  const r = MYWH.all.find(x => x.part_no === partNo);
+  if (!r) return;
+  const have = mywhQty(r);
+
+  const f = await formModal({
+    title:'🔢 ตรวจนับ / ปรับยอด',
+    subtitle:`${partNo} · ${r.name || ''} — ในระบบตอนนี้ ${money(have)} ${r.unit || ''}`,
+    ok:'ปรับยอดตามที่นับได้',
+    fields:[
+      { k:'qty',  label:'นับได้จริงกี่ชิ้น', type:'number', required:true, min:0, value:have,
+        hint:'ใส่ยอดจริงที่นับได้ ไม่ใช่ส่วนต่าง — ระบบคิดให้เอง' },
+      { k:'note', label:'หมายเหตุ', placeholder:'เช่น นับรอบสิ้นเดือน' }
+    ]});
+  if (!f) return;
+
+  try {
+    const { data, error } = await sb.rpc('stock_count', {
+      p_part_no:partNo, p_wh_code:MYWH.wh, p_counted:Number(f.qty),
+      p_note:f.note || null, p_by:who() });
+    if (error) throw error;
+    const d = Number(data) || 0;
+    toast(d === 0 ? '✅ ยอดตรงกับระบบอยู่แล้ว ไม่ได้ปรับอะไร'
+                  : `✅ ปรับยอดแล้ว ${d > 0 ? 'ของเกิน +' : 'ของหาย '}${money(d)}`);
+    mywhLoad();
+  } catch(e){ fail(e); }
+}
+
+/* ---------- รับเข้า / ยกเลิก ---------- */
+async function mywhAct(no, act){
+  const label = act === 'receive'
+    ? 'รับของเข้า ' + MYWH.label
+    : 'ยกเลิกใบเบิกนี้ (ของยังไม่ถูกตัด)';
+  const ok = await confirmModal('ยืนยัน', label + '\nเอกสาร ' + no,
+    { ok:'ยืนยัน', danger: act === 'cancel' });
+  if (!ok) return;
+  try {
+    const { error } = await sb.rpc(
+      act === 'receive' ? 'transfer_receive' : 'transfer_cancel',
+      { p_no:no, p_by:who() });
+    if (error) throw error;
+    toast('✅ ' + label + ' เรียบร้อย');
+    mywhLoad();
+  } catch(e){ fail(e); }
+}
+
+/* ---------- ดูรายการในเอกสาร ---------- */
+async function mywhPeek(no){
+  const d = (MYWH.docs || []).find(x => x.transfer_no === no);
+  if (!d) return;
+  try {
+    const { data, error } = await sb.from('v_transfer_lines')
+      .select('*').eq('transfer_id', d.id);
+    if (error) throw error;
+    const lines = data || [];
+    const [, lb] = WH_ST[d.status] || ['', d.status];
+    await infoModal(`${d.kind_label || 'เอกสาร'} ${no}`,
+      `${d.from_name} → ${d.to_name} · ${lb}`,
+      `<div class="tw"><table>
+        <thead><tr><th>อะไหล่</th><th class="num">จำนวน</th>
+          <th class="num">ต้นทางมี</th></tr></thead>
+        <tbody>${lines.length ? lines.map(l => `<tr>
+          <td><b class="mono">${esc(l.part_no)}</b>
+            <div class="sub2">${esc(l.part_name || '')}</div></td>
+          <td class="num">${money(l.qty)} ${esc(l.unit || '')}</td>
+          <td class="num sub2">${money(l.from_qty)}</td></tr>`).join('')
+          : '<tr><td colspan="3" class="empty">ไม่มีรายการ</td></tr>'}</tbody></table></div>
+      ${d.reject_reason ? `<div class="box-crit" style="margin-top:12px">
+        ไม่อนุมัติ: ${esc(d.reject_reason)}</div>` : ''}
+      <div class="box-info" style="margin-top:12px;font-size:12.5px">
+        ตั้งเรื่อง ${esc(dtth(d.req_at || d.created_at))} โดย ${esc(d.req_by || d.created_by || '—')}<br>
+        ${d.sent_at ? (d.status === 'rejected' ? 'ไม่อนุมัติ ' : 'จ่ายของ ')
+            + esc(dtth(d.sent_at)) + ' โดย ' + esc(d.sent_by || '—') + '<br>' : ''}
+        ${d.received_at ? 'รับเข้า ' + esc(dtth(d.received_at)) + ' โดย ' + esc(d.received_by || '—') : ''}
+      </div>`, { wide:false });
+  } catch(e){ fail(e); }
+}
