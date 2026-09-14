@@ -140,13 +140,16 @@
       <!-- ============ ใบโอน ============ -->
       <div class="page" id="p-tr">
         <div class="card">
-          <h3>ใบโอนระหว่างคลัง<span class="sp"></span>
+          <h3>เอกสารคลัง — ใบเบิก · ใบคืน · ใบโอน<span class="sp"></span>
             <button class="btn p sm" onclick="openTransferDoc()">➕ สร้างใบโอน</button>
           </h3>
+          <div id="trInbox"></div>
           <div class="box-info" style="margin:12px 18px">
-            ของจะถูกตัดออกจากคลังต้นทางตอนกด <b>ส่งของ</b> และเข้าคลังปลายทางตอนกด <b>รับเข้า</b>
-            — ระหว่างทางของจะไม่หายไปจากระบบ
+            <b>ใบเบิก</b> ฝ่ายช่าง/ฝ่ายขายตั้งมาเอง — คลังกลางกด <b>อนุมัติ+จ่าย</b> ของถึงจะถูกตัด<br>
+            <b>ใบคืน</b> ฝ่ายคืนของกลับมา ของออกจากคลังฝ่ายแล้ว รอคลังกลางกด <b>รับเข้า</b><br>
+            <b>ใบโอน</b> คลังกลางตั้งเอง ตัดของตอนกด <b>ส่งของ</b> — ของระหว่างทางไม่หายจากระบบ
           </div>
+          <div class="chips" id="trFilter" style="margin:0 18px 4px"></div>
           <div class="cb" style="padding-top:0"><div id="trTbl"></div></div>
         </div>
       </div>
@@ -286,8 +289,10 @@ const PAGE_META = {
 
 /* สถานะสต๊อก → สีป้าย */
 const STATE_PILL = { 'ติดลบ':'tag-crit', 'หมด':'tag-crit', 'ต้องสั่ง':'tag-warn', 'ปกติ':'tag-good' };
-const TR_PILL    = { draft:'st0', sent:'st3', received:'st6', cancelled:'tag-crit' };
-const TR_LABEL   = { draft:'ร่าง', sent:'ส่งแล้ว รอรับ', received:'รับเข้าแล้ว', cancelled:'ยกเลิก' };
+const TR_PILL    = { draft:'st0', requested:'st1', sent:'st3', received:'st6',
+                     cancelled:'tag-crit', rejected:'tag-crit' };
+const TR_LABEL   = { draft:'ร่าง', requested:'⏳ รออนุมัติ', sent:'ส่งแล้ว รอรับ',
+                     received:'รับเข้าแล้ว', cancelled:'ยกเลิก', rejected:'ไม่อนุมัติ' };
 
 /* ---------- ตัวเลขในตาราง ---------- */
 const qCell = n => {
@@ -685,28 +690,66 @@ async function openTransfer(partNo){
 /* =====================================================================
    หน้า 3 — ใบโอน (หลายรายการ)
    ===================================================================== */
+S.trKind = '';                       // '' = ทั้งหมด · req · return · transfer
+function trKind(k){ S.trKind = k; renderTransfers(); }
+
 function renderTransfers(){
-  $('trTbl').innerHTML = S.trs.length ? `<div class="tw"><table>
-    <thead><tr><th>เลขที่</th><th>จาก → ไป</th><th class="num">รายการ</th><th class="num">จำนวน</th>
+  const all  = S.trs || [];
+  const waitApprove = all.filter(t => t.kind === 'req'    && t.status === 'requested');
+  const waitBack    = all.filter(t => t.kind === 'return' && t.status === 'sent');
+  const waitOut     = all.filter(t => t.kind !== 'return' && t.status === 'sent');
+
+  /* คิวงาน — เปิดหน้ามาต้องเห็นทันทีว่าค้างอะไรอยู่ */
+  $('trInbox').innerHTML = (waitApprove.length || waitBack.length)
+    ? `<div class="box-warn" style="margin:12px 18px">
+        <b>มีงานค้างที่คลังกลาง</b>
+        <div class="sub2" style="margin-top:5px">
+          ${waitApprove.length ? `⏳ ใบเบิกรออนุมัติ <b>${money(waitApprove.length)}</b> ใบ
+            (${esc(waitApprove.map(t => t.transfer_no).slice(0,4).join(', '))}${waitApprove.length>4?' …':''})<br>` : ''}
+          ${waitBack.length ? `↩️ ของคืนรอรับเข้า <b>${money(waitBack.length)}</b> ใบ
+            (${esc(waitBack.map(t => t.transfer_no).slice(0,4).join(', '))}${waitBack.length>4?' …':''})` : ''}
+        </div></div>`
+    : (waitOut.length
+        ? `<div class="box-info" style="margin:12px 18px">
+            🚚 จ่ายของออกไปแล้ว <b>${money(waitOut.length)}</b> ใบ รอปลายทางกดรับ</div>`
+        : '');
+
+  /* ตัวกรองตามชนิดเอกสาร */
+  const n = k => k ? all.filter(t => t.kind === k).length : all.length;
+  $('trFilter').innerHTML = [['','ทั้งหมด'],['req','📝 ใบเบิก'],
+                             ['return','↩️ ใบคืน'],['transfer','🔁 ใบโอน']]
+    .map(([k,l]) => `<button class="chip ${S.trKind===k?'on':''}" onclick="trKind('${k}')">
+      ${l} <b>${money(n(k))}</b></button>`).join('');
+
+  const rows = S.trKind ? all.filter(t => t.kind === S.trKind) : all;
+
+  $('trTbl').innerHTML = rows.length ? `<div class="tw"><table>
+    <thead><tr><th>เลขที่</th><th>ชนิด</th><th>จาก → ไป</th><th class="num">รายการ</th><th class="num">จำนวน</th>
       <th>สถานะ</th><th>ล่าสุด</th><th></th></tr></thead>
-    <tbody>${S.trs.map(t => `<tr>
+    <tbody>${rows.map(t => `<tr>
       <td><b class="mono">${esc(t.transfer_no)}</b>
-        <div class="sub2">${esc(t.created_by || '')} · ${esc(dtth(t.created_at))}</div></td>
+        <div class="sub2">${esc(t.req_by || t.created_by || '')} · ${esc(dtth(t.created_at))}</div></td>
+      <td>${esc(t.kind_label || 'ใบโอน')}</td>
       <td>${esc(t.from_name)} <b>→</b> ${esc(t.to_name)}
-        ${t.note ? `<div class="sub2">${esc(t.note)}</div>` : ''}</td>
+        ${t.note ? `<div class="sub2">${esc(t.note)}</div>` : ''}
+        ${t.reject_reason ? `<div class="sub2" style="color:var(--crit)">
+          เหตุผล: ${esc(t.reject_reason)}</div>` : ''}</td>
       <td class="num">${money(t.line_count)}</td>
       <td class="num">${money(t.qty_total)}</td>
       <td><span class="pill ${TR_PILL[t.status] || 'st0'}">${TR_LABEL[t.status] || esc(t.status)}</span></td>
       <td class="sub2">${esc(dtth(t.received_at || t.sent_at || t.created_at))}</td>
       <td class="num" style="white-space:nowrap">
         <button class="btn ic" title="ดูรายการ" onclick="peekTransfer('${esc(t.transfer_no)}')">👀</button>
+        ${isBoss() && t.status === 'requested' ? `
+          <button class="btn sm g" onclick="trAction('${esc(t.transfer_no)}','approve')">✅ อนุมัติ+จ่าย</button>
+          <button class="btn sm dn" onclick="trAction('${esc(t.transfer_no)}','reject')">✕ ไม่อนุมัติ</button>` : ''}
         ${isBoss() && t.status === 'draft' ? `
           <button class="btn sm p" onclick="trAction('${esc(t.transfer_no)}','send')">🚚 ส่งของ</button>
           <button class="btn ic dn" title="ยกเลิก" onclick="trAction('${esc(t.transfer_no)}','cancel')">✕</button>` : ''}
         ${isBoss() && t.status === 'sent' ? `
           <button class="btn sm g" onclick="trAction('${esc(t.transfer_no)}','receive')">📥 รับเข้า</button>` : ''}
       </td></tr>`).join('')}</tbody></table></div>`
-    : '<div class="empty">ยังไม่มีใบโอน</div>';
+    : `<div class="empty">${S.trKind ? 'ไม่มีเอกสารชนิดนี้' : 'ยังไม่มีเอกสารคลัง'}</div>`;
 }
 
 async function peekTransfer(no){
@@ -737,11 +780,42 @@ async function peekTransfer(no){
 
 async function trAction(no, act){
   if (!bossOnly()) return;
-  const label = { send:'ส่งของออกจากคลังต้นทาง', receive:'รับของเข้าคลังปลายทาง', cancel:'ยกเลิกใบโอนนี้' }[act];
-  const okGo = await confirmModal('ยืนยัน', `${label}\nใบโอน ${no}`,
+  const t = (S.trs || []).find(x => x.transfer_no === no);
+
+  /* ไม่อนุมัติ — ต้องบอกเหตุผลเสมอ ฝ่ายที่ขอจะได้รู้ว่าทำไม */
+  if (act === 'reject'){
+    const f = await formModal({
+      title:'✕ ไม่อนุมัติใบเบิก ' + no,
+      subtitle:'ของไม่ถูกตัด · ฝ่ายที่ขอจะเห็นเหตุผลนี้ในหน้าของเขา',
+      ok:'ไม่อนุมัติ', danger:true,
+      fields:[{ k:'why', label:'เหตุผล', type:'textarea', required:true,
+                placeholder:'เช่น ของไม่พอ ให้รอรอบหน้า / ขอเกินความจำเป็น' }]});
+    if (!f) return;
+    try {
+      const { error } = await sb.rpc('req_reject', { p_no:no, p_reason:f.why, p_by:who() });
+      if (error) throw error;
+      toast('✅ บันทึกว่าไม่อนุมัติแล้ว');
+      reloadAll();
+    } catch(e){ fail(e); }
+    return;
+  }
+
+  const label = {
+    approve:'อนุมัติและจ่ายของออกจากคลังกลาง',
+    send:'ส่งของออกจากคลังต้นทาง',
+    receive:'รับของเข้าคลังปลายทาง',
+    cancel:'ยกเลิกเอกสารนี้'
+  }[act];
+  const extra = act === 'approve' && t
+    ? `\n${t.from_name} → ${t.to_name} · ${money(t.line_count)} รายการ รวม ${money(t.qty_total)} ชิ้น` +
+      '\n\nกดแล้วของจะถูกตัดออกจากคลังกลางทันที'
+    : '';
+  const okGo = await confirmModal('ยืนยัน', `${label}\nเอกสาร ${no}${extra}`,
     { ok:'ยืนยัน', danger: act === 'cancel' });
   if (!okGo) return;
-  const fn = { send:'transfer_send', receive:'transfer_receive', cancel:'transfer_cancel' }[act];
+
+  const fn = { approve:'req_approve', send:'transfer_send',
+               receive:'transfer_receive', cancel:'transfer_cancel' }[act];
   try {
     const { error } = await sb.rpc(fn, { p_no:no, p_by:who() });
     if (error) throw error;
