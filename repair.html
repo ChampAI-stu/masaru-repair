@@ -162,7 +162,10 @@
           </div>
         </div>
         <div class="card">
-          <h3>รายการใบงาน <span class="sp"></span><span class="muted" id="jobCount"></span></h3>
+          <h3>รายการใบงาน <span class="sp"></span><span class="muted" id="jobCount"></span>
+            <button class="btn sm noprint" onclick="exportJobs()"
+                    title="ได้เฉพาะใบงานที่กรองอยู่ตอนนี้">⬇️ Export Excel</button>
+          </h3>
           <div class="cb">
             <div class="tw"><table id="tblJobs">
               <thead><tr><th>เลขออเดอร์</th><th>ลูกค้า</th><th>เครื่องมือ</th><th>อาการ</th><th>ช่าง</th><th>สถานะ</th><th>กำหนดเสร็จ</th><th class="num">รวม</th><th class="num noprint">จัดการ</th></tr></thead>
@@ -948,12 +951,16 @@ window.PAGERS = {
 let ME = { id:null, email:'', name:'', role:'staff', techId:null };
 const who = () => ME.name || ME.email || 'ไม่ระบุ';
 const isBoss = () => ME.role === 'head' || ME.role === 'admin';
-const ROLE_LABEL = { staff:'พนักงานรับเครื่อง', tech:'ช่างซ่อม', head:'หัวหน้าช่าง', admin:'ผู้ดูแลระบบ' };
+const ROLE_LABEL = { staff:'พนักงานรับเครื่อง', tech:'ช่างซ่อม', head:'หัวหน้าช่าง',
+                     admin:'ผู้ดูแลระบบ', test:'ผู้ทดลองใช้' };
 const ROLE_PAGES = {
   staff: ['dash','jobs','intake','cust','job'],
   tech:  ['dash','jobs','dispatch','parts','whreq','report','job'],
   head:  ['dash','jobs','dispatch','intake','cust','parts','whreq','report','setting','job'],
-  admin: ['dash','jobs','dispatch','intake','cust','parts','whreq','report','setting','job']
+  admin: ['dash','jobs','dispatch','intake','cust','parts','whreq','report','setting','job'],
+  /* ผู้ทดลองใช้ — เหมือนหัวหน้าทุกหน้า ยกเว้น "ตั้งค่า"
+     และ is_boss() ไม่รวม test จึงลบใบงาน/อนุมัติ/แก้ค่าตั้งระบบไม่ได้ */
+  test:  ['dash','jobs','dispatch','intake','cust','parts','whreq','report','job']
 };
 
 
@@ -3420,6 +3427,112 @@ async function receiveParts(){
 /* =====================================================================
    รายงาน
    ===================================================================== */
+/* =====================================================================
+   Export รายการใบงานเป็น Excel
+     ได้เฉพาะใบที่กรองอยู่ตอนนี้ (ชิป + ค้นหา + ช่าง) — เห็นอะไรได้อันนั้น
+     ใช้ SheetJS เขียน .xlsx จริง · โหลดไลบรารีไม่ได้ก็ถอยไปเป็น CSV
+   ===================================================================== */
+const XL_COLS = [
+  ['เลขออเดอร์',     j => j.order_no || j.tracking_in || ''],
+  ['เลขในระบบ',      j => j.job_no],
+  ['สถานะ',          j => STATUS[j.status] || j.status],
+  ['ขั้นตอน',         j => stepOf(j.status) + '/6'],
+  ['ลูกค้า',          j => j.customer_name || ''],
+  ['เบอร์โทร',        j => j.customer_phone || ''],
+  ['ช่องทาง',         j => j.platform || ''],
+  ['ชื่อร้าน',         j => j.shop_name || ''],
+  ['เลขพัสดุขาเข้า',   j => j.tracking_in || ''],
+  ['เลขพัสดุขาออก',   j => j.tracking_out || ''],
+  ['SKU',            j => j.sku || ''],
+  ['แบรนด์',          j => j.brand || ''],
+  ['รุ่น',             j => j.model || ''],
+  ['Serial No.',     j => j.serial_no || ''],
+  ['ประเภทเครื่อง',    j => j.tool_type || ''],
+  ['อาการที่ลูกค้าแจ้ง', j => j.symptom || ''],
+  ['อาการที่พบ',       j => j.inspect_result || ''],
+  ['หมวดอาการ',       j => j.symptom_name || ''],
+  ['เงื่อนไขประกัน',    j => (WARRANTY[j.warranty_case] || {}).l || ''],
+  ['ประเภทเคส',       j => CASE_TYPE[j.case_type] || ''],
+  ['ระดับความยาก',    j => SEVERITY[j.severity] || ''],
+  ['ช่างผู้รับผิดชอบ',   j => j.tech_name || ''],
+  ['วันที่ขนส่งมาถึง',   j => dth(j.arrived_at)],
+  ['แกะกล่องเมื่อ',     j => j.unboxed_at ? dth(j.unboxed_at) : ''],
+  ['วันที่รับเครื่อง',    j => dth(j.received_at)],
+  ['กำหนดเสร็จ',      j => dth(j.due_date)],
+  ['ส่งมอบเมื่อ',       j => j.delivered_at ? dth(j.delivered_at) : ''],
+  ['เกินกำหนด (วัน)',  j => j.days_overdue > 0 ? j.days_overdue : 0],
+  ['อยู่ในศูนย์ (วัน)',  j => j.days_in_shop ?? ''],
+  ['ค่าแรง',           j => Number(j.labor_cost) || 0],
+  ['ค่าอะไหล่',        j => Number(j.parts_cost) || 0],
+  ['ทุนอะไหล่จริง',    j => Number(j.parts_cost_real ?? j.parts_cost) || 0],
+  ['ส่วนลด',          j => Number(j.discount) || 0],
+  ['รวมค่าซ่อม',       j => Number(j.total_cost) || 0],
+  ['ค่าส่งขาเข้า',      j => Number(j.ship_in_fee) || 0],
+  ['ค่าส่งขาเข้าใครจ่าย', j => j.ship_in_by || ''],
+  ['ค่าส่งขาออก',      j => Number(j.ship_out_fee) || 0],
+  ['ค่าส่งขาออกใครจ่าย', j => j.ship_out_by || ''],
+  ['ค่าส่งรอคืนลูกค้า',  j => Number(j.ship_refund_amount) || 0],
+  ['สถานะเบิกคืน',     j => j.refund_label || ''],
+  ['ประเมินการซ่อม',   j => j.repairable === true ? 'ซ่อมได้'
+                          : j.no_repair_action === 'salvage' ? 'ซ่อมไม่ได้ — แยกเป็นอะไหล่'
+                          : j.repairable === false ? 'ซ่อมไม่ได้ — เปลี่ยนสินค้า' : ''],
+  ['รอคลิปจากลูกค้า',  j => j.clip_waiting ? 'รออยู่ ' + (j.clip_days_waiting || 0) + ' วัน' : ''],
+  ['เหตุผลที่ไม่รับเคลม', j => j.reject_reason || ''],
+  ['หมายเหตุตอนรับ',   j => j.intake_note || ''],
+  ['แอดมินที่รับเรื่อง',  j => j.admin_name || '']
+];
+
+/** ใบงานที่กรองอยู่ตอนนี้ — ตรรกะเดียวกับที่ renderJobs ใช้ จะได้ไม่หลุดกัน */
+function jobsInView(){
+  const q = (val('gSearch') || '').toLowerCase(), tc = val('fTech');
+  return S.jobs.filter(j => {
+    if (!matchFilter(j)) return false;
+    if (tc && j.technician_id !== tc) return false;
+    if (q && ![j.job_no,j.customer_name,j.serial_no,j.sku,j.model,j.brand,j.tool_type,j.symptom,
+               j.order_no,j.tracking_in,j.tracking_out,j.platform,j.shop_name]
+      .join(' ').toLowerCase().includes(q)) return false;
+    return true;
+  });
+}
+
+async function exportJobs(){
+  const rows = jobsInView();
+  if (!rows.length) return toast('ไม่มีใบงานให้ส่งออก — ลองเปลี่ยนตัวกรอง', true);
+
+  const head = XL_COLS.map(c => c[0]);
+  const body = rows.map(j => XL_COLS.map(c => { try { return c[1](j); } catch(e){ return ''; } }));
+  const chip = (S.filter || 'all');
+  const name = 'ใบงานซ่อม_' + chip + '_' + new Date().toISOString().slice(0,10);
+
+  try {
+    await loadXLSX();
+    const ws = XLSX.utils.aoa_to_sheet([head, ...body]);
+    /* ความกว้างคอลัมน์ — ไม่ตั้งไว้ Excel จะบีบจนอ่านไม่ออก */
+    ws['!cols'] = head.map((t, i) => ({
+      wch: Math.min(42, Math.max(t.length + 2,
+        ...body.slice(0, 200).map(r => String(r[i] ?? '').length + 2))) }));
+    ws['!autofilter'] = { ref: XLSX.utils.encode_range({
+      s:{ r:0, c:0 }, e:{ r:body.length, c:head.length - 1 } }) };
+    ws['!freeze'] = { xSplit:'1', ySplit:'1' };
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'ใบงานซ่อม');
+    XLSX.writeFile(wb, name + '.xlsx');
+    toast(`⬇️ ส่งออก ${money(rows.length)} ใบงานแล้ว`);
+  } catch(e){
+    /* เน็ตบริษัทบล็อก CDN ก็ยังต้องได้ไฟล์ — CSV เปิดด้วย Excel ได้เหมือนกัน */
+    console.warn('เขียน .xlsx ไม่ได้ ใช้ CSV แทน', e);
+    const cell = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+    const csv = '﻿' + [head, ...body].map(r => r.map(cell).join(',')).join('\r\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type:'text/csv;charset=utf-8' }));
+    a.download = name + '.csv';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    toast(`⬇️ ส่งออก ${money(rows.length)} ใบงานเป็น CSV (เปิดด้วย Excel ได้)`);
+  }
+}
+
+
 /* =====================================================================
    ค่าส่งเบิกคืนลูกค้า — CS รวบรวมยื่นบัญชี
      เคสภายใน 7 วัน ลูกค้าสำรองจ่ายค่าส่งขาเข้าไปก่อน บริษัทต้องคืน
