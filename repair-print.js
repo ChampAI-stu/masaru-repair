@@ -47,6 +47,7 @@ function printJob(kind){
         ${row('เบอร์โทร', j.customer_phone)}
         ${row('เลข Order', j.order_no)}
         ${row('ช่องทางที่ซื้อ', j.platform)}
+        ${row('ชื่อร้าน', j.shop_name)}
       </div></div>
       <div class="pbox"><div class="h">ข้อมูลเครื่องมือ</div><div class="b">
         ${row('ประเภทเครื่อง', j.tool_type)}
