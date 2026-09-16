@@ -103,6 +103,19 @@
           <div class="chips" id="rangeChips"></div>
         </div></div>
         <div class="kpis" id="dashKpi"></div>
+
+        <div class="card" id="cardUnbox" hidden>
+          <h3>📦 กล่องค้างแกะ <span class="sp"></span>
+            <span class="muted" style="font-weight:400;font-size:13px">
+              นับจากวันที่ขนส่งมาถึงศูนย์</span>
+            <span class="pill tag-crit" id="ubCount">0</span></h3>
+          <div class="cb"><div class="tw"><table id="tblUnbox">
+            <thead><tr><th>เลขที่งาน</th><th>ช่องทาง</th><th>พัสดุขาเข้า</th>
+              <th>ของถึงศูนย์</th><th>ครบกำหนด</th><th class="num">เหลือ</th>
+              <th class="num noprint"></th></tr></thead>
+            <tbody></tbody></table></div></div>
+        </div>
+
         <div class="card">
           <h3>ติดตามสถานะ 6 ขั้นตอน</h3>
           <div class="cb"><div class="stepcards" id="stepCards"></div></div>
@@ -264,7 +277,10 @@
                     <div><label>รุ่น</label><input type="text" id="nModel" placeholder="เช่น GBH 2-26"></div>
                     <div><label>Serial No.</label><input type="text" id="nSerial" placeholder="—"></div>
                   </div>
-                  <div class="grid g2" style="gap:11px">
+                  <div class="grid g3" style="gap:11px">
+                    <div><label>📦 วันที่ขนส่งมาถึงศูนย์</label>
+                      <input type="date" id="nArrived">
+                      <span class="hint">เริ่มนับเวลาแกะกล่อง</span></div>
                     <div><label>วันที่รับ</label><input type="date" id="nRecv"></div>
                     <div><label>กำหนดเสร็จ (ประมาณการ)
                       <span class="muted" style="font-weight:400">· ระบบคิดจริงตอนมอบหมายช่าง</span></label>
@@ -555,6 +571,28 @@
           </div>
         </div>
 
+        <div class="card" id="cardUnboxCfg">
+          <h3>📦 กติกาแกะกล่อง</h3>
+          <div class="cb">
+            <div class="grid g3">
+              <div><label>ต้องแกะภายในกี่วัน</label>
+                <input type="number" id="cfgUnbox" min="1" max="30" step="1">
+                <span class="hint">นับวันปฏิทิน รวมเสาร์-อาทิตย์</span></div>
+            </div>
+            <div class="box-info" style="margin-top:12px">
+              นับจาก <b>วันที่ขนส่งมาถึงศูนย์</b> ที่กรอกในใบงาน —
+              ไม่ใช่วันที่สร้างใบงาน<br>
+              เกินกำหนดแล้วจะขึ้น <b>การ์ดแดงในแดชบอร์ด</b> ·
+              <b>ชิปกรอง "กล่องค้างแกะ"</b> ในหน้าใบงาน · และ <b>กระดิ่งแจ้งเตือน</b>
+              <div class="sub2" style="margin-top:4px">
+                เปลี่ยนค่านี้แล้วมีผลกับทุกใบทันที รวมใบที่แกะไปแล้ว (คิดย้อนว่าทันกำหนดไหม)</div>
+            </div>
+            <div style="margin-top:13px">
+              <button class="btn p" onclick="saveUnboxDays()">💾 บันทึกกติกาแกะกล่อง</button>
+            </div>
+          </div>
+        </div>
+
         <div class="card" id="cardReward">
           <h3>🏅 เรทรางวัลช่างต่อชิ้น <span class="sp"></span>
             <span class="pill tag-crit">ช่างไม่เห็นตัวเลขนี้</span></h3>
@@ -730,6 +768,28 @@ const WARRANTY = {
   unknown:      { l:'ยังไม่ระบุ',                 ship:'—',      parts:'—',      labor:'—',      cls:'st0' }
 };
 const SEVERITY = { light:'เคสเบา (ง่าย)', medium:'เคสกลาง', heavy:'เคสหนัก (ยาก)' };
+/* ต้องแกะกล่องภายในกี่วันหลังขนส่งมาถึง — โหลดจริงจาก sys_config คีย์ unbox_days */
+let UNBOX_DAYS = 3;
+
+/* กล่องต้องแกะภายในกำหนด — นับจากวันที่ขนส่งมาถึง (24_unbox.sql)
+     unbox_state     : no_date · ok · today · late · done · done_late
+     unbox_days_left : เหลือกี่วัน · ติดลบ = เกินมาแล้วกี่วัน
+   ประกาศเป็น function ไม่ใช่ const เพราะถูกเรียกจากโค้ดที่อยู่ก่อนหน้านี้ในไฟล์ */
+
+/** กล่องใบนี้ยังค้างแกะอยู่ไหม — ปิดงานแล้วไม่นับ */
+function unboxPending(j){
+  return !CLOSED.includes(j.status) && !j.unboxed_at && j.arrived_at != null;
+}
+
+/** ข้อความนับถอยหลังสั้น ๆ ใช้ได้ทั้งในตารางและในกระดิ่ง */
+function unboxLeftText(j){
+  const d = j.unbox_days_left;
+  if (d == null) return '';
+  if (d < 0)   return 'เกินมา ' + Math.abs(d) + ' วัน';
+  if (d === 0) return 'ครบวันนี้';
+  return 'เหลือ ' + d + ' วัน';
+}
+
 /* จำนวนวันต่อระดับ — โหลดจริงจาก sys_config ตอนเปิดระบบ ค่านี้เป็นค่าสำรอง */
 let DIFF_DAYS   = { light:1, medium:2, heavy:3 };
 let REWARD_RATE = { light:0, medium:0, heavy:0 };
@@ -1024,6 +1084,7 @@ async function startApp(session){
       if (r.key === 'difficulty_days') DIFF_DAYS   = { ...DIFF_DAYS,   ...(r.value || {}) };
       if (r.key === 'reward_rate')     REWARD_RATE = { ...REWARD_RATE, ...(r.value || {}) };
       if (r.key === 'slots_per_level') SLOTS       = { ...SLOTS,       ...(r.value || {}) };
+      if (r.key === 'unbox_days')      UNBOX_DAYS  = Number(r.value?.limit) || UNBOX_DAYS;
     });
     if (techs.error) throw techs.error;
 
@@ -1296,6 +1357,8 @@ function filterCounts(){
     waiting:    S.jobs.filter(j => j.status === 'awaiting_parcel').length,
     unknown:    S.jobs.filter(j => j.status === 'unknown_parcel').length,
     notnotified:S.jobs.filter(j => j.status === 'awaiting_parcel' && !j.notified_at).length,
+    unbox:      S.jobs.filter(unboxPending).length,
+    unboxlate:  S.jobs.filter(j => unboxPending(j) && j.unbox_days_left < 0).length,
     nowarranty: open.filter(j => j.warranty_case === 'out_warranty').length,
     nocondition:open.filter(j => !j.warranty_case || j.warranty_case === 'unknown').length
   };
@@ -1304,11 +1367,13 @@ function filterCounts(){
   return c;
 }
 function renderChips(){
+  renderUnbox();
   const c = filterCounts();
   const A = [['all','ทั้งหมด'],['open','งานค้าง'],['waiting','รอลูกค้าส่งของ'],['overdue','เกินกำหนด'],
              ['wait_parts','รออะไหล่'],['unassigned','ยังไม่มอบหมาย'],['ready','พร้อมส่งมอบ'],
              ['nowarranty','นอกประกัน'],['nocondition','ยังไม่ระบุประกัน'],
-             ['unknown','พัสดุไม่ทราบที่มา'],['notnotified','ยังไม่แจ้งลูกค้า']];
+             ['unknown','พัสดุไม่ทราบที่มา'],['notnotified','ยังไม่แจ้งลูกค้า'],
+             ['unbox','📦 กล่องค้างแกะ'],['unboxlate','🚨 เกินกำหนดแกะ']];
   $('chipsA').innerHTML = A.map(([k,l]) =>
     `<button class="chip ${S.filter===k?'on':''}" onclick="setFilter('${k}')">${l}<span class="c">${c[k]}</span></button>`).join('');
   $('chipsB').innerHTML = STEPS.map(s =>
@@ -1329,6 +1394,8 @@ function matchFilter(j){
   if (f === 'waiting')    return j.status === 'awaiting_parcel';
   if (f === 'unknown')    return j.status === 'unknown_parcel';
   if (f === 'notnotified')return j.status === 'awaiting_parcel' && !j.notified_at;
+  if (f === 'unbox')      return unboxPending(j);
+  if (f === 'unboxlate')  return unboxPending(j) && j.unbox_days_left < 0;
   if (f === 'nowarranty') return !CLOSED.includes(j.status) && j.warranty_case === 'out_warranty';
   if (f === 'nocondition')return !CLOSED.includes(j.status) && (!j.warranty_case || j.warranty_case === 'unknown');
   if (f.startsWith('step')) return stepOf(j.status) === Number(f.slice(4));
@@ -1413,7 +1480,7 @@ async function lookupCustomer(){
 function clearIntake(){
   ['nSerial','nToolType','nBrand','nModel','nPhone','nCustName','nAddress','nSymptom','nAcc','nCustId',
    'nOrder','nTrackIn','nAdmin'].forEach(id => $(id).value = '');
-  $('nSymCat').value = ''; $('nPlatform').value = '';
+  $('nSymCat').value = ''; $('nPlatform').value = ''; $('nArrived').value = '';
   $('nCaseType').value = 'claim'; $('nWarranty').value = 'unknown';
   showWarrantyBox();
   const t = new Date(), d = n => String(n).padStart(2,'0');
@@ -1463,6 +1530,7 @@ async function saveJob(){
       warranty_case: val('nWarranty'),
       admin_name:    val('nAdmin') || who(),
       status: val('nTrackIn') ? 'received' : 'awaiting_parcel',
+      arrived_at:  val('nArrived') || null,
       received_at: rec ? new Date(rec + 'T09:00:00').toISOString() : undefined,
       due_date: val('nDue') || null, created_by: who()
     }).select('id, job_no').single();
@@ -1865,6 +1933,7 @@ function stepForm(nStep, j, pc){
                ? `· แจ้งลูกค้าแล้วเมื่อ <b>${dtth(j.notified_at)}</b>`
                : '· <b style="color:var(--crit)">ยังไม่ได้แจ้งลูกค้าให้ส่งของ (SOP A6)</b>'}</div>`
         : '';
+    const ubox = unboxBox(j);
     return hint + head + (unknown ? `
     <div class="grid g2">
       <div><label>ร้านที่ต้องประสาน</label>
@@ -1888,12 +1957,17 @@ function stepForm(nStep, j, pc){
     </div>
     <div id="wBox" style="margin-top:13px">${warrantyBox(j.warranty_case)}</div>
 
-    <div class="grid g2" style="margin-top:14px">
+    <div class="grid g3" style="margin-top:14px">
+      <div><label>📦 วันที่ขนส่งมาถึงศูนย์</label>
+        <input type="date" id="sArrived" value="${j.arrived_at ? String(j.arrived_at).slice(0,10) : ''}"
+               max="${new Date().toISOString().slice(0,10)}">
+        <span class="hint">เริ่มนับเวลาแกะกล่องจากวันนี้ — กรอกตามวันที่ขนส่งเอามาส่งจริง</span></div>
       <div><label>วันที่รับ <span class="muted" style="font-weight:400">(ล็อกไว้ แก้ไม่ได้)</span></label>
         <input type="text" value="${dth(j.received_at)}" disabled></div>
       <div><label>กำหนดเสร็จ</label>
         <input type="text" value="${j.assigned_at ? dth(j.due_date) : 'กำหนดที่ขั้น 3 มอบหมายงาน'}" disabled></div>
     </div>
+    ${ubox}
     <div style="margin-top:14px"><label>อาการเสียที่ลูกค้าแจ้ง <span class="req">*</span></label>
       <textarea id="sSymptom">${esc(j.symptom||'')}</textarea></div>
     <div style="margin-top:14px"><label>ของที่นำมาด้วย</label>
@@ -2123,6 +2197,7 @@ function collectStep(){
   if ($('sSymptom'))  p.symptom         = g('sSymptom') || null;
   if ($('sAcc'))      p.accessories     = g('sAcc') || null;
   if ($('sCat'))      p.symptom_category= g('sCat') || null;
+  if ($('sArrived'))  p.arrived_at      = g('sArrived')  || null;
   if ($('sOrder'))    p.order_no        = g('sOrder')    || null;
   if ($('sTrackIn'))  p.tracking_in     = g('sTrackIn')  || null;
   if ($('sTrackOut')) p.tracking_out    = g('sTrackOut') || null;
@@ -2181,12 +2256,69 @@ async function saveStep(extra){
   } catch(e){ fail(e); }
 }
 
+/** กล่องสรุปสถานะการแกะ + ปุ่มกด — โผล่ในขั้นรับเครื่อง */
+function unboxBox(j){
+  if (j.unboxed_at){
+    const late = j.unbox_state === 'done_late';
+    return `<div class="box-${late ? 'warn' : 'ok'}" style="margin-top:13px">
+      ✅ <b>แกะกล่องแล้ว</b> เมื่อ ${dtth(j.unboxed_at)}
+      ${j.unboxed_by ? 'โดย ' + esc(j.unboxed_by) : ''}
+      ${j.unbox_days_used != null
+        ? ` · ใช้ไป <b>${j.unbox_days_used} วัน</b>หลังของถึงศูนย์` : ''}
+      ${late ? '<div class="sub2" style="margin-top:3px">ช้ากว่ากติกาที่ตั้งไว้</div>' : ''}
+    </div>`;
+  }
+  if (!j.arrived_at) return `<div class="box-info" style="margin-top:13px">
+    📦 <b>ยังไม่ได้ลงวันที่ขนส่งมาถึง</b> — กรอกวันข้างบนแล้วกดบันทึก
+    ระบบจะเริ่มนับเวลาแกะกล่องให้</div>`;
+
+  const d    = j.unbox_days_left;
+  const kind = d < 0 ? 'crit' : d === 0 ? 'warn' : 'info';
+  const head = d < 0 ? `🚨 <b>เกินกำหนดแกะมาแล้ว ${Math.abs(d)} วัน</b>`
+             : d === 0 ? '⏰ <b>ครบกำหนดแกะวันนี้</b>'
+             : `📦 <b>เหลือเวลาแกะอีก ${d} วัน</b>`;
+  return `<div class="box-${kind}" style="margin-top:13px">
+    ${head}
+    <div class="sub2" style="margin-top:3px">
+      ของถึงศูนย์ ${dth(j.arrived_at)} · ครบกำหนด ${dth(j.unbox_due)}</div>
+    <div style="margin-top:9px">
+      <button class="btn ${d < 0 ? 'dn' : 'g'}" onclick="markUnboxed()">📦 แกะกล่องแล้ว</button>
+    </div></div>`;
+}
+
+/** บันทึกว่าแกะกล่องแล้ว — เวลาจับจากเครื่องเซิร์ฟเวอร์ แก้ย้อนหลังไม่ได้ */
+async function markUnboxed(){
+  if (!S.job) return;
+  /* ถ้าเพิ่งพิมพ์วันที่ลงช่องแต่ยังไม่กดบันทึก ต้องเซฟก่อน ไม่งั้นฝั่งเซิร์ฟเวอร์ยังไม่มีวัน */
+  const typed = val('sArrived');
+  if (typed && String(S.job.arrived_at || '').slice(0,10) !== typed) await saveStep();
+
+  const ok = await confirmModal('ยืนยันว่าแกะกล่องแล้ว',
+    `${S.job.job_no} · ของถึงศูนย์ ${dth(typed || S.job.arrived_at)}\n\n` +
+    'ระบบจะบันทึกเวลาตอนนี้เป็นเวลาที่แกะกล่อง แก้ย้อนหลังไม่ได้',
+    { ok:'แกะแล้ว', danger:false });
+  if (!ok) return;
+
+  try {
+    const { error } = await sb.rpc('mark_unboxed', { p_job_id:S.job.id, p_by:who() });
+    if (error) throw error;
+    toast('✅ บันทึกว่าแกะกล่องแล้ว');
+    S.peek = null;
+    openJob(S.job.id);
+    reloadAll();
+  } catch(e){ fail(e); }
+}
+
 /** A9 — พัสดุมาถึงศูนย์ */
 async function receiveParcel(){
   if (!val('sTrackIn') && !await confirmModal('ยังไม่มีเลขพัสดุขาเข้า',
       'SOP ข้อ A9.1 ให้ตรวจสอบเลขอ้างอิงก่อนรับเข้า\nยืนยันรับเข้าโดยไม่มีเลขพัสดุ?', { ok:'รับเข้าเลย' })) return;
   S.peek = null;
-  await saveStep({ status:'received', received_at: new Date().toISOString() });
+  /* ยังไม่เคยลงวันของมาถึง ให้ถือว่าวันนี้ — นาฬิกาแกะกล่องจะได้เริ่มเดิน */
+  const extra = { status:'received', received_at: new Date().toISOString() };
+  if (!S.job?.arrived_at && !val('sArrived'))
+    extra.arrived_at = new Date().toISOString().slice(0,10);
+  await saveStep(extra);
 }
 
 /** A6 — แจ้งลูกค้าให้จัดส่งสินค้ามาที่ศูนย์ */
@@ -3410,6 +3542,7 @@ async function loadSettings(){
 function renderSettings(){
   /* ---- สเกลความยาก + เรทรางวัล ---- */
   const set = (id, v) => { if ($(id)) $(id).value = v; };
+  set('cfgUnbox',   UNBOX_DAYS);
   set('cfgDLight',  DIFF_DAYS.light);
   set('cfgDMedium', DIFF_DAYS.medium);
   set('cfgDHeavy',  DIFF_DAYS.heavy);
@@ -3493,6 +3626,16 @@ async function saveDiffDays(){
   try {
     await saveCfg('difficulty_days', v, 'สเกลความยาก');
     DIFF_DAYS = v; renderSettings(); previewDue();
+  } catch(e){ fail(e); }
+}
+
+async function saveUnboxDays(){
+  const n = Math.max(1, Math.min(30, Math.round(Number(val('cfgUnbox')) || 3)));
+  try {
+    await saveCfg('unbox_days', { limit:n }, 'กติกาแกะกล่อง');
+    UNBOX_DAYS = n;
+    renderSettings();
+    reloadAll();                       // วันที่เหลือคิดที่ฝั่งฐานข้อมูล ต้องโหลดใหม่
   } catch(e){ fail(e); }
 }
 
@@ -3661,6 +3804,40 @@ async function toggleSym(code, on){
 /* =====================================================================
    การแจ้งเตือน — คำนวณสด ๆ จากข้อมูลจริง ไม่ต้องมีตารางเพิ่ม
    ===================================================================== */
+/** ตารางกล่องค้างแกะในแดชบอร์ด — ไม่มีของค้างก็ซ่อนการ์ดไปเลย */
+function renderUnbox(){
+  const card = $('cardUnbox');
+  if (!card) return;
+  const rows = S.jobs.filter(unboxPending)
+    .sort((a,b) => (a.unbox_days_left ?? 99) - (b.unbox_days_left ?? 99));
+  card.hidden = !rows.length;
+  if (!rows.length) return;
+
+  const late = rows.filter(j => j.unbox_days_left < 0).length;
+  const cnt  = $('ubCount');
+  cnt.textContent = late ? `${money(rows.length)} · เกินกำหนด ${money(late)}` : money(rows.length);
+  cnt.className   = 'pill ' + (late ? 'tag-crit' : 'tag-warn');
+
+  $('tblUnbox').querySelector('tbody').innerHTML = rows.slice(0, 40).map(j => {
+    const d  = j.unbox_days_left;
+    const cl = d < 0 ? 'tag-crit' : d === 0 ? 'tag-warn' : 'tag-good';
+    return `<tr>
+      <td><b class="mono">${esc(j.job_no)}</b>
+        <div class="sub2">${esc(j.customer_name || 'ยังไม่รู้เจ้าของ')}</div></td>
+      <td>${esc(j.platform || '—')}
+        ${j.order_no ? `<div class="sub2">Order ${esc(j.order_no)}</div>` : ''}</td>
+      <td class="mono sub2">${esc(j.tracking_in || '—')}</td>
+      <td>${esc(dth(j.arrived_at))}</td>
+      <td class="sub2">${esc(dth(j.unbox_due))}</td>
+      <td class="num"><span class="pill ${cl}">${esc(unboxLeftText(j))}</span></td>
+      <td class="num noprint">
+        <button class="btn sm p" onclick="openJob('${esc(j.id)}')">เปิดใบงาน</button></td>
+    </tr>`;
+  }).join('') + (rows.length > 40
+    ? `<tr><td colspan="7" class="sub2">…และอีก ${money(rows.length - 40)} ใบ
+         — ดูทั้งหมดที่หน้าใบงาน ตัวกรอง "กล่องค้างแกะ"</td></tr>` : '');
+}
+
 function buildAlerts(){
   const A = [];
   const open = S.jobs.filter(j => !CLOSED.includes(j.status));
@@ -3682,6 +3859,17 @@ function buildAlerts(){
     t2:`ขาด ${s.qty_short} ${s.unit || 'ชิ้น'} · ใบงาน ${s.job_no || '—'}`,
     rt:`ค้าง ${s.days_waiting || 0} วัน`,
     go:() => goPage('parts') }));
+
+  // กล่องค้างแกะ — ของยังไม่ได้เปิดเลย เร่งกว่างานที่เริ่มแล้ว
+  S.jobs.filter(unboxPending)
+        .filter(j => (j.unbox_days_left ?? 99) <= 0)
+        .sort((a,b) => (a.unbox_days_left ?? 0) - (b.unbox_days_left ?? 0))
+        .forEach(j => A.push({
+          g:'กล่องค้างแกะ', lv:(j.unbox_days_left ?? 0) < 0 ? 'crit' : 'warn', ic:'📦',
+          t1:`${j.job_no} · ${j.customer_name || 'ยังไม่รู้เจ้าของ'}`,
+          t2:`${j.platform || 'ไม่ระบุช่องทาง'} · ของถึงศูนย์ ${dth(j.arrived_at)}` +
+             (j.tracking_in ? ' · พัสดุ ' + j.tracking_in : ''),
+          rt:unboxLeftText(j), go:() => openJob(j.id) }));
 
   // เกินกำหนด — เร่งด่วนสุด
   open.filter(j => j.days_overdue > 0)
