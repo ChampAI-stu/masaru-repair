@@ -301,8 +301,9 @@
               <div class="grid">
                 <div><label>อาการเสียที่ลูกค้าแจ้ง</label>
                   <textarea id="nSymptom" placeholder="อธิบายอาการเสีย… (ยังไม่แกะกล่อง ข้ามได้)"></textarea></div>
-                <div><label>ของที่นำมาด้วย</label>
-                  <input type="text" id="nAcc" placeholder="เช่น กล่อง, ดอกสว่าน, สายชาร์จ"></div>
+                <div><label>SKU</label>
+                  <input type="text" id="nSku" placeholder="รหัสสินค้าของตัวเครื่อง"
+                         style="text-transform:uppercase"></div>
                 <div><label>หมายเหตุ</label>
                   <textarea id="nNote" placeholder="เช่น กล่องบุบมาแต่แรก · ลูกค้าขอด่วน · ไม่มีใบเสร็จ · ตกลงกับลูกค้าว่า…"
                             style="min-height:62px"></textarea></div>
@@ -1368,6 +1369,7 @@ function filterCounts(){
     unknown:    S.jobs.filter(j => j.status === 'unknown_parcel').length,
     notnotified:S.jobs.filter(j => j.status === 'awaiting_parcel' && !j.notified_at).length,
     unbox:      S.jobs.filter(unboxPending).length,
+    clip:       S.jobs.filter(j => j.clip_waiting).length,
     unboxlate:  S.jobs.filter(j => unboxPending(j) && j.unbox_days_left < 0).length,
     nowarranty: open.filter(j => j.warranty_case === 'out_warranty').length,
     nocondition:open.filter(j => !j.warranty_case || j.warranty_case === 'unknown').length
@@ -1383,7 +1385,8 @@ function renderChips(){
              ['wait_parts','รออะไหล่'],['unassigned','ยังไม่มอบหมาย'],['ready','พร้อมส่งมอบ'],
              ['nowarranty','นอกประกัน'],['nocondition','ยังไม่ระบุประกัน'],
              ['unknown','พัสดุไม่ทราบที่มา'],['notnotified','ยังไม่แจ้งลูกค้า'],
-             ['unbox','📦 กล่องค้างแกะ'],['unboxlate','🚨 เกินกำหนดแกะ']];
+             ['unbox','📦 กล่องค้างแกะ'],['unboxlate','🚨 เกินกำหนดแกะ'],
+             ['clip','📹 รอคลิปจากลูกค้า']];
   $('chipsA').innerHTML = A.map(([k,l]) =>
     `<button class="chip ${S.filter===k?'on':''}" onclick="setFilter('${k}')">${l}<span class="c">${c[k]}</span></button>`).join('');
   $('chipsB').innerHTML = STEPS.map(s =>
@@ -1404,6 +1407,7 @@ function matchFilter(j){
   if (f === 'waiting')    return j.status === 'awaiting_parcel';
   if (f === 'unknown')    return j.status === 'unknown_parcel';
   if (f === 'notnotified')return j.status === 'awaiting_parcel' && !j.notified_at;
+  if (f === 'clip')       return !!j.clip_waiting;
   if (f === 'unbox')      return unboxPending(j);
   if (f === 'unboxlate')  return unboxPending(j) && j.unbox_days_left < 0;
   if (f === 'nowarranty') return !CLOSED.includes(j.status) && j.warranty_case === 'out_warranty';
@@ -1417,7 +1421,7 @@ function renderJobs(){
   const rows = S.jobs.filter(j => {
     if (!matchFilter(j)) return false;
     if (tc && j.technician_id !== tc) return false;
-    if (q && ![j.job_no,j.customer_name,j.serial_no,j.model,j.brand,j.tool_type,j.symptom,
+    if (q && ![j.job_no,j.customer_name,j.serial_no,j.sku,j.model,j.brand,j.tool_type,j.symptom,
                j.order_no,j.tracking_in,j.tracking_out,j.platform]
       .join(' ').toLowerCase().includes(q)) return false;
     return true;
@@ -1434,7 +1438,8 @@ function renderJobs(){
       onkeydown="if(event.key==='Enter'){event.preventDefault();openJob('${j.id}')}">
       <td class="mono"><b>${esc(j.job_no)}</b>
         <div class="sub2">${j.order_no ? 'Order ' + esc(j.order_no) : dth(j.received_at)}</div></td>
-      <td>${j.status === 'unknown_parcel'
+      <td>${j.clip_waiting ? '<span class="pill tag-warn">📹 รอคลิป</span> ' : ''}
+        ${j.status === 'unknown_parcel'
         ? '<span class="pill st-unknown">ยังไม่ทราบเจ้าของ</span>'
         : esc(j.customer_name || '—')}
         <div class="sub2">${esc(j.customer_phone || (j.tracking_in ? 'พัสดุ ' + j.tracking_in : ''))}</div></td>
@@ -1488,7 +1493,7 @@ async function lookupCustomer(){
 }
 
 function clearIntake(){
-  ['nSerial','nToolType','nBrand','nModel','nPhone','nCustName','nAddress','nSymptom','nAcc','nNote','nCustId',
+  ['nSerial','nToolType','nBrand','nModel','nPhone','nCustName','nAddress','nSymptom','nSku','nNote','nCustId',
    'nOrder','nTrackIn','nAdmin'].forEach(id => $(id).value = '');
   $('nSymCat').value = ''; $('nPlatform').value = ''; $('nArrived').value = '';
   $('nCaseType').value = 'claim'; $('nWarranty').value = 'unknown';
@@ -1546,7 +1551,7 @@ async function saveJob(){
       tool_type: val('nToolType') || null, brand: val('nBrand') || null,
       model: val('nModel') || null, serial_no: val('nSerial') || null,
       symptom: val('nSymptom') || null, symptom_category: val('nSymCat') || null,
-      accessories: val('nAcc') || null,
+      sku: val('nSku').toUpperCase() || null,
       intake_note: val('nNote') || null,
       order_no:      val('nOrder')    || null,
       tracking_in:   val('nTrackIn')  || null,
@@ -1671,6 +1676,10 @@ function renderJobPage(){
       ? `<span class="pill ${WARRANTY[j.warranty_case].cls}">${esc(WARRANTY[j.warranty_case].l)}</span>` : ''}
     ${j.status === 'rejected' && j.reject_reason
       ? `<span class="pill tag-crit" title="${esc(j.reject_reason)}">ไม่รับเคลม</span>` : ''}
+    ${j.clip_waiting
+      ? `<span class="pill tag-warn" title="${esc(j.clip_note || '')}">
+           📹 รอคลิป ${j.clip_days_waiting > 0 ? j.clip_days_waiting + ' วัน' : 'วันนี้'}</span>
+         <button class="btn sm g noprint" onclick="clipReceived()">✅ ได้คลิปแล้ว</button>` : ''}
     <span class="sp" style="flex:1"></span>
     ${CLOSED.includes(j.status) && isBoss() && (j.photo_count > 0)
       ? `<button class="btn sm dn noprint" onclick="clearPhotos()"
@@ -1700,6 +1709,7 @@ function renderJobPage(){
           <span class="pill ${(WARRANTY[j.warranty_case]||WARRANTY.unknown).cls}">${esc((WARRANTY[j.warranty_case]||WARRANTY.unknown).l)}</span></span></div>
         <div class="kv"><span class="k">ประเภทเครื่อง</span><span class="v">${esc(j.tool_type||'—')}</span></div>
         <div class="kv"><span class="k">แบรนด์ / รุ่น</span><span class="v">${esc([j.brand,j.model].filter(Boolean).join(' ')||'—')}</span></div>
+        <div class="kv"><span class="k">SKU</span><span class="v mono">${esc(j.sku||'—')}</span></div>
         <div class="kv"><span class="k">Serial No.</span><span class="v mono">${esc(j.serial_no||'—')}</span></div>
         <div class="kv"><span class="k">วันที่รับ</span><span class="v">${dth(j.received_at)}</span></div>
         <div class="kv"><span class="k">ระดับความยาก</span><span class="v">
@@ -1716,7 +1726,8 @@ function renderJobPage(){
           <label>อาการเสียที่ลูกค้าแจ้ง</label>
           <div class="box-warn">${esc(j.symptom||'—')}</div>
         </div>
-        ${j.accessories ? `<div style="margin-top:13px"><label>ของที่นำมาด้วย</label>
+        ${j.accessories ? `<div style="margin-top:13px">
+          <label>ของที่นำมาด้วย <span class="muted" style="font-weight:400">(ใบงานเก่า)</span></label>
           <div class="chipset">${j.accessories.split(/[,·]/).filter(x=>x.trim())
             .map(x => `<span>${esc(x.trim())}</span>`).join('')}</div></div>` : ''}
         ${j.intake_note ? `<div style="margin-top:13px"><label>📝 หมายเหตุตอนรับเครื่อง</label>
@@ -1964,6 +1975,14 @@ function stepForm(nStep, j, pc){
                : '· <b style="color:var(--crit)">ยังไม่ได้แจ้งลูกค้าให้ส่งของ (SOP A6)</b>'}</div>`
         : '';
     const ubox = unboxBox(j);
+    const cbox = j.clip_waiting ? `<div class="box-warn" style="margin-top:13px">
+      📹 <b>ขอคลิปจากลูกค้าไปแล้ว</b> เมื่อ ${dtth(j.clip_requested_at)}
+      ${j.clip_requested_by ? 'โดย ' + esc(j.clip_requested_by) : ''}
+      · รอมา <b>${j.clip_days_waiting > 0 ? j.clip_days_waiting + ' วัน' : 'วันนี้'}</b>
+      <div class="sub2" style="margin-top:4px">ขอไว้ว่า: ${esc(j.clip_note || '—')}</div>
+      <div style="margin-top:9px">
+        <button class="btn g" onclick="clipReceived()">✅ ได้คลิปแล้ว เปิดเรื่องต่อ</button>
+      </div></div>` : '';
     return hint + head + (unknown ? `
     <div class="grid g2">
       <div><label>ร้านที่ต้องประสาน</label>
@@ -1997,11 +2016,12 @@ function stepForm(nStep, j, pc){
       <div><label>กำหนดเสร็จ</label>
         <input type="text" value="${j.assigned_at ? dth(j.due_date) : 'กำหนดที่ขั้น 3 มอบหมายงาน'}" disabled></div>
     </div>
-    ${ubox}
+    ${ubox}${cbox}
     <div style="margin-top:14px"><label>อาการเสียที่ลูกค้าแจ้ง <span class="req">*</span></label>
       <textarea id="sSymptom">${esc(j.symptom||'')}</textarea></div>
-    <div style="margin-top:14px"><label>ของที่นำมาด้วย</label>
-      <input type="text" id="sAcc" value="${esc(j.accessories||'')}" placeholder="กล่อง, ดอกสว่าน"></div>
+    <div style="margin-top:14px"><label>SKU</label>
+      <input type="text" id="sSku" value="${esc(j.sku||'')}" placeholder="รหัสสินค้าของตัวเครื่อง"
+             style="text-transform:uppercase"></div>
     <div style="margin-top:14px"><label>หมายเหตุตอนรับเครื่อง</label>
       <textarea id="sIntakeNote" style="min-height:62px"
         placeholder="เช่น กล่องบุบมาแต่แรก · ลูกค้าขอด่วน · ไม่มีใบเสร็จ">${esc(j.intake_note||'')}</textarea></div>
@@ -2026,6 +2046,7 @@ function stepForm(nStep, j, pc){
           ? (j.notified_at ? '' : `<button class="btn" onclick="notifyCustomer()">📞 แจ้งลูกค้าแล้ว</button>`)
             + `<button class="btn p" onclick="receiveParcel()">📦 รับพัสดุเข้าศูนย์</button>`
           : `<button class="btn g" onclick="moveStep(2)">ไปตรวจเช็ค →</button>`)
+      + `<button class="btn dn" onclick="requestClip()">📹 ไม่รับเคลม (ขอคลิป)</button>`
       + `<button class="btn dn" onclick="rejectClaim()">ไม่รับเคลม</button>`);
   }
 
@@ -2228,7 +2249,7 @@ function collectStep(){
   const p = { created_by: who() };
   const g = id => $(id) ? val(id) : undefined;
   if ($('sSymptom'))  p.symptom         = g('sSymptom') || null;
-  if ($('sAcc'))      p.accessories     = g('sAcc') || null;
+  if ($('sSku'))      p.sku             = g('sSku').toUpperCase() || null;
   if ($('sCat'))      p.symptom_category= g('sCat') || null;
   if ($('sArrived'))  p.arrived_at      = g('sArrived')  || null;
   if ($('sIntakeNote')) p.intake_note    = g('sIntakeNote') || null;
@@ -2470,6 +2491,67 @@ async function replaceUnit(){
     status:'ready'
   });
   toast('✅ บันทึกเป็นเคสเปลี่ยนสินค้าแล้ว — ไปขั้นส่งมอบเพื่อปิดงาน');
+}
+
+/* ---------------------------------------------------------------------
+   ไม่รับเคลม แต่ขอคลิป — ปิดเรื่องไว้ก่อน ยังเปิดช่องให้ลูกค้าส่งคลิปมาแย้ง
+   ต่างจากไม่รับเคลมธรรมดาตรงที่ยังมีอะไรให้รอ จึงต้องตามได้ว่ารอมากี่วันแล้ว
+   --------------------------------------------------------------------- */
+const CLIP_ASK = [
+  'ถ่ายตอนกดสวิตช์ ให้เห็นทั้งเครื่องในคลิปเดียว',
+  'ถ่ายให้เห็น Serial No. บนตัวเครื่องชัด ๆ',
+  'ถ่ายตอนเสียบแบต / ชาร์จ ให้เห็นไฟสถานะ',
+  'ถ่ายอาการเสียตอนใช้งานจริง ไม่ตัดต่อ'
+];
+
+async function requestClip(){
+  if (!S.job) return;
+  const f = await formModal({
+    title:'📹 ไม่รับเคลม — ขอคลิปจากลูกค้า',
+    subtitle:'ปิดเรื่องไว้ก่อน แต่ยังเปิดช่องให้ลูกค้าส่งคลิปมาแย้ง · ถ้าคลิปชัดว่าเสียจริง เปิดเรื่องต่อได้',
+    ok:'บันทึกและขอคลิป', danger:true,
+    fields:[
+      { k:'ask', label:'ขอให้ลูกค้าถ่ายอะไร', required:true, list:CLIP_ASK,
+        hint:'พิมพ์เองได้ หรือเลือกจากรายการที่ใช้บ่อย',
+        placeholder:'เช่น ถ่ายตอนกดสวิตช์ ให้เห็นทั้งเครื่อง + เห็น Serial ในคลิปเดียว' },
+      { k:'channel', label:'แจ้งลูกค้าทางไหน', half:true,
+        list:['Shopee chat','TikTok chat','Lazada chat','LINE','โทรศัพท์','Facebook'],
+        placeholder:'Shopee chat / LINE / โทร' }
+    ]});
+  if (!f) return;
+  try {
+    const note = f.ask + (f.channel ? ' · แจ้งทาง ' + f.channel : '');
+    const { error } = await sb.rpc('request_clip',
+      { p_job_id:S.job.id, p_note:note, p_by:who() });
+    if (error) throw error;
+    toast('📹 บันทึกว่าขอคลิปแล้ว — เคสนี้จะอยู่ในรายการ "รอคลิปจากลูกค้า"');
+    S.peek = null;
+    openJob(S.job.id);
+    reloadAll();
+  } catch(e){ fail(e); }
+}
+
+/** ลูกค้าส่งคลิปมาแล้ว — เปิดเรื่องกลับมาเดินตามขั้นตอนปกติ */
+async function clipReceived(){
+  if (!S.job) return;
+  const f = await formModal({
+    title:'✅ ได้คลิปจากลูกค้าแล้ว',
+    subtitle:'ใบงานจะกลับไปขั้นตรวจเช็ค แล้วเดินเรื่องตามปกติ',
+    ok:'เปิดเรื่องต่อ',
+    fields:[
+      { k:'note', label:'คลิปบอกอะไร', type:'textarea',
+        placeholder:'เช่น คลิปเห็นชัดว่ากดสวิตช์แล้วไม่ติดจริง' }
+    ]});
+  if (!f) return;
+  try {
+    const { error } = await sb.rpc('clip_received',
+      { p_job_id:S.job.id, p_note:f.note || null, p_by:who() });
+    if (error) throw error;
+    toast('✅ เปิดเรื่องต่อแล้ว — ไปขั้นตรวจเช็คได้เลย');
+    S.peek = null;
+    openJob(S.job.id);
+    reloadAll();
+  } catch(e){ fail(e); }
 }
 
 /** A3.1 — ไม่รับเคลม ปิดเรื่อง */
@@ -3893,6 +3975,16 @@ function buildAlerts(){
     t2:`ขาด ${s.qty_short} ${s.unit || 'ชิ้น'} · ใบงาน ${s.job_no || '—'}`,
     rt:`ค้าง ${s.days_waiting || 0} วัน`,
     go:() => goPage('parts') }));
+
+  // รอคลิปจากลูกค้า — ปิดเรื่องไว้แล้ว แต่ยังมีอะไรให้ตาม ไม่งั้นค้างลืม
+  S.jobs.filter(j => j.clip_waiting)
+        .sort((a,b) => (b.clip_days_waiting||0) - (a.clip_days_waiting||0))
+        .forEach(j => A.push({
+          g:'รอคลิปจากลูกค้า', lv:(j.clip_days_waiting||0) >= 3 ? 'crit' : 'warn', ic:'📹',
+          t1:`${j.job_no} · ${j.customer_name || 'ยังไม่รู้เจ้าของ'}`,
+          t2:(j.clip_note || 'ขอคลิปประกอบการพิจารณา').slice(0, 70),
+          rt:(j.clip_days_waiting||0) > 0 ? `รอ ${j.clip_days_waiting} วัน` : 'วันนี้',
+          go:() => openJob(j.id) }));
 
   // กล่องค้างแกะ — ของยังไม่ได้เปิดเลย เร่งกว่างานที่เริ่มแล้ว
   S.jobs.filter(unboxPending)
