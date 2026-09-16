@@ -766,9 +766,34 @@ window.addEventListener('load', () => {
   if (typeof printJob !== 'function') miss.push('repair-print.js');
 
   if (miss.length){
+    const base = location.href.replace(/[^/]*$/, '');
     console.warn('[repair] ไฟล์ประกอบยังโหลดไม่ครบ:', miss.join(', '),
       '\n· ถ้าเพิ่ง push ขึ้น GitHub Pages ให้รอ 1-2 นาที แล้วกด Ctrl+Shift+R',
-      '\n· ถ้ายังไม่หาย เปิด', location.href.replace(/[^/]*$/, '') + miss[0], 'ดูว่าขึ้น 404 ไหม');
+      '\n· ถ้ายังไม่หาย เปิด', base + miss[0], 'ดูว่าขึ้น 404 ไหม');
+
+    /* เตือนใน Console อย่างเดียวไม่พอ — ถ้าไฟล์ที่หายคือ repair.css
+       หน้าจะกลายเป็น HTML เปล่า คนใช้เห็นแต่หน้าพัง ไม่รู้ว่าเพราะอะไร
+       แบนเนอร์นี้จึงเขียน style ฝังในตัวเอง ไม่พึ่ง repair.css เลย */
+    const bar = document.createElement('div');
+    bar.setAttribute('data-boot-warn', '1');
+    bar.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:99999;'
+      + 'background:#fdecec;border-bottom:2px solid #c0392b;color:#7d1d13;'
+      + 'font:14px/1.6 system-ui,sans-serif;padding:12px 16px;box-shadow:0 2px 10px rgba(0,0,0,.18)';
+    bar.innerHTML =
+      '<b>⚠️ ไฟล์ประกอบโหลดไม่ครบ — หน้าจอจะเพี้ยน</b>'
+      + '<div style="margin-top:5px">ขาด: <b>' + miss.join(' · ') + '</b>'
+      + ' — ต้องอยู่โฟลเดอร์เดียวกับ index.html ใน repo</div>'
+      + '<div style="margin-top:5px;font-size:13px">'
+      +   '1) เพิ่ง push ขึ้น GitHub Pages → รอ 1-2 นาที แล้วกด <b>Ctrl+Shift+R</b><br>'
+      +   '2) ยังไม่หาย → กดลิงก์นี้ดูว่าขึ้น 404 ไหม: '
+      +   miss.map(f => '<a href="' + base + f + '" target="_blank" style="color:#7d1d13">' + f + '</a>').join(' · ')
+      +   '<br>3) ขึ้น 404 = ยังไม่ได้อัปไฟล์นี้ หรือชื่อไฟล์ตัวพิมพ์ใหญ่-เล็กไม่ตรง'
+      + '</div>'
+      + '<button style="position:absolute;right:10px;top:10px;border:1px solid #c0392b;'
+      +   'background:#fff;color:#7d1d13;border-radius:7px;padding:4px 10px;cursor:pointer"'
+      +   ' onclick="this.parentNode.remove()">ปิด</button>';
+    document.body.appendChild(bar);
+    document.body.style.paddingTop = bar.offsetHeight + 'px';
   }
 });
 window.addEventListener('unhandledrejection', e => showCrash(e.reason?.message || e.reason, 'promise'));
