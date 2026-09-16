@@ -35,7 +35,8 @@ function printJob(kind){
       </div>
       <div class="rt">
         <div class="t">${deliver ? 'ใบส่งมอบสินค้า / ปิดงานซ่อม' : 'ใบรับเครื่องเข้าซ่อม'}</div>
-        <div class="no">${esc(j.job_no)}</div>
+        <div class="no">${esc((j.order_no || '').trim() || (j.tracking_in || '').trim() || j.job_no)}</div>
+        <div class="d">เลขในระบบ ${esc(j.job_no)}</div>
         <div class="d">พิมพ์เมื่อ ${now}</div>
         <div class="d">สถานะ: <b>${esc(STATUS[j.status] || j.status)}</b></div>
       </div>
