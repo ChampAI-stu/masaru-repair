@@ -254,14 +254,21 @@
               </div>
 
               <div>
-                <div style="font-weight:700;color:var(--navy);margin-bottom:11px">👤 ข้อมูลลูกค้า</div>
+                <div style="font-weight:700;color:var(--navy);margin-bottom:11px">👤 ข้อมูลลูกค้า
+                  <span class="muted" style="font-weight:400;font-size:12.5px">· ไม่รู้ตอนนี้ก็ข้ามได้</span></div>
+                <div class="box-info" style="margin-bottom:11px;font-size:12.5px">
+                  กล่องที่ยังไม่ได้แกะ ยังไม่รู้เจ้าของ — สร้างใบงานไว้ก่อนได้เลย
+                  ระบบจะตั้งเป็น <b>"พัสดุไม่ทราบที่มา"</b> แล้วค่อยกด
+                  <b>"พบเจ้าของแล้ว"</b> ทีหลัง
+                </div>
                 <div class="grid">
                   <div>
-                    <label>เบอร์โทร <span class="req">*</span></label>
+                    <label>เบอร์โทร</label>
                     <div class="row"><input type="tel" id="nPhone" placeholder="08X-XXX-XXXX" style="flex:1;min-width:110px">
                       <button class="btn sm" onclick="lookupCustomer()">ค้นลูกค้าเดิม</button></div>
                   </div>
-                  <div><label>ชื่อลูกค้า <span class="req">*</span></label><input type="text" id="nCustName" placeholder="เช่น ABC Engineering"></div>
+                  <div><label>ชื่อลูกค้า</label><input type="text" id="nCustName" placeholder="เช่น ABC Engineering">
+                    <span class="hint">ใส่แค่เบอร์ก็ได้ ระบบใช้เบอร์เป็นชื่อไปก่อน แก้ทีหลังได้</span></div>
                   <div><label>ที่อยู่</label><textarea id="nAddress" placeholder="ที่อยู่สำหรับติดต่อ / จัดส่ง" style="min-height:60px"></textarea></div>
                 </div>
                 <div id="custHint" class="sub2" style="margin-top:8px"></div>
@@ -270,7 +277,7 @@
                 <div style="font-weight:700;color:var(--navy);margin-bottom:11px">🔧 รายละเอียดเครื่องมือ</div>
                 <div class="grid">
                   <div class="grid g2" style="gap:11px">
-                    <div><label>ประเภทเครื่อง <span class="req">*</span></label><input type="text" id="nToolType" placeholder="เช่น Rotary Hammer"></div>
+                    <div><label>ประเภทเครื่อง</label><input type="text" id="nToolType" placeholder="เช่น Rotary Hammer"></div>
                     <div><label>แบรนด์</label><input type="text" id="nBrand" placeholder="Bosch / Makita…"></div>
                   </div>
                   <div class="grid g2" style="gap:11px">
@@ -292,8 +299,8 @@
 
             <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--line2)">
               <div class="grid">
-                <div><label>อาการเสียที่ลูกค้าแจ้ง <span class="req">*</span></label>
-                  <textarea id="nSymptom" placeholder="อธิบายอาการเสีย…"></textarea></div>
+                <div><label>อาการเสียที่ลูกค้าแจ้ง</label>
+                  <textarea id="nSymptom" placeholder="อธิบายอาการเสีย… (ยังไม่แกะกล่อง ข้ามได้)"></textarea></div>
                 <div><label>ของที่นำมาด้วย</label>
                   <input type="text" id="nAcc" placeholder="เช่น กล่อง, ดอกสว่าน, สายชาร์จ"></div>
                 <select id="nSymCat" hidden><option value="">—</option></select>
@@ -1503,25 +1510,39 @@ async function previewJobNo(){
 }
 
 async function saveJob(){
-  if (!val('nCustName')) return toast('กรอกชื่อลูกค้าก่อน', true);
-  if (!val('nPhone'))    return toast('กรอกเบอร์โทรก่อน', true);
-  if (!val('nToolType')) return toast('กรอกประเภทเครื่องก่อน', true);
-  if (!val('nSymptom'))  return toast('กรอกอาการเสียก่อน', true);
+  /* กล่องมาถึงแต่ยังไม่ได้แกะ = ยังไม่รู้เจ้าของ ไม่รู้เครื่อง ไม่รู้อาการ
+     จึงไม่บังคับช่องพวกนี้ — ขอแค่มีอะไรสักอย่างที่ใช้ตามเรื่องกลับมาได้ */
+  const hasCust = val('nCustName') || val('nPhone');
+  const hasRef  = val('nTrackIn') || val('nOrder');
+  if (!hasCust && !hasRef)
+    return toast('ต้องมีอย่างน้อย 1 อย่าง: ชื่อลูกค้า · เบอร์โทร · เลขพัสดุขาเข้า · เลขคำสั่งซื้อ', true);
+
+  const miss = [!val('nToolType') && 'ประเภทเครื่อง',
+                !val('nSymptom')  && 'อาการเสีย'].filter(Boolean);
+  if (miss.length){
+    const okGo = await confirmModal('ยังไม่ได้กรอก ' + miss.join(' และ '),
+      'ถ้ายังไม่ได้แกะกล่อง ข้ามไปก่อนได้ — กลับมาเติมทีหลังในใบงานได้เลย\n\n' +
+      'สร้างใบงานเลยไหม?', { ok:'สร้างใบงาน', danger:false });
+    if (!okGo) return;
+  }
+
   try {
     let cid = val('nCustId');
-    if (!cid){
+    if (!cid && hasCust){
       const { data, error } = await sb.from('repair_customers').insert({
-        name: val('nCustName'), phone: val('nPhone') || null, address: val('nAddress') || null
+        /* ไม่ใส่ชื่อมา ใช้เบอร์เป็นชื่อไปก่อน — ค้นเจอ แก้ทีหลังได้ */
+        name: val('nCustName') || val('nPhone'),
+        phone: val('nPhone') || null, address: val('nAddress') || null
       }).select('id').single();
       if (error) throw error;
       cid = data.id;
     }
     const rec = val('nRecv');
     const { data: job, error } = await sb.from('repair_jobs').insert({
-      customer_id: cid,
+      customer_id: cid || null,          // ไม่มีลูกค้า ต้องส่ง null ไม่ใช่ค่าว่าง (uuid รับค่าว่างไม่ได้)
       tool_type: val('nToolType') || null, brand: val('nBrand') || null,
       model: val('nModel') || null, serial_no: val('nSerial') || null,
-      symptom: val('nSymptom'), symptom_category: val('nSymCat') || null,
+      symptom: val('nSymptom') || null, symptom_category: val('nSymCat') || null,
       accessories: val('nAcc') || null,
       order_no:      val('nOrder')    || null,
       tracking_in:   val('nTrackIn')  || null,
@@ -1529,13 +1550,16 @@ async function saveJob(){
       case_type:     val('nCaseType'),
       warranty_case: val('nWarranty'),
       admin_name:    val('nAdmin') || who(),
-      status: val('nTrackIn') ? 'received' : 'awaiting_parcel',
+      /* ไม่รู้เจ้าของ = พัสดุไม่ทราบที่มา (SOP A9.2) ตามเรื่องต่อด้วยปุ่ม "พบเจ้าของแล้ว" */
+      status: !cid ? 'unknown_parcel'
+            : val('nTrackIn') ? 'received' : 'awaiting_parcel',
       arrived_at:  val('nArrived') || null,
       received_at: rec ? new Date(rec + 'T09:00:00').toISOString() : undefined,
       due_date: val('nDue') || null, created_by: who()
     }).select('id, job_no').single();
     if (error) throw error;
-    toast('✅ สร้างใบงาน ' + job.job_no + ' แล้ว');
+    toast(cid ? '✅ สร้างใบงาน ' + job.job_no + ' แล้ว'
+              : '✅ สร้างใบงาน ' + job.job_no + ' แบบยังไม่รู้เจ้าของ — กด "พบเจ้าของแล้ว" เมื่อรู้ข้อมูล');
 
     if (INTAKE_FILES.length && uploadOn()){
       toast(`⏳ กำลังอัปโหลดรูป ${INTAKE_FILES.length} รูป…`);
