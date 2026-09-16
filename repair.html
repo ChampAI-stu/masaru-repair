@@ -243,6 +243,10 @@
                     <input type="text" id="nOrder" placeholder="เลข Order จากแพลตฟอร์ม"></div>
                   <div><label>เลขพัสดุขาเข้า (Tracking)</label>
                     <input type="text" id="nTrackIn" placeholder="เลขที่ลูกค้าส่งมา"></div>
+                  <div><label>ชื่อร้านแพลตฟอร์ม</label>
+                    <input type="text" id="nShop" list="shopList" autocomplete="off"
+                           placeholder="ร้านที่ลูกค้าซื้อของมา">
+                    <datalist id="shopList"></datalist></div>
                   <div><label>แพลตฟอร์ม / ช่องทาง</label><select id="nPlatform">
                     <option value="">— ไม่ระบุ —</option>
                     ${''}</select></div>
@@ -1378,8 +1382,18 @@ function filterCounts(){
   STEPS.forEach(s => c['step' + s.n] = sc[s.n]);
   return c;
 }
+/** รายชื่อร้านที่เคยกรอกมาแล้ว — เอามาเป็นตัวช่วยเลือก จะได้ไม่พิมพ์ผิดคนละแบบ */
+function refreshShopList(){
+  const el = $('shopList');
+  if (!el) return;
+  const names = [...new Set((S.jobs || []).map(j => (j.shop_name || '').trim()).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, 'th'));
+  el.innerHTML = names.map(n => `<option value="${esc(n)}"></option>`).join('');
+}
+
 function renderChips(){
   renderUnbox();
+  refreshShopList();
   const c = filterCounts();
   const A = [['all','ทั้งหมด'],['open','งานค้าง'],['waiting','รอลูกค้าส่งของ'],['overdue','เกินกำหนด'],
              ['wait_parts','รออะไหล่'],['unassigned','ยังไม่มอบหมาย'],['ready','พร้อมส่งมอบ'],
@@ -1422,7 +1436,7 @@ function renderJobs(){
     if (!matchFilter(j)) return false;
     if (tc && j.technician_id !== tc) return false;
     if (q && ![j.job_no,j.customer_name,j.serial_no,j.sku,j.model,j.brand,j.tool_type,j.symptom,
-               j.order_no,j.tracking_in,j.tracking_out,j.platform]
+               j.order_no,j.tracking_in,j.tracking_out,j.platform,j.shop_name]
       .join(' ').toLowerCase().includes(q)) return false;
     return true;
   });
@@ -1493,7 +1507,7 @@ async function lookupCustomer(){
 }
 
 function clearIntake(){
-  ['nSerial','nToolType','nBrand','nModel','nPhone','nCustName','nAddress','nSymptom','nSku','nNote','nCustId',
+  ['nSerial','nToolType','nBrand','nModel','nPhone','nCustName','nAddress','nSymptom','nSku','nNote','nShop','nCustId',
    'nOrder','nTrackIn','nAdmin'].forEach(id => $(id).value = '');
   $('nSymCat').value = ''; $('nPlatform').value = ''; $('nArrived').value = '';
   $('nCaseType').value = 'claim'; $('nWarranty').value = 'unknown';
@@ -1556,6 +1570,7 @@ async function saveJob(){
       order_no:      val('nOrder')    || null,
       tracking_in:   val('nTrackIn')  || null,
       platform:      val('nPlatform') || null,
+      shop_name:     val('nShop')     || null,
       case_type:     val('nCaseType'),
       warranty_case: val('nWarranty'),
       admin_name:    val('nAdmin') || who(),
@@ -1704,6 +1719,7 @@ function renderJobPage(){
         <div class="kv"><span class="k">พัสดุขาเข้า</span><span class="v mono">${esc(j.tracking_in||'—')}</span></div>
         ${j.tracking_out ? `<div class="kv"><span class="k">พัสดุขาออก</span><span class="v mono">${esc(j.tracking_out)}</span></div>` : ''}
         <div class="kv"><span class="k">ช่องทาง</span><span class="v">${esc(j.platform||'—')}</span></div>
+        <div class="kv"><span class="k">ชื่อร้าน</span><span class="v">${esc(j.shop_name||'—')}</span></div>
         <div class="kv"><span class="k">ประเภทเคส</span><span class="v">${esc(CASE_TYPE[j.case_type]||'—')}</span></div>
         <div class="kv"><span class="k">ประกัน</span><span class="v">
           <span class="pill ${(WARRANTY[j.warranty_case]||WARRANTY.unknown).cls}">${esc((WARRANTY[j.warranty_case]||WARRANTY.unknown).l)}</span></span></div>
@@ -1985,8 +2001,6 @@ function stepForm(nStep, j, pc){
       </div></div>` : '';
     return hint + head + (unknown ? `
     <div class="grid g2">
-      <div><label>ร้านที่ต้องประสาน</label>
-        <input type="text" id="sShop" value="${esc(j.shop_name||'')}" placeholder="ชื่อร้านที่ลูกค้าซื้อ"></div>
       <div><label>แบรนด์บนกล่อง</label>
         <input type="text" id="sBrandU" value="${esc(j.brand||'')}" placeholder="MASARU / Kosen / ..."></div>
     </div>
@@ -1998,6 +2012,10 @@ function stepForm(nStep, j, pc){
       <div><label>เลขพัสดุขาเข้า</label><input type="text" id="sTrackIn" value="${esc(j.tracking_in||'')}"></div>
       <div><label>แพลตฟอร์ม</label><select id="sPlatform"><option value="">— ไม่ระบุ —</option>
         ${PLATFORMS.map(p => `<option ${p===j.platform?'selected':''}>${esc(p)}</option>`).join('')}</select></div>
+      <div><label>ชื่อร้านแพลตฟอร์ม</label>
+        <input type="text" id="sShop" value="${esc(j.shop_name||'')}" list="shopListJob" autocomplete="off"
+               placeholder="${unknown ? 'ร้านที่ต้องประสานหาเจ้าของ' : 'ร้านที่ลูกค้าซื้อของมา'}">
+        <datalist id="shopListJob">${shopOptions()}</datalist></div>
       <div><label>ประเภทเคส</label><select id="sCaseType">${opts(CASE_TYPE, j.case_type)}</select></div>
       <div><label>เงื่อนไขประกัน <span class="req">*</span></label>
         <select id="sWarranty" onchange="document.getElementById('wBox').innerHTML=warrantyBox(this.value)">
@@ -2309,6 +2327,13 @@ async function saveStep(extra){
     if (keep && !extra?.status){ S.peek = keep; renderJobPage(); }
     reloadAll();
   } catch(e){ fail(e); }
+}
+
+/** ตัวเลือกชื่อร้านสำหรับ datalist ในหน้าใบงาน */
+function shopOptions(){
+  return [...new Set((S.jobs || []).map(j => (j.shop_name || '').trim()).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, 'th'))
+    .map(n => `<option value="${esc(n)}"></option>`).join('');
 }
 
 /** กล่องสรุปสถานะการแกะ + ปุ่มกด — โผล่ในขั้นรับเครื่อง */
