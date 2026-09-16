@@ -51,6 +51,7 @@ function printJob(kind){
       <div class="pbox"><div class="h">ข้อมูลเครื่องมือ</div><div class="b">
         ${row('ประเภทเครื่อง', j.tool_type)}
         ${row('แบรนด์ / รุ่น', [j.brand,j.model].filter(Boolean).join(' '))}
+        ${row('SKU', j.sku)}
         ${row('Serial No.', j.serial_no)}
         ${row('ของที่นำมาด้วย', j.accessories)}
       </div></div>
