@@ -560,6 +560,50 @@
             <div class="cb"><div id="topParts"></div></div>
           </div>
         </div>
+
+        <!-- ---------- แท็บค่าส่งเบิกคืนลูกค้า (CS ใช้ยื่นบัญชี) ---------- -->
+        <div id="rt-refund" hidden>
+          <div class="box-info" style="margin-bottom:14px">
+            เคส <b>ประกันภายใน 7 วัน</b> บริษัทเป็นคนแบกค่าส่งขาเข้า
+            แต่ลูกค้าเป็นคนสำรองจ่ายไปก่อน — บริษัทจึงต้องคืนเงินให้<br>
+            ระบบดึงเคสที่เข้าเกณฑ์มาให้เอง · CS เลือกรายการ → ยื่นบัญชี → บัญชีจ่ายคืน
+          </div>
+
+          <div class="kpis" id="rfKpi"></div>
+
+          <div class="card">
+            <h3>💰 ค่าส่งที่ต้องคืนลูกค้า <span class="sp"></span>
+              <button class="btn sm" onclick="rfExport()">⬇️ โหลดไฟล์ส่งบัญชี</button>
+              <button class="btn sm p" onclick="rfSubmit()">📄 ยื่นบัญชี</button>
+              <button class="btn sm g" onclick="rfPaid()">✅ จ่ายคืนแล้ว</button>
+            </h3>
+            <div class="cb">
+              <div class="chips" id="rfTabs" style="margin-bottom:12px"></div>
+              <div class="search" style="margin-bottom:12px">
+                <input type="text" id="rfSearch" placeholder="ค้นหา เลขออเดอร์ / ลูกค้า / เลขเอกสารเบิก"
+                       oninput="renderRefund()">
+                <select id="rfMonth" onchange="renderRefund()" style="width:auto;min-width:150px"></select>
+              </div>
+              <div class="tw"><table id="tblRefund">
+                <thead><tr>
+                  <th class="num noprint"><input type="checkbox" id="rfAll" onchange="rfToggleAll(this)"></th>
+                  <th>เลขออเดอร์</th><th>ลูกค้า</th><th>ช่องทาง</th>
+                  <th>วันที่รับ</th><th class="num">ยอดคืน</th><th class="num">ใบเสร็จ</th>
+                  <th>สถานะ</th><th>เลขเอกสาร</th>
+                </tr></thead><tbody></tbody></table></div>
+              <div id="rfEmpty" class="empty" style="display:none">ไม่มีรายการในกลุ่มนี้</div>
+              <div id="rfSum" class="sub2" style="margin-top:10px"></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>📅 สรุปต่อเดือน</h3>
+            <div class="cb"><div class="tw"><table id="tblRefundMonth">
+              <thead><tr><th>เดือน</th><th class="num">เคส</th><th class="num">ยอดรวม</th>
+                <th class="num">รอเบิก</th><th class="num">ยื่นแล้ว</th><th class="num">จ่ายคืนแล้ว</th>
+              </tr></thead><tbody></tbody></table></div></div>
+          </div>
+        </div>
       </div>
 
       <!-- ============ ใบงาน (หน้าเต็ม) ============ -->
@@ -777,9 +821,15 @@ const CASE_TYPE = {
   consult:   'สอบถาม / ให้คำปรึกษา'
 };
 const WARRANTY = {
-  within7:      { l:'ภายใน 7 วัน',               ship:'บริษัท', parts:'บริษัท', labor:'บริษัท', cls:'tag-good' },
-  in_warranty:  { l:'ในประกัน 1 / 6 / 12 เดือน',  ship:'ลูกค้า', parts:'บริษัท', labor:'บริษัท', cls:'tag-warn' },
-  out_warranty: { l:'นอกประกัน / ประกันขาด',       ship:'ลูกค้า', parts:'ลูกค้า', labor:'ลูกค้า', cls:'tag-crit' },
+  within7:      { l:'ภายใน 7 วัน',               ship:'บริษัท', parts:'บริษัท', labor:'บริษัท', cls:'tag-good',
+                  shipIn:'บริษัท', shipOut:'บริษัท', advance:true,
+                  note:'ขาส่งมา <b>ลูกค้าสำรองจ่ายไปก่อน</b> แล้วบริษัทคืนเงินให้ · ขาส่งกลับบริษัทออกเอง' },
+  in_warranty:  { l:'ในประกัน 1 / 6 / 12 เดือน',  ship:'ลูกค้า', parts:'บริษัท', labor:'บริษัท', cls:'tag-warn',
+                  shipIn:'ลูกค้า', shipOut:'ลูกค้า', advance:false,
+                  note:'ค่าส่งลูกค้าออกเองทั้ง 2 ขา · บริษัทออกให้เฉพาะค่าอะไหล่กับค่าแรง' },
+  out_warranty: { l:'นอกประกัน / ประกันขาด',       ship:'ลูกค้า', parts:'ลูกค้า', labor:'ลูกค้า', cls:'tag-crit',
+                  shipIn:'ลูกค้า', shipOut:'ลูกค้า', advance:false,
+                  note:'ลูกค้าออกเองทั้งหมด — ค่าส่ง ค่าอะไหล่ ค่าแรง' },
   unknown:      { l:'ยังไม่ระบุ',                 ship:'—',      parts:'—',      labor:'—',      cls:'st0' }
 };
 const SEVERITY = { light:'เคสเบา (ง่าย)', medium:'เคสกลาง', heavy:'เคสหนัก (ยาก)' };
@@ -883,6 +933,7 @@ const stepOf = st => STEP_OF[st] || 0;
 let sb = null;
 const S = { jobs:[], techs:[], cats:[], parts:[], custs:[], stock:[], job:null, lines:[], photos:[], slog:[], filter:'open', range:'all', seen:null, peek:null, custView:null, pg:{jobs:1,cust:1,parts:1}, per:30,
   adjust:[], shortage:[], shortDaily:[], prs:[], salvage:[], score:[], repTab:'work',
+  refund:[], refundMonth:[], rfTab:'pending',
   board:[], queue:[] };
 
 /* ตารางที่แบ่งหน้า — repair-ui.js เรียกผ่านทะเบียนนี้ (ใช้ร่วมกับโมดูลอื่นได้) */
@@ -1510,9 +1561,22 @@ function warrantyBox(code){
   const w = WARRANTY[code] || WARRANTY.unknown;
   if (code === 'unknown') return '<div class="box-warn">⚠️ ยังไม่ระบุเงื่อนไขประกัน — ต้องเลือกก่อนเริ่มซ่อม</div>';
   const cls = code === 'within7' ? 'box-ok' : code === 'in_warranty' ? 'box-warn' : 'box-crit';
-  return `<div class="${cls}"><b>${esc(w.l)}</b> — ค่าส่ง: <b>${esc(w.ship)}</b> ·
-    ค่าอะไหล่: <b>${esc(w.parts)}</b> · ค่าแรง: <b>${esc(w.labor)}</b>
-    <div class="muted" style="font-size:12px;margin-top:3px">ค่าส่งเป็นต้นทุนของฝ่ายที่รับผิดชอบ ไม่ใช่รายได้ของใคร</div></div>`;
+  const who = v => v === 'บริษัท'
+    ? '<b style="color:var(--good)">บริษัทออก</b>'
+    : '<b style="color:var(--crit)">ลูกค้าออก</b>';
+  return `<div class="${cls}"><b>${esc(w.l)}</b>
+    <div style="margin-top:6px;display:flex;gap:16px;flex-wrap:wrap;font-size:13px">
+      <span>🚚 ค่าส่งขาเข้า: ${who(w.shipIn)}</span>
+      <span>📦 ค่าส่งขากลับ: ${who(w.shipOut)}</span>
+      <span>🔩 ค่าอะไหล่: ${who(w.parts)}</span>
+      <span>🔧 ค่าแรง: ${who(w.labor)}</span>
+    </div>
+    <div class="sub2" style="margin-top:5px">${w.note || ''}</div>
+    ${w.advance ? `<div class="sub2" style="margin-top:4px">
+      💰 เคสนี้จะเข้ารายการ <b>"ค่าส่งรอเบิกคืนลูกค้า"</b> ให้เอง เมื่อกรอกค่าส่งขาเข้าแล้ว —
+      CS ดูรวมได้ที่ รายงาน → 💰 ค่าส่งเบิกคืน</div>` : ''}
+    <div class="muted" style="font-size:12px;margin-top:3px">
+      ค่าส่งเป็นต้นทุนของฝ่ายที่รับผิดชอบ ไม่ใช่รายได้ของใคร</div></div>`;
 }
 function showWarrantyBox(){ $('warnBox').innerHTML = warrantyBox(val('nWarranty')); }
 
@@ -2078,9 +2142,18 @@ function stepForm(nStep, j, pc){
         <div><input type="text" id="sShipNote" value="${esc(j.ship_note||'')}"
           placeholder="ขนส่งเจ้าไหน / เลขใบเสร็จ"></div>
       </div>
+      <label style="display:flex;gap:7px;align-items:flex-start;margin-top:11px;font-weight:400;font-size:13px">
+        <input type="checkbox" id="sAdvance" ${j.ship_in_advanced ? 'checked' : ''} style="margin-top:3px">
+        <span>💰 <b>ลูกค้าสำรองจ่ายค่าส่งขาเข้าไปก่อน</b> — บริษัทต้องคืนเงินให้
+          <div class="sub2">ติ๊กไว้ = เข้ารายการรอเบิกคืนอัตโนมัติ ·
+            ถ้าบริษัทเรียกรถไปรับเองแล้วจ่ายขนส่งตรง ให้ติ๊กออก</div></span>
+      </label>
       <div class="box-info" style="margin-top:9px;font-size:12.5px">
         ค่าส่ง <b>ไม่นับเป็นรายได้ของใคร</b> — บันทึกไว้เพื่อรู้ว่าฝ่ายไหนแบกเท่าไหร่ ·
         ระบบเติม "ใครจ่าย" ให้เองตามเงื่อนไขประกัน แก้ได้ถ้าตกลงกับลูกค้าเป็นอย่างอื่น</div>
+      ${refundBox(j)}
+      ${j.ship_refund_status && j.ship_refund_status !== 'none'
+        ? `<div style="margin-top:13px">${photoBox('ship_receipt','ใบเสร็จค่าส่งของลูกค้า',3)}</div>` : ''}
     </div>
     ` + foot(
       (unknown
@@ -2324,6 +2397,7 @@ function collectStep(){
   if ($('sShipInBy'))  p.ship_in_by     = g('sShipInBy')  || null;
   if ($('sShipOutBy')) p.ship_out_by    = g('sShipOutBy') || null;
   if ($('sShipNote'))  p.ship_note      = g('sShipNote')  || null;
+  if ($('sAdvance'))   p.ship_in_advanced = $('sAdvance').checked;
   if ($('sLabor'))    p.labor_cost      = Number(g('sLabor')) || 0;
   if ($('sDiscount')) p.discount        = Number(g('sDiscount')) || 0;
   Object.keys(p).forEach(k => p[k] === undefined && delete p[k]);
@@ -2351,6 +2425,60 @@ async function saveStep(extra){
     await openJob(S.job.id);
     if (keep && !extra?.status){ S.peek = keep; renderJobPage(); }
     reloadAll();
+  } catch(e){ fail(e); }
+}
+
+/* ---------------------------------------------------------------------
+   ค่าส่งที่ลูกค้าสำรองจ่าย — บริษัทเป็นหนี้อยู่ ต้องคืน
+   รอเบิก → ยื่นบัญชีแล้ว → จ่ายคืนลูกค้าแล้ว
+   --------------------------------------------------------------------- */
+const REFUND = {
+  pending:   ['tag-warn', '💰 รอ CS รวบรวมยื่นเบิก'],
+  submitted: ['st3',      '📄 ยื่นบัญชีแล้ว'],
+  paid:      ['tag-good', '✅ จ่ายคืนลูกค้าแล้ว']
+};
+
+function refundBox(j){
+  const st = j.ship_refund_status;
+  if (!st || st === 'none') return '';
+  const [cl, lb] = REFUND[st] || ['st0', st];
+  const amt = Number(j.ship_refund_amount ?? j.ship_in_fee) || 0;
+  return `<div class="box-${st === 'paid' ? 'ok' : 'warn'}" style="margin-top:13px">
+    <span class="pill ${cl}">${lb}</span>
+    <b style="margin-left:8px">ต้องคืนลูกค้า ฿${money2(amt)}</b>
+    ${st === 'pending' && isBoss()
+      ? `<button class="btn sm" style="margin-left:8px" onclick="editRefund()">✏️ แก้ยอด</button>` : ''}
+    <div class="sub2" style="margin-top:4px">
+      ${j.ship_refund_ref ? 'เลขเอกสารเบิก <b>' + esc(j.ship_refund_ref) + '</b> · ' : ''}
+      ${j.ship_refund_submitted_at
+        ? 'ยื่น ' + dth(j.ship_refund_submitted_at) + ' โดย ' + esc(j.ship_refund_submitted_by || '—') : ''}
+      ${j.ship_refund_paid_at
+        ? ' · จ่ายคืน ' + dth(j.ship_refund_paid_at) + ' โดย ' + esc(j.ship_refund_paid_by || '—') : ''}
+    </div>
+    ${j.ship_refund_note ? `<div class="sub2">หมายเหตุ: ${esc(j.ship_refund_note)}</div>` : ''}
+    ${st === 'pending' && !(j.receipt_count > 0)
+      ? '<div class="sub2" style="color:var(--crit);margin-top:4px">⚠️ ยังไม่มีรูปใบเสร็จค่าส่ง — บัญชีมักขอดูก่อนอนุมัติ</div>' : ''}
+  </div>`;
+}
+
+async function editRefund(){
+  if (!S.job) return;
+  const f = await formModal({
+    title:'✏️ แก้ยอดที่ต้องคืนลูกค้า',
+    subtitle:'ใส่ยอดตามใบเสร็จค่าส่งจริง · แก้ได้เฉพาะตอนยังไม่ได้ยื่นบัญชี',
+    ok:'บันทึกยอด',
+    fields:[
+      { k:'amt',  label:'ยอดที่ต้องคืน (บาท)', type:'number', required:true, min:0,
+        value: S.job.ship_refund_amount ?? S.job.ship_in_fee ?? 0 },
+      { k:'note', label:'หมายเหตุ', placeholder:'เช่น ใบเสร็จจริง 72 บาท' }
+    ]});
+  if (!f) return;
+  try {
+    const { error } = await sb.rpc('refund_set_amount',
+      { p_job_id:S.job.id, p_amount:Number(f.amt), p_note:f.note || null });
+    if (error) throw error;
+    toast('✅ แก้ยอดแล้ว');
+    S.peek = null; openJob(S.job.id); reloadAll();
   } catch(e){ fail(e); }
 }
 
@@ -3292,11 +3420,219 @@ async function receiveParts(){
 /* =====================================================================
    รายงาน
    ===================================================================== */
+/* =====================================================================
+   ค่าส่งเบิกคืนลูกค้า — CS รวบรวมยื่นบัญชี
+     เคสภายใน 7 วัน ลูกค้าสำรองจ่ายค่าส่งขาเข้าไปก่อน บริษัทต้องคืน
+     รอเบิก → ยื่นบัญชีแล้ว → จ่ายคืนลูกค้าแล้ว
+   ===================================================================== */
+const RF_TABS = [['pending','💰 รอเบิก'],['submitted','📄 ยื่นบัญชีแล้ว'],
+                 ['paid','✅ จ่ายคืนแล้ว'],['','ทั้งหมด']];
+
+async function loadRefund(){
+  try {
+    const [r, m] = await Promise.all([
+      window.__pageAll(() => sb.from('v_ship_refund').select('*')),
+      sb.from('v_ship_refund_month').select('*').limit(36)
+    ]);
+    S.refund = r || [];
+    S.refundMonth = m.error ? [] : (m.data || []);
+  } catch(e){
+    /* ยังไม่ได้รัน 28_ship_refund.sql → ซ่อนแท็บ ไม่ให้หน้าพัง */
+    if (/does not exist|schema cache/i.test(e?.message || '')){
+      S.refund = null; S.refundMonth = [];
+      console.warn('v_ship_refund — ยังไม่ได้รัน 28_ship_refund.sql?', e.message);
+    } else fail(e);
+  }
+}
+
+function rfToggleAll(el){
+  document.querySelectorAll('#tblRefund tbody input[type=checkbox]')
+    .forEach(c => { if (!c.disabled) c.checked = el.checked; });
+}
+const rfPicked = () => [...document.querySelectorAll('#tblRefund tbody input[type=checkbox]:checked')]
+  .map(c => c.dataset.id);
+
+function rfSetTab(k){ S.rfTab = k; renderRefund(); }
+
+function rfRows(){
+  const q  = (val('rfSearch') || '').toLowerCase();
+  const mo = val('rfMonth');
+  return (S.refund || []).filter(r => {
+    if (S.rfTab && r.ship_refund_status !== S.rfTab) return false;
+    if (mo && String(r.received_at || '').slice(0,7) !== mo) return false;
+    if (!q) return true;
+    return [r.order_no, r.job_no, r.customer_name, r.customer_phone, r.ship_refund_ref, r.shop_name]
+      .filter(Boolean).join(' ').toLowerCase().includes(q);
+  });
+}
+
+function renderRefund(){
+  const card = $('rt-refund');
+  if (!card) return;
+  if (S.refund === null){
+    card.innerHTML = `<div class="box-warn">ยังใช้หน้านี้ไม่ได้ — ให้รัน
+      <b class="mono">28_ship_refund.sql</b> ที่ Supabase → SQL Editor ก่อน</div>`;
+    return;
+  }
+  const all = S.refund || [];
+  if (S.rfTab === undefined) S.rfTab = 'pending';
+
+  /* ตัวเลือกเดือน — เติมครั้งเดียว ไม่ให้ค่าที่เลือกไว้หาย */
+  const sel = $('rfMonth');
+  if (sel && !sel.dataset.filled){
+    const mons = [...new Set(all.map(r => String(r.received_at || '').slice(0,7)).filter(Boolean))].sort().reverse();
+    sel.innerHTML = '<option value="">ทุกเดือน</option>' +
+      mons.map(m => `<option value="${m}">${m}</option>`).join('');
+    sel.dataset.filled = '1';
+  }
+
+  const sum = st => all.filter(r => !st || r.ship_refund_status === st)
+                       .reduce((s, r) => s + (Number(r.refund_amount) || 0), 0);
+  const cnt = st => all.filter(r => !st || r.ship_refund_status === st).length;
+
+  $('rfKpi').innerHTML = [
+    ['nb','💰','รอ CS ยื่นเบิก', cnt('pending'),   sum('pending')],
+    ['ne','📄','ยื่นบัญชีแล้ว',   cnt('submitted'), sum('submitted')],
+    ['nc','✅','จ่ายคืนแล้ว',     cnt('paid'),      sum('paid')],
+    ['na','Σ','รวมทั้งหมด',      cnt(''),          sum('')]
+  ].map(([cl,e,l,n,v]) => `<div class="kpi ${cl}">
+      <div class="t"><span class="l">${l}</span><span class="e">${e}</span></div>
+      <div class="n">${money(n)}<small> เคส</small></div>
+      <div class="sub2">฿${money2(v)}</div></div>`).join('');
+
+  $('rfTabs').innerHTML = RF_TABS.map(([k,t]) =>
+    `<button class="chip ${S.rfTab === k ? 'on' : ''}" onclick="rfSetTab('${k}')">
+       ${t} <b>${money(cnt(k))}</b></button>`).join('');
+
+  const rows = rfRows();
+  $('rfEmpty').style.display = rows.length ? 'none' : 'block';
+  $('rfAll').checked = false;
+  $('tblRefund').querySelector('tbody').innerHTML = rows.map(r => {
+    const [cl, lb] = REFUND[r.ship_refund_status] || ['st0', r.ship_refund_status];
+    const canPick = r.ship_refund_status !== 'paid';
+    return `<tr>
+      <td class="num noprint"><input type="checkbox" data-id="${esc(r.id)}" ${canPick ? '' : 'disabled'}></td>
+      <td class="mono"><b>${esc(r.order_no || r.tracking_in || r.job_no)}</b>
+        <div class="sub2">ระบบ ${esc(r.job_no)}</div></td>
+      <td>${esc(r.customer_name || '—')}
+        <div class="sub2">${esc(r.customer_phone || '')}</div></td>
+      <td class="sub2">${esc(r.platform || '—')}
+        ${r.shop_name ? '<div class="sub2">' + esc(r.shop_name) + '</div>' : ''}</td>
+      <td class="sub2" style="white-space:nowrap">${esc(dth(r.received_at))}</td>
+      <td class="num"><b>฿${money2(r.refund_amount)}</b></td>
+      <td class="num">${r.receipt_count > 0
+        ? '<span class="pill tag-good">' + r.receipt_count + '</span>'
+        : '<span class="pill tag-crit">ไม่มี</span>'}</td>
+      <td><span class="pill ${cl}">${lb}</span></td>
+      <td class="mono sub2">${esc(r.ship_refund_ref || '—')}</td>
+    </tr>`;
+  }).join('');
+
+  const tot = rows.reduce((s, r) => s + (Number(r.refund_amount) || 0), 0);
+  $('rfSum').innerHTML = `แสดง <b>${money(rows.length)}</b> รายการ · รวม <b>฿${money2(tot)}</b>
+    ${rows.some(r => !(r.receipt_count > 0))
+      ? ' · <span style="color:var(--crit)">มีรายการที่ยังไม่มีรูปใบเสร็จ</span>' : ''}`;
+
+  $('tblRefundMonth').querySelector('tbody').innerHTML =
+    (S.refundMonth || []).map(m => `<tr>
+      <td><b>${esc(String(m['เดือน']).slice(0,7))}</b></td>
+      <td class="num">${money(m['เคสทั้งหมด'])}</td>
+      <td class="num"><b>฿${money2(m['ยอดรวม'])}</b></td>
+      <td class="num">฿${money2(m['ยอดรอเบิก'] || 0)}</td>
+      <td class="num">฿${money2(m['ยอดยื่นแล้ว'] || 0)}</td>
+      <td class="num">฿${money2(m['ยอดจ่ายคืนแล้ว'] || 0)}</td>
+    </tr>`).join('') || '<tr><td colspan="6" class="empty">ยังไม่มีข้อมูล</td></tr>';
+}
+
+/* ---------- ยื่นบัญชี ---------- */
+async function rfSubmit(){
+  const ids = rfPicked();
+  if (!ids.length) return toast('เลือกรายการที่จะยื่นก่อน (ติ๊กช่องหน้าแถว)', true);
+  const picked = (S.refund || []).filter(r => ids.includes(r.id));
+  const bad = picked.filter(r => r.ship_refund_status !== 'pending');
+  if (bad.length) return toast(`มี ${bad.length} รายการที่ยื่นไปแล้ว — เอาออกก่อน`, true);
+  const noRc = picked.filter(r => !(r.receipt_count > 0));
+
+  const f = await formModal({
+    title:'📄 ยื่นเบิกค่าส่งกับบัญชี',
+    subtitle:`${picked.length} รายการ · รวม ฿${money2(picked.reduce((s,r)=>s+(Number(r.refund_amount)||0),0))}`
+      + (noRc.length ? ` · ⚠️ ไม่มีรูปใบเสร็จ ${noRc.length} รายการ` : ''),
+    ok:'บันทึกว่ายื่นแล้ว',
+    fields:[{ k:'ref', label:'เลขเอกสารที่ยื่นบัญชี', required:true,
+              placeholder:'เช่น PV-2609-001', hint:'ใช้เลขเดียวกันทุกรายการที่เลือก' }]});
+  if (!f) return;
+  try {
+    const { data, error } = await sb.rpc('refund_submit',
+      { p_job_ids:ids, p_ref:f.ref, p_by:who() });
+    if (error) throw error;
+    toast(`✅ ยื่นบัญชีแล้ว ${money(data)} รายการ (เอกสาร ${f.ref})`);
+    await loadRefund(); renderRefund();
+  } catch(e){ fail(e); }
+}
+
+/* ---------- บัญชีจ่ายคืนแล้ว ---------- */
+async function rfPaid(){
+  const ids = rfPicked();
+  if (!ids.length) return toast('เลือกรายการที่จ่ายคืนแล้วก่อน', true);
+  const picked = (S.refund || []).filter(r => ids.includes(r.id));
+  const bad = picked.filter(r => r.ship_refund_status !== 'submitted');
+  if (bad.length) return toast(`มี ${bad.length} รายการที่ยังไม่ได้ยื่นบัญชี — ต้องยื่นก่อน`, true);
+
+  const f = await formModal({
+    title:'✅ บันทึกว่าจ่ายคืนลูกค้าแล้ว',
+    subtitle:`${picked.length} รายการ · รวม ฿${money2(picked.reduce((s,r)=>s+(Number(r.refund_amount)||0),0))}`,
+    ok:'บันทึก',
+    fields:[{ k:'note', label:'หมายเหตุ', placeholder:'เช่น โอนคืนพร้อมกันวันที่ 20 ก.ย.' }]});
+  if (!f) return;
+  try {
+    const { data, error } = await sb.rpc('refund_paid',
+      { p_job_ids:ids, p_by:who(), p_note:f.note || null });
+    if (error) throw error;
+    toast(`✅ บันทึกจ่ายคืนแล้ว ${money(data)} รายการ`);
+    await loadRefund(); renderRefund();
+  } catch(e){ fail(e); }
+}
+
+/* ---------- โหลดเป็นไฟล์ส่งบัญชี ---------- */
+function rfExport(){
+  const rows = rfRows();
+  if (!rows.length) return toast('ไม่มีรายการให้โหลด', true);
+  const head = ['เลขออเดอร์','เลขในระบบ','ลูกค้า','เบอร์โทร','ช่องทาง','ชื่อร้าน',
+                'วันที่รับเครื่อง','ค่าส่งขาเข้า','ยอดที่ต้องคืน','จำนวนใบเสร็จ',
+                'สถานะ','เลขเอกสารเบิก','วันที่ยื่น','ผู้ยื่น','วันที่จ่ายคืน','ผู้จ่าย','หมายเหตุ'];
+  const body = rows.map(r => [
+    r.order_no || r.tracking_in || '', r.job_no, r.customer_name || '', r.customer_phone || '',
+    r.platform || '', r.shop_name || '', dth(r.received_at),
+    Number(r.ship_in_fee) || 0, Number(r.refund_amount) || 0, r.receipt_count || 0,
+    r.refund_label || '', r.ship_refund_ref || '',
+    r.ship_refund_submitted_at ? dth(r.ship_refund_submitted_at) : '', r.ship_refund_submitted_by || '',
+    r.ship_refund_paid_at ? dth(r.ship_refund_paid_at) : '', r.ship_refund_paid_by || '',
+    r.ship_refund_note || ''
+  ]);
+  const tot = rows.reduce((s, r) => s + (Number(r.refund_amount) || 0), 0);
+  body.push([]);
+  body.push(['รวม', '', '', '', '', '', '', '', tot]);
+
+  /* ใส่ BOM ให้ Excel ภาษาไทยไม่เพี้ยน · ครอบ " ทุกช่องกันคอมมาในข้อความ */
+  const cell = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+  const csv = '﻿' + [head, ...body].map(r => r.map(cell).join(',')).join('\r\n');
+  const name = 'ค่าส่งเบิกคืน_' + new Date().toISOString().slice(0,10) +
+               (S.rfTab ? '_' + S.rfTab : '') + '.csv';
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type:'text/csv;charset=utf-8' }));
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  toast(`⬇️ โหลด ${money(rows.length)} รายการแล้ว — รวม ฿${money2(tot)}`);
+}
+
+
 /* ---------- แท็บ ---------- */
 const REP_TABS = [
   { k:'work',    t:'📊 ผลงานช่าง',    boss:false },
   { k:'money',   t:'💵 การเงินและรางวัล', boss:true  },
-  { k:'quality', t:'🔍 คุณภาพสินค้า',  boss:false }
+  { k:'quality', t:'🔍 คุณภาพสินค้า',  boss:false },
+  { k:'refund',  t:'💰 ค่าส่งเบิกคืน',  boss:false }
 ];
 const DIFF_COLOR = { light:'#9cbbdf', medium:'#4f83bb', heavy:'#1F3864', none:'#d8e0ec' };
 
@@ -3312,6 +3648,7 @@ function redrawRepTab(){
   if (S.repTab === 'work')    drawDiffChart();
   if (S.repTab === 'money')   drawRevChart();
   if (S.repTab === 'quality') drawTopParts();
+  if (S.repTab === 'refund')  renderRefund();
 }
 function renderRepTabs(){
   const show = REP_TABS.filter(t => !t.boss || isBoss());
@@ -3326,6 +3663,7 @@ async function loadReport(){
   /* ช่างไม่ต้องมีตัวเลขเงินอยู่ในหน้าเลย — ถอดออกจาก DOM ทิ้ง */
   if (!isBoss()){ const m = $('rt-money'); if (m) m.innerHTML = ''; }
 
+  await loadRefund();
   await loadWorkReport();                     // ต้องมาก่อน — ตารางรางวัลใช้ S.score
   await Promise.all([loadQualityReport(), isBoss() ? loadMoneyReport() : Promise.resolve()]);
 }
