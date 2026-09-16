@@ -365,6 +365,22 @@
           </div>
         </div>
 
+        <div class="card" id="cardSalvage" hidden>
+          <h3>📦 เครื่องที่แยกเป็นอะไหล่ <span class="sp"></span>
+            <span class="muted" style="font-weight:400;font-size:13px">
+              ประเมินว่าซ่อมไม่ได้ แล้วเลือก "แยกออกไป เพื่อเป็นสต๊อกอะไหล่"</span>
+            <span class="pill tag-warn" id="svCount">0</span></h3>
+          <div class="cb"><div class="tw"><table id="tblSalvage">
+            <thead><tr><th>ใบงาน</th><th>แบรนด์ / รุ่น</th><th>Serial</th>
+              <th>อาการที่พบ</th><th>ปลายทางเครื่อง</th><th>วันที่รับเข้า</th></tr></thead>
+            <tbody></tbody></table></div>
+            <div class="box-info" style="margin-top:12px;font-size:13px">
+              เครื่องพวกนี้ยังไม่ถูกถอดเป็นอะไหล่ในระบบ — ถอดแล้วให้ไปที่
+              <b>เบิก / คืน คลังกลาง → ตรวจนับ</b> เพื่อเพิ่มยอดอะไหล่ที่ได้มา
+            </div>
+          </div>
+        </div>
+
         <div class="card" id="cardPR">
           <h3>📄 ใบขอจัดซื้ออะไหล่ <span class="sp"></span>
             <span class="muted" style="font-weight:400;font-size:13px">SOP A11b.1 · เสนอหัวหน้าศูนย์ → CEO</span></h3>
@@ -770,7 +786,7 @@ const stepOf = st => STEP_OF[st] || 0;
 
 let sb = null;
 const S = { jobs:[], techs:[], cats:[], parts:[], custs:[], stock:[], job:null, lines:[], photos:[], slog:[], filter:'open', range:'all', seen:null, peek:null, custView:null, pg:{jobs:1,cust:1,parts:1}, per:30,
-  adjust:[], shortage:[], shortDaily:[], prs:[], score:[], repTab:'work',
+  adjust:[], shortage:[], shortDaily:[], prs:[], salvage:[], score:[], repTab:'work',
   board:[], queue:[] };
 
 /* ตารางที่แบ่งหน้า — repair-ui.js เรียกผ่านทะเบียนนี้ (ใช้ร่วมกับโมดูลอื่นได้) */
@@ -1917,12 +1933,18 @@ function stepForm(nStep, j, pc){
     <div class="grid g2" style="margin-top:14px">
       <div><label>ความรุนแรงของเคส</label><select id="sSeverity">
         <option value="">— ยังไม่ระบุ —</option>${opts(SEVERITY, j.severity)}</select></div>
-      <div><label>ประเมินการซ่อม</label><select id="sRepairable">
+      <div><label>ประเมินการซ่อม</label>
+        <select id="sRepairable" onchange="repairableChanged()">
         <option value="">— ยังไม่ระบุ —</option>
-        <option value="yes" ${j.repairable === true  ? 'selected':''}>ซ่อมได้</option>
-        <option value="no"  ${j.repairable === false ? 'selected':''}>ซ่อมไม่ได้ — ควรเปลี่ยนสินค้าใหม่</option>
+        <option value="yes" ${j.repairable === true ? 'selected':''}>ซ่อมได้</option>
+        <option value="no" ${j.repairable === false && j.no_repair_action !== 'salvage'
+          ? 'selected':''}>ซ่อมไม่ได้ — ควรเปลี่ยนสินค้าใหม่ให้ลูกค้า</option>
+        <option value="salvage" ${j.no_repair_action === 'salvage'
+          ? 'selected':''}>ซ่อมไม่ได้ — แยกออกไป เพื่อเป็นสต๊อกอะไหล่</option>
       </select></div>
     </div>
+    <div id="sRepairNote">${repairNoteHTML(
+       j.no_repair_action === 'salvage' ? 'salvage' : (j.repairable === false ? 'no' : ''))}</div>
     ${recap('อาการที่ลูกค้าแจ้ง: ' + esc(j.symptom || '—')
       + '\nเงื่อนไขประกัน: ' + esc((WARRANTY[j.warranty_case]||WARRANTY.unknown).l))}
     ` + foot(`<button class="btn g" onclick="moveStep(3)">ไปมอบหมายงาน →</button>`);
@@ -2065,6 +2087,10 @@ function stepForm(nStep, j, pc){
     ${j.case_type === 'replace' ? `<div class="box-warn" style="margin-top:14px">
       🔄 <b>เคสเปลี่ยนสินค้า</b> — ปลายทางเครื่องเดิม:
       <b>${esc(DISPOSITION[j.old_unit_disposition] || 'ยังไม่ระบุ')}</b></div>` : ''}
+    ${j.no_repair_action === 'salvage' ? `<div class="box-warn" style="margin-top:14px">
+      📦 <b>เครื่องนี้แยกเก็บเป็นสต๊อกอะไหล่</b> — ไม่ส่งคืนลูกค้า
+      <div class="sub2" style="margin-top:3px">ฝ่ายคลังดูรายการทั้งหมดได้ที่
+        หน้า <b>คลังอะไหล่ → เครื่องที่แยกเป็นอะไหล่</b></div></div>` : ''}
     <div style="margin-top:14px">${warrantyBox(j.warranty_case)}</div>
     <p style="margin:16px 0 0;color:var(--ink2)">
       ${done ? '✅ ปิดงานเรียบร้อยแล้ว' : 'เมื่อลูกค้ารับเครื่องแล้ว กดยืนยันส่งมอบเพื่อปิดงาน'}</p>
@@ -2108,8 +2134,14 @@ function collectStep(){
   if ($('sShop'))     p.shop_name       = g('sShop') || null;
   if ($('sBrandU'))   p.brand           = g('sBrandU') || null;
   if ($('sUnknown'))  p.unknown_note    = g('sUnknown') || null;
-  if ($('sRepairable')) p.repairable    = g('sRepairable') === 'yes' ? true
-                                         : g('sRepairable') === 'no' ? false : null;
+  if ($('sRepairable')){
+    /* ดรอปดาวน์มี 3 ตัวเลือก แต่เก็บลง 2 คอลัมน์
+         repairable        true / false / null  (ของเดิม รายงานเก่ายังใช้ได้)
+         no_repair_action  replace / salvage / null  (ทางที่เลือกเมื่อซ่อมไม่ได้) */
+    const v = g('sRepairable');
+    p.repairable       = v === 'yes' ? true : (v === 'no' || v === 'salvage') ? false : null;
+    p.no_repair_action = v === 'salvage' ? 'salvage' : v === 'no' ? 'replace' : null;
+  }
   if ($('sInspect'))  p.inspect_result  = g('sInspect') || null;
   if ($('sDiff'))     p.severity        = g('sDiff') || null;
   if ($('sMethod'))   p.repair_method   = g('sMethod') || null;
@@ -2225,6 +2257,30 @@ async function claimOwner(){
       status:'received', received_at: new Date().toISOString()
     });
   } catch(e){ fail(e); }
+}
+
+/* ---------------------------------------------------------------------
+   ประเมินว่าซ่อมไม่ได้ — มี 2 ทางที่ปลายทางเครื่องต่างกันคนละเรื่อง
+     เปลี่ยนสินค้าใหม่ = เครื่องเดิมออกจากบริษัท ลูกค้าได้เครื่องใหม่
+     แยกเป็นสต๊อกอะไหล่ = เครื่องอยู่ในบริษัท ถอดเก็บเป็นอะไหล่
+   ต้องแยกให้ออก ไม่งั้นรายงาน "ซ่อมไม่ได้" จะปนกันจนใช้ไม่ได้
+   --------------------------------------------------------------------- */
+function repairNoteHTML(v){
+  if (v === 'salvage') return `<div class="box-warn" style="margin-top:12px">
+    📦 <b>แยกเก็บเป็นสต๊อกอะไหล่</b> — เครื่องนี้ไม่ซ่อมและไม่ส่งคืนลูกค้า
+    ให้ถอดเก็บเป็นอะไหล่ไว้ใช้กับเคสอื่น
+    <div class="sub2" style="margin-top:4px">
+      บันทึกแล้วจะไปโผล่ในรายการ <b>"เครื่องที่แยกเป็นอะไหล่"</b> ให้ฝ่ายคลังไปถอดต่อ ·
+      ยังต้องแจ้งลูกค้าตามเงื่อนไขประกันตามปกติ</div></div>`;
+  if (v === 'no') return `<div class="box-warn" style="margin-top:12px">
+    🔄 <b>ควรเปลี่ยนสินค้าใหม่</b> — ไปที่ขั้นซ่อม แล้วกดปุ่ม
+    <b>"ซ่อมไม่ได้ เปลี่ยนสินค้า"</b> เพื่อออกเลขพัสดุใหม่ตาม SOP A12b</div>`;
+  return '';
+}
+
+function repairableChanged(){
+  const v = val('sRepairable');
+  if ($('sRepairNote')) $('sRepairNote').innerHTML = repairNoteHTML(v);
 }
 
 /** A12b — ซ่อมไม่ได้ / ใช้เวลานาน → ส่งสินค้าใหม่ให้ลูกค้าทันที */
@@ -2740,17 +2796,40 @@ function closeCust(){
    ===================================================================== */
 async function loadParts(){
   try {
-    const [stock, sh, pr] = await Promise.all([
+    const [stock, sh, pr, sv] = await Promise.all([
       window.__pageAll(() => sb.from('v_parts_stock').select('*')),
       sb.from('v_shortage_daily').select('*').limit(200),
-      sb.from('v_purchase_requests').select('*').limit(100)
+      sb.from('v_purchase_requests').select('*').limit(100),
+      sb.from('v_salvage_units').select('*').limit(300)
     ]);
     S.stock = stock;
     S.shortDaily = sh.error ? [] : (sh.data || []);
     S.prs        = pr.error ? [] : (pr.data || []);
+    /* ยังไม่ได้รัน 23_salvage.sql ก็ไม่ต้องพัง แค่ซ่อนการ์ดไว้ */
+    S.salvage    = sv.error ? [] : (sv.data || []);
     if (sh.error) console.warn('v_shortage_daily', sh.error.message);
-    renderParts(); renderShortage(); renderPR(); renderAdjust(); renderBell();
+    if (sv.error) console.warn('v_salvage_units — ยังไม่ได้รัน 23_salvage.sql?', sv.error.message);
+    renderParts(); renderShortage(); renderPR(); renderAdjust(); renderSalvage(); renderBell();
   } catch(e){ fail(e); }
+}
+
+/* ---------- เครื่องที่แยกไว้เป็นสต๊อกอะไหล่ ---------- */
+function renderSalvage(){
+  const rows = S.salvage || [];
+  $('cardSalvage').hidden = !rows.length;
+  $('svCount').textContent = money(rows.length);
+  if (!rows.length) return;
+  $('tblSalvage').querySelector('tbody').innerHTML = rows.map(r => `<tr>
+    <td><b class="mono">${esc(r.job_no)}</b>
+      ${r.customer_name ? `<div class="sub2">${esc(r.customer_name)}</div>` : ''}</td>
+    <td>${esc(r.brand || '—')}${r.model ? ' / ' + esc(r.model) : ''}</td>
+    <td class="mono sub2">${esc(r.serial_no || '—')}</td>
+    <td>${esc(r.inspect_result || r.symptom || '—')}
+      ${r.symptom_name ? `<div class="sub2">${esc(r.symptom_name)}</div>` : ''}</td>
+    <td><span class="pill ${r.old_unit_disposition === 'spare_parts' ? 'tag-good' : 'st0'}">
+      ${esc(r.disposition_label)}</span></td>
+    <td class="sub2" style="white-space:nowrap">${esc(dth(r.received_at))}</td>
+  </tr>`).join('');
 }
 
 /* ---------- อะไหล่ที่ขาด สรุปรายวัน ---------- */
