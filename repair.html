@@ -71,7 +71,7 @@
       <div class="search">
         <span class="mg">🔍</span>
         <input type="text" id="gSearch" placeholder="ค้นหา ใบงาน / Order / Tracking"
-               title="ค้นได้จากเลขที่งาน ชื่อลูกค้า Serial รุ่น หรืออาการเสีย">
+               title="ค้นได้จากเลขออเดอร์ เลขพัสดุ เลขในระบบ ชื่อลูกค้า ชื่อร้าน SKU Serial รุ่น หรืออาการเสีย">
       </div>
       <button class="bell" id="bellBtn" title="การแจ้งเตือน" aria-haspopup="true" aria-expanded="false">
         🔔<span class="badge" id="bellCount" hidden>0</span></button>
@@ -110,7 +110,7 @@
               นับจากวันที่ขนส่งมาถึงศูนย์</span>
             <span class="pill tag-crit" id="ubCount">0</span></h3>
           <div class="cb"><div class="tw"><table id="tblUnbox">
-            <thead><tr><th>เลขที่งาน</th><th>ช่องทาง</th><th>พัสดุขาเข้า</th>
+            <thead><tr><th>เลขออเดอร์</th><th>ช่องทาง</th><th>พัสดุขาเข้า</th>
               <th>ของถึงศูนย์</th><th>ครบกำหนด</th><th class="num">เหลือ</th>
               <th class="num noprint"></th></tr></thead>
             <tbody></tbody></table></div></div>
@@ -134,7 +134,7 @@
           <div class="card">
             <h3>งานที่เกินกำหนด <span class="sp"></span><span id="odCount" class="pill tag-crit"></span></h3>
             <div class="cb"><div class="tw"><table id="tblOverdue">
-              <thead><tr><th>เลขที่งาน</th><th>ลูกค้า</th><th>เครื่องมือ</th><th>กำหนดเสร็จ</th><th class="num">เกินกำหนด</th><th class="num noprint"></th></tr></thead>
+              <thead><tr><th>เลขออเดอร์</th><th>ลูกค้า</th><th>เครื่องมือ</th><th>กำหนดเสร็จ</th><th class="num">เกินกำหนด</th><th class="num noprint"></th></tr></thead>
               <tbody></tbody></table></div>
               <div id="odEmpty" class="empty" style="display:none">🎉 ไม่มีงานเกินกำหนด</div>
             </div>
@@ -165,7 +165,7 @@
           <h3>รายการใบงาน <span class="sp"></span><span class="muted" id="jobCount"></span></h3>
           <div class="cb">
             <div class="tw"><table id="tblJobs">
-              <thead><tr><th>เลขที่งาน</th><th>ลูกค้า</th><th>เครื่องมือ</th><th>อาการ</th><th>ช่าง</th><th>สถานะ</th><th>กำหนดเสร็จ</th><th class="num">รวม</th><th class="num noprint">จัดการ</th></tr></thead>
+              <thead><tr><th>เลขออเดอร์</th><th>ลูกค้า</th><th>เครื่องมือ</th><th>อาการ</th><th>ช่าง</th><th>สถานะ</th><th>กำหนดเสร็จ</th><th class="num">รวม</th><th class="num noprint">จัดการ</th></tr></thead>
               <tbody></tbody></table></div>
             <div id="jobsEmpty" class="empty" style="display:none">ไม่มีใบงานที่ตรงเงื่อนไข</div>
             <div id="pgJobs"></div>
@@ -342,7 +342,7 @@
           <div class="kpis" id="cdKpi"></div>
           <div class="card"><div class="cb" style="padding:0">
             <div class="tw"><table id="tblCustJobs">
-              <thead><tr><th>เลขที่งาน</th><th>เครื่องมือ</th><th>อาการ</th><th>สถานะ</th><th>วันที่รับ</th><th class="num">รวม</th></tr></thead>
+              <thead><tr><th>เลขออเดอร์</th><th>เครื่องมือ</th><th>อาการ</th><th>สถานะ</th><th>วันที่รับ</th><th class="num">รวม</th></tr></thead>
               <tbody></tbody></table></div>
           </div></div>
         </div>
@@ -790,6 +790,27 @@ let UNBOX_DAYS = 3;
      unbox_state     : no_date · ok · today · late · done · done_late
      unbox_days_left : เหลือกี่วัน · ติดลบ = เกินมาแล้วกี่วัน
    ประกาศเป็น function ไม่ใช่ const เพราะถูกเรียกจากโค้ดที่อยู่ก่อนหน้านี้ในไฟล์ */
+
+/* เลขที่ใช้เรียกใบงานในหน้าจอ — เอาเลขออเดอร์ขึ้นก่อน
+     เลขระบบ REP-xxxx ยังมีอยู่ในฐานข้อมูล ใช้เป็นกุญแจ ใช้บนใบพิมพ์และ QR
+     แต่คนทำงานจำเลขออเดอร์ ไม่ใช่เลขระบบ จอจึงโชว์เลขออเดอร์เป็นหลัก
+     ไม่มีออเดอร์ (พัสดุไม่ทราบที่มา / หน้าร้าน) ค่อยไล่ลงไปเลขพัสดุ แล้วเลขระบบ */
+function jobRef(j){
+  return (j.order_no || '').trim() || (j.tracking_in || '').trim() || j.job_no || '—';
+}
+/** เจอแค่เลขระบบ (ตารางอะไหล่ขาด / คำขอแก้) ให้ย้อนไปหาเลขออเดอร์จากใบงาน */
+function refByNo(no){
+  if (!no) return '—';
+  const j = (S.jobs || []).find(x => x.job_no === no);
+  return j ? jobRef(j) : no;
+}
+
+/** ป้ายบอกว่าเลขที่โชว์อยู่เป็นเลขอะไร */
+function jobRefKind(j){
+  if ((j.order_no || '').trim())   return 'Order';
+  if ((j.tracking_in || '').trim()) return 'พัสดุ';
+  return 'เลขระบบ';
+}
 
 /** กล่องใบนี้ยังค้างแกะอยู่ไหม — ปิดงานแล้วไม่นับ */
 function unboxPending(j){
@@ -1341,7 +1362,7 @@ function renderDash(){
   $('odEmpty').style.display = od.length ? 'none' : 'block';
   $('tblOverdue').querySelector('tbody').innerHTML = od.slice(0,12).map(j =>
     `<tr>
-      <td class="mono"><b>${esc(j.job_no)}</b></td><td>${esc(j.customer_name || '—')}</td>
+      <td class="mono"><b>${esc(jobRef(j))}</b></td><td>${esc(j.customer_name || '—')}</td>
       <td>${esc([j.brand,j.model].filter(Boolean).join(' ') || '—')}</td>
       <td>${dth(j.due_date)}</td>
       <td class="num"><span class="pill tag-crit">${j.days_overdue} วัน</span></td>
@@ -1450,8 +1471,8 @@ function renderJobs(){
     return `<tr class="click ${S.seen === j.id ? 'seen' : ''}" tabindex="0"
       onclick="openJob('${j.id}')"
       onkeydown="if(event.key==='Enter'){event.preventDefault();openJob('${j.id}')}">
-      <td class="mono"><b>${esc(j.job_no)}</b>
-        <div class="sub2">${j.order_no ? 'Order ' + esc(j.order_no) : dth(j.received_at)}</div></td>
+      <td class="mono"><b>${esc(jobRef(j))}</b>
+        <div class="sub2">${esc(jobRefKind(j))} · ${esc(dth(j.received_at))}</div></td>
       <td>${j.clip_waiting ? '<span class="pill tag-warn">📹 รอคลิป</span> ' : ''}
         ${j.status === 'unknown_parcel'
         ? '<span class="pill st-unknown">ยังไม่ทราบเจ้าของ</span>'
@@ -1684,7 +1705,11 @@ function renderJobPage(){
 
   <div class="card"><div class="cb" style="display:flex;align-items:center;gap:11px;flex-wrap:wrap;padding:13px 18px">
     <button class="btn sm noprint" onclick="closeJob()" title="กลับรายการใบงาน">←</button>
-    <span class="mono" style="font-size:18px;font-weight:800;color:var(--navy)">${esc(j.job_no)}</span>
+    <span style="line-height:1.2">
+      <span class="mono" style="font-size:18px;font-weight:800;color:var(--navy);display:block">${esc(jobRef(j))}</span>
+      <span class="sub2" style="font-size:11.5px">${esc(jobRefKind(j))}${
+        jobRefKind(j) === 'เลขระบบ' ? '' : ' · ระบบ ' + esc(j.job_no)}</span>
+    </span>
     <span class="pill st${cur}"><span class="d"></span>${STATUS[j.status]||j.status}</span>
     ${late ? `<span class="pill tag-crit">เกินกำหนด ${j.days_overdue} วัน</span>` : ''}
     ${j.warranty_case && j.warranty_case !== 'unknown'
@@ -1877,7 +1902,7 @@ async function peekBoard(){
           const me2 = q.id === jobId, lv = lvOf(q.severity) || { t:'—', ico:'' };
           return `<tr ${me2 ? 'style="background:var(--gold-l);font-weight:700"' : ''}>
             <td class="num">${q.queue_no}</td>
-            <td class="mono">${esc(q.job_no)}${me2 ? ' <span class="pill st1">ใบนี้</span>' : ''}</td>
+            <td class="mono">${esc(jobRef(q))}${me2 ? ' <span class="pill st1">ใบนี้</span>' : ''}</td>
             <td><span class="pill lv-${q.severity}">${lv.ico} ${lv.t}</span></td>
             <td>${esc([q.brand,q.model].filter(Boolean).join(' ') || q.tool_type || '—')}</td>
             <td class="num">${esc(waitTxt(Number(q.hours_waiting)||0))}</td></tr>`;
@@ -2904,7 +2929,7 @@ function renderDispatch(){
     const wait = Number(q.hours_waiting) || 0;
     return `<tr class="click" onclick="openJob('${q.id}')">
       <td class="num"><b>${q.queue_no}</b></td>
-      <td class="mono"><b>${esc(q.job_no)}</b></td>
+      <td class="mono"><b>${esc(jobRef(q))}</b></td>
       <td><span class="pill lv-${q.severity}">${lv.ico} ${lv.t}</span></td>
       <td>${esc(q.customer_name || '—')}</td>
       <td>${esc([q.brand,q.model].filter(Boolean).join(' ') || q.tool_type || '—')}</td>
@@ -2920,7 +2945,7 @@ function renderDispatch(){
   $('cardNoLevel').hidden = !noLv.length;
   $('noLvCount').textContent = noLv.length + ' ใบ';
   if (noLv.length) $('tblNoLevel').querySelector('tbody').innerHTML = noLv.map(j => `<tr>
-    <td class="mono"><b>${esc(j.job_no)}</b></td>
+    <td class="mono"><b>${esc(jobRef(j))}</b></td>
     <td>${esc(j.customer_name || '—')}</td>
     <td>${esc([j.brand,j.model].filter(Boolean).join(' ') || j.tool_type || '—')}</td>
     <td class="sub2">${esc((j.symptom||'').slice(0,40))}</td>
@@ -2936,7 +2961,7 @@ function slotCell(s, lv){
                                && j.severity === lv.k && !CLOSED.includes(j.status));
   const chips = jobs.map(j => `<div class="slotjob ${j.days_overdue > 0 ? 'late' : ''}"
       onclick="openJob('${j.id}')" title="${esc(j.symptom||'')}">
-      <b>${esc(j.job_no.replace(/^REP-\d{4}-/,'#'))}</b>
+      <b>${esc(jobRef(j).replace(/^REP-\d{4}-/,'#').slice(-12))}</b>
       <span>${esc([j.brand,j.model].filter(Boolean).join(' ') || j.tool_type || '')}</span>
       ${j.days_overdue > 0 ? `<em>เกิน ${j.days_overdue} วัน</em>` : ''}</div>`).join('');
   /* ระบบนับว่าใช้อยู่ n งาน แต่หาใบในเครื่องไม่เจอ (คนละสิทธิ์ / ยังไม่รีเฟรช)
@@ -2965,7 +2990,7 @@ async function runDispatch(){
         fields:[{ k:'x', label:'รายละเอียด', type:'textarea',
           value:(data||[]).map(r => {
             const lv = LEVELS.find(l => l.k === r.level);
-            return `${r.job_no}  →  ${r.tech_name}  (${lv ? lv.t : r.level}` +
+            return `${refByNo(r.job_no)}  →  ${r.tech_name}  (${lv ? lv.t : r.level}` +
                    `${r.waited_hours ? ' · รอมา ' + waitTxt(Number(r.waited_hours)) : ''})`;
           }).join('\n') }]
       });
@@ -3043,7 +3068,7 @@ function openCust(id){
     const s = stepOf(j.status);
     return `<tr class="click" tabindex="0" onclick="openJob('${j.id}')"
       onkeydown="if(event.key==='Enter')openJob('${j.id}')">
-      <td class="mono"><b>${esc(j.job_no)}</b></td>
+      <td class="mono"><b>${esc(jobRef(j))}</b></td>
       <td>${esc([j.brand,j.model].filter(Boolean).join(' ') || j.tool_type || '—')}
         <div class="sub2">${esc(j.serial_no||'')}</div></td>
       <td>${esc(j.symptom||'—')}</td>
@@ -3093,7 +3118,7 @@ function renderSalvage(){
   $('svCount').textContent = money(rows.length);
   if (!rows.length) return;
   $('tblSalvage').querySelector('tbody').innerHTML = rows.map(r => `<tr>
-    <td><b class="mono">${esc(r.job_no)}</b>
+    <td><b class="mono">${esc(refByNo(r.job_no))}</b>
       ${r.customer_name ? `<div class="sub2">${esc(r.customer_name)}</div>` : ''}</td>
     <td>${esc(r.brand || '—')}${r.model ? ' / ' + esc(r.model) : ''}</td>
     <td class="mono sub2">${esc(r.serial_no || '—')}</td>
@@ -3155,7 +3180,7 @@ function renderAdjust(){
   $('adjCount').textContent = rows.length;
   if (!rows.length) return;
   $('tblAdjust').querySelector('tbody').innerHTML = rows.map(a => `<tr>
-    <td class="mono"><b>${esc(a.job_no||'—')}</b>
+    <td class="mono"><b>${esc(refByNo(a.job_no))}</b>
       <div class="sub2"><button class="dlink2" onclick="openJob('${a.job_id}')">เปิดใบงาน</button></div></td>
     <td class="mono"><b>${esc(a.part_no||'—')}</b><div class="sub2">${esc(a.part_name||'')}</div></td>
     <td><span class="pill st1">${esc(ADJ_KIND[a.kind]||a.kind)}</span></td>
@@ -3562,7 +3587,7 @@ async function loadMoneyReport(){
   $('noWarCount').textContent = noWar.length + ' เคส';
   if (noWar.length){
     $('tblNoWar').querySelector('tbody').innerHTML = noWar.slice(0,50).map(j => `<tr>
-      <td class="mono"><b>${esc(j.job_no)}</b><div class="sub2">${esc(dth(j.received_at))}</div></td>
+      <td class="mono"><b>${esc(jobRef(j))}</b><div class="sub2">${esc(dth(j.received_at))}</div></td>
       <td>${esc(j.customer_name || '—')}</td>
       <td>${esc([j.brand,j.model].filter(Boolean).join(' ') || j.tool_type || '—')}</td>
       <td>${esc(j.platform || '—')}</td>
@@ -3963,10 +3988,10 @@ function renderUnbox(){
     const d  = j.unbox_days_left;
     const cl = d < 0 ? 'tag-crit' : d === 0 ? 'tag-warn' : 'tag-good';
     return `<tr>
-      <td><b class="mono">${esc(j.job_no)}</b>
+      <td><b class="mono">${esc(jobRef(j))}</b>
         <div class="sub2">${esc(j.customer_name || 'ยังไม่รู้เจ้าของ')}</div></td>
       <td>${esc(j.platform || '—')}
-        ${j.order_no ? `<div class="sub2">Order ${esc(j.order_no)}</div>` : ''}</td>
+        ${j.shop_name ? `<div class="sub2">${esc(j.shop_name)}</div>` : ''}</td>
       <td class="mono sub2">${esc(j.tracking_in || '—')}</td>
       <td>${esc(dth(j.arrived_at))}</td>
       <td class="sub2">${esc(dth(j.unbox_due))}</td>
@@ -3988,7 +4013,7 @@ function buildAlerts(){
   // คำขอแก้อะไหล่ที่รอหัวหน้าอนุมัติ — ค้างไว้ = ยอดเงินในใบงานยังไม่ถูก
   (S.adjust || []).forEach(a => A.push({
     g:'คำขอแก้อะไหล่ รออนุมัติ', lv:(a.days_waiting||0) >= 1 ? 'crit' : 'warn', ic:'✏️',
-    t1:`${a.job_no || '—'} · ${a.part_no || '—'} ${a.part_name || ''}`,
+    t1:`${refByNo(a.job_no)} · ${a.part_no || '—'} ${a.part_name || ''}`,
     t2:`${ADJ_KIND[a.kind] || a.kind} · ${a.qty_now ?? '—'} → ${a.kind === 'return' ? 0 : (a.qty_new ?? '—')} · ผู้ขอ ${a.requested_by || '—'}`,
     rt:(a.days_waiting||0) > 0 ? `รอ ${a.days_waiting} วัน` : 'วันนี้',
     go:() => openJob(a.job_id) }));
@@ -3997,7 +4022,7 @@ function buildAlerts(){
   (S.shortage || []).forEach(s => A.push({
     g:'อะไหล่ขาด ยังไม่ได้สั่งซื้อ', lv:(s.days_waiting||0) >= 2 ? 'crit' : 'warn', ic:'🧾',
     t1:`${s.part_no} · ${s.part_name}`,
-    t2:`ขาด ${s.qty_short} ${s.unit || 'ชิ้น'} · ใบงาน ${s.job_no || '—'}`,
+    t2:`ขาด ${s.qty_short} ${s.unit || 'ชิ้น'} · ใบงาน ${refByNo(s.job_no)}`,
     rt:`ค้าง ${s.days_waiting || 0} วัน`,
     go:() => goPage('parts') }));
 
@@ -4006,7 +4031,7 @@ function buildAlerts(){
         .sort((a,b) => (b.clip_days_waiting||0) - (a.clip_days_waiting||0))
         .forEach(j => A.push({
           g:'รอคลิปจากลูกค้า', lv:(j.clip_days_waiting||0) >= 3 ? 'crit' : 'warn', ic:'📹',
-          t1:`${j.job_no} · ${j.customer_name || 'ยังไม่รู้เจ้าของ'}`,
+          t1:`${jobRef(j)} · ${j.customer_name || 'ยังไม่รู้เจ้าของ'}`,
           t2:(j.clip_note || 'ขอคลิปประกอบการพิจารณา').slice(0, 70),
           rt:(j.clip_days_waiting||0) > 0 ? `รอ ${j.clip_days_waiting} วัน` : 'วันนี้',
           go:() => openJob(j.id) }));
@@ -4017,7 +4042,7 @@ function buildAlerts(){
         .sort((a,b) => (a.unbox_days_left ?? 0) - (b.unbox_days_left ?? 0))
         .forEach(j => A.push({
           g:'กล่องค้างแกะ', lv:(j.unbox_days_left ?? 0) < 0 ? 'crit' : 'warn', ic:'📦',
-          t1:`${j.job_no} · ${j.customer_name || 'ยังไม่รู้เจ้าของ'}`,
+          t1:`${jobRef(j)} · ${j.customer_name || 'ยังไม่รู้เจ้าของ'}`,
           t2:`${j.platform || 'ไม่ระบุช่องทาง'} · ของถึงศูนย์ ${dth(j.arrived_at)}` +
              (j.tracking_in ? ' · พัสดุ ' + j.tracking_in : ''),
           rt:unboxLeftText(j), go:() => openJob(j.id) }));
@@ -4026,7 +4051,7 @@ function buildAlerts(){
   open.filter(j => j.days_overdue > 0)
       .sort((a,b) => b.days_overdue - a.days_overdue)
       .forEach(j => A.push({ g:'เกินกำหนด', lv:'crit', ic:'🚨',
-        t1:`${j.job_no} · ${j.customer_name || '—'}`,
+        t1:`${jobRef(j)} · ${j.customer_name || '—'}`,
         t2:`${[j.brand,j.model].filter(Boolean).join(' ') || j.tool_type || 'ไม่ระบุเครื่อง'} · ${j.tech_name || 'ยังไม่มอบหมาย'}`,
         rt:`เกิน ${j.days_overdue} วัน`, go:() => openJob(j.id) }));
 
@@ -4035,28 +4060,28 @@ function buildAlerts(){
       .sort((a,b) => new Date(a.due_date) - new Date(b.due_date))
       .forEach(j => { const d = dayDiff(j.due_date);
         A.push({ g:'ใกล้ครบกำหนด', lv:'warn', ic:'⏰',
-          t1:`${j.job_no} · ${j.customer_name || '—'}`,
+          t1:`${jobRef(j)} · ${j.customer_name || '—'}`,
           t2:`${j.tech_name || 'ยังไม่มอบหมาย'} · ${STATUS[j.status] || j.status}`,
           rt: d <= 0 ? 'วันนี้' : 'พรุ่งนี้', go:() => openJob(j.id) }); });
 
   // ยังไม่มอบหมายช่าง
   open.filter(j => !j.technician_id)
       .forEach(j => A.push({ g:'ยังไม่มอบหมายช่าง', lv:'warn', ic:'👤',
-        t1:`${j.job_no} · ${j.customer_name || '—'}`,
+        t1:`${jobRef(j)} · ${j.customer_name || '—'}`,
         t2:`รับเข้ามา ${j.days_in_shop ?? 0} วันแล้ว`,
         rt:'รอจ่ายงาน', go:() => openJob(j.id) }));
 
   // รออะไหล่
   open.filter(j => j.status === 'wait_parts')
       .forEach(j => A.push({ g:'งานติดรออะไหล่', lv:'warn', ic:'📦',
-        t1:`${j.job_no} · ${[j.brand,j.model].filter(Boolean).join(' ') || '—'}`,
+        t1:`${jobRef(j)} · ${[j.brand,j.model].filter(Boolean).join(' ') || '—'}`,
         t2:`${j.tech_name || '—'} · ค้าง ${j.days_in_shop ?? 0} วัน`,
         rt:'รออะไหล่', go:() => openJob(j.id) }));
 
   // พร้อมส่งมอบ — ต้องโทรตามลูกค้า
   S.jobs.filter(j => j.status === 'ready')
         .forEach(j => A.push({ g:'พร้อมส่งมอบ — รอลูกค้ารับ', lv:'ok', ic:'✅',
-          t1:`${j.job_no} · ${j.customer_name || '—'}`,
+          t1:`${jobRef(j)} · ${j.customer_name || '—'}`,
           t2:`${j.customer_phone || 'ไม่มีเบอร์ติดต่อ'} · รวม ฿${money(j.total_cost)}`,
           rt:'นัดรับได้', go:() => openJob(j.id) }));
 
@@ -4065,28 +4090,28 @@ function buildAlerts(){
         .sort((a,b) => (b.days_in_shop||0) - (a.days_in_shop||0))
         .forEach(j => A.push({ g:'พัสดุไม่ทราบที่มา — ต้องประสานหาเจ้าของ',
           lv:(j.days_in_shop||0) > 7 ? 'crit' : 'warn', ic:'📦',
-          t1:`${j.job_no} · ${j.tracking_in || 'ไม่มีเลขพัสดุ'}`,
+          t1:`${jobRef(j)} · ${j.tracking_in || 'ไม่มีเลขพัสดุ'}`,
           t2:`${j.brand || 'ไม่ทราบแบรนด์'}${j.shop_name ? ' · ร้าน ' + j.shop_name : ''}`,
           rt:`ค้าง ${j.days_in_shop ?? 0} วัน`, go:() => openJob(j.id) }));
 
   // ยังไม่ได้แจ้งลูกค้าให้ส่งของ (SOP A6)
   S.jobs.filter(j => j.status === 'awaiting_parcel' && !j.notified_at)
         .forEach(j => A.push({ g:'ยังไม่ได้แจ้งลูกค้าให้ส่งของ', lv:'crit', ic:'📞',
-          t1:`${j.job_no} · ${j.customer_name || '—'}`,
+          t1:`${jobRef(j)} · ${j.customer_name || '—'}`,
           t2:`${j.customer_phone || 'ไม่มีเบอร์ติดต่อ'} · รับเรื่องมาแล้ว ${j.days_in_shop ?? 0} วัน`,
           rt:'ต้องแจ้ง', go:() => openJob(j.id) }));
 
   // รอลูกค้าส่งของนานเกิน 7 วัน (SOP A6-A7)
   S.jobs.filter(j => j.status === 'awaiting_parcel' && (j.days_in_shop ?? 0) > 7)
         .forEach(j => A.push({ g:'รอลูกค้าส่งของนานเกิน 7 วัน', lv:'warn', ic:'📮',
-          t1:`${j.job_no} · ${j.customer_name || '—'}`,
+          t1:`${jobRef(j)} · ${j.customer_name || '—'}`,
           t2:`${j.order_no ? 'Order ' + j.order_no + ' · ' : ''}แจ้งเคลมมาแล้ว ${j.days_in_shop} วัน`,
           rt:'ตามลูกค้า', go:() => openJob(j.id) }));
 
   // ยังไม่ระบุเงื่อนไขประกัน — กระทบว่าใครจ่ายเงิน
   open.filter(j => !j.warranty_case || j.warranty_case === 'unknown')
       .forEach(j => A.push({ g:'ยังไม่ระบุเงื่อนไขประกัน', lv:'crit', ic:'⚖️',
-        t1:`${j.job_no} · ${j.customer_name || '—'}`,
+        t1:`${jobRef(j)} · ${j.customer_name || '—'}`,
         t2:'ต้องระบุก่อนเริ่มซ่อม ไม่งั้นเก็บเงินลูกค้าไม่ถูก',
         rt:'ต้องระบุ', go:() => openJob(j.id) }));
 
