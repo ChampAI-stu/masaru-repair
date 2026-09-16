@@ -303,6 +303,9 @@
                   <textarea id="nSymptom" placeholder="อธิบายอาการเสีย… (ยังไม่แกะกล่อง ข้ามได้)"></textarea></div>
                 <div><label>ของที่นำมาด้วย</label>
                   <input type="text" id="nAcc" placeholder="เช่น กล่อง, ดอกสว่าน, สายชาร์จ"></div>
+                <div><label>หมายเหตุ</label>
+                  <textarea id="nNote" placeholder="เช่น กล่องบุบมาแต่แรก · ลูกค้าขอด่วน · ไม่มีใบเสร็จ · ตกลงกับลูกค้าว่า…"
+                            style="min-height:62px"></textarea></div>
                 <select id="nSymCat" hidden><option value="">—</option></select>
               </div>
               <div style="margin-top:13px">
@@ -1485,7 +1488,7 @@ async function lookupCustomer(){
 }
 
 function clearIntake(){
-  ['nSerial','nToolType','nBrand','nModel','nPhone','nCustName','nAddress','nSymptom','nAcc','nCustId',
+  ['nSerial','nToolType','nBrand','nModel','nPhone','nCustName','nAddress','nSymptom','nAcc','nNote','nCustId',
    'nOrder','nTrackIn','nAdmin'].forEach(id => $(id).value = '');
   $('nSymCat').value = ''; $('nPlatform').value = ''; $('nArrived').value = '';
   $('nCaseType').value = 'claim'; $('nWarranty').value = 'unknown';
@@ -1544,6 +1547,7 @@ async function saveJob(){
       model: val('nModel') || null, serial_no: val('nSerial') || null,
       symptom: val('nSymptom') || null, symptom_category: val('nSymCat') || null,
       accessories: val('nAcc') || null,
+      intake_note: val('nNote') || null,
       order_no:      val('nOrder')    || null,
       tracking_in:   val('nTrackIn')  || null,
       platform:      val('nPlatform') || null,
@@ -1715,6 +1719,8 @@ function renderJobPage(){
         ${j.accessories ? `<div style="margin-top:13px"><label>ของที่นำมาด้วย</label>
           <div class="chipset">${j.accessories.split(/[,·]/).filter(x=>x.trim())
             .map(x => `<span>${esc(x.trim())}</span>`).join('')}</div></div>` : ''}
+        ${j.intake_note ? `<div style="margin-top:13px"><label>📝 หมายเหตุตอนรับเครื่อง</label>
+          <div class="box-info">${esc(j.intake_note)}</div></div>` : ''}
 
         <div style="margin-top:15px">${photoBox('before','รูปภาพก่อนซ่อม',6)}</div>
 
@@ -1996,6 +2002,9 @@ function stepForm(nStep, j, pc){
       <textarea id="sSymptom">${esc(j.symptom||'')}</textarea></div>
     <div style="margin-top:14px"><label>ของที่นำมาด้วย</label>
       <input type="text" id="sAcc" value="${esc(j.accessories||'')}" placeholder="กล่อง, ดอกสว่าน"></div>
+    <div style="margin-top:14px"><label>หมายเหตุตอนรับเครื่อง</label>
+      <textarea id="sIntakeNote" style="min-height:62px"
+        placeholder="เช่น กล่องบุบมาแต่แรก · ลูกค้าขอด่วน · ไม่มีใบเสร็จ">${esc(j.intake_note||'')}</textarea></div>
 
     <div style="margin-top:16px"><label>🚚 ค่าส่งขาเข้า
       <span class="muted" style="font-weight:400">(ลูกค้าส่งเครื่องมาศูนย์)</span></label>
@@ -2222,6 +2231,7 @@ function collectStep(){
   if ($('sAcc'))      p.accessories     = g('sAcc') || null;
   if ($('sCat'))      p.symptom_category= g('sCat') || null;
   if ($('sArrived'))  p.arrived_at      = g('sArrived')  || null;
+  if ($('sIntakeNote')) p.intake_note    = g('sIntakeNote') || null;
   if ($('sOrder'))    p.order_no        = g('sOrder')    || null;
   if ($('sTrackIn'))  p.tracking_in     = g('sTrackIn')  || null;
   if ($('sTrackOut')) p.tracking_out    = g('sTrackOut') || null;
