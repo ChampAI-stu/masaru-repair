@@ -175,7 +175,8 @@ const PHASES = [
   { k:'before',   label:'ก่อนซ่อม',    max:6 },
   { k:'during',   label:'ระหว่างซ่อม',  max:6 },
   { k:'after',    label:'หลังซ่อม',     max:4 },
-  { k:'document', label:'เอกสาร',      max:4 }
+  { k:'document',     label:'เอกสาร',       max:4 },
+  { k:'ship_receipt', label:'ใบเสร็จค่าส่ง', max:3 }
 ];
 const photoUrl  = key => 'https://drive.google.com/thumbnail?id=' + key + '&sz=w600';
 const photoOpen = key => 'https://drive.google.com/file/d/' + key + '/view';
