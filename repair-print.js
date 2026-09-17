@@ -69,7 +69,11 @@ function printJob(kind){
       <div class="pbox"><div class="h">เลขพัสดุอ้างอิง</div><div class="b">
         ${row('พัสดุขาเข้า', j.tracking_in)}
         ${row('พัสดุขาออก', j.tracking_out)}
-        ${row('ประเภทเคส', CASE_TYPE[j.case_type])}
+        ${j.case_origin === 'internal'
+            ? row('ที่มาของเคส', 'เคสในระบบแพลตฟอร์ม')
+            : row('ประเภทเคส', CASE_TYPE[j.case_type])}
+        ${j.cause_label ? row('สาเหตุ', j.cause_label) : ''}
+        ${row('แอดมิน / CS', j.admin_name)}
         ${j.old_unit_disposition ? row('เครื่องเดิม', DISPOSITION[j.old_unit_disposition]) : ''}
       </div></div>
     </div>
