@@ -1,0 +1,1695 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>คลังอะไหล่ · MASARU</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<link rel="stylesheet" href="repair.css">
+<style>
+/* เฉพาะโมดูลคลัง — ที่เหลือใช้ repair.css ร่วมกับโมดูลซ่อม */
+.whcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:13px;margin-bottom:18px}
+.whcard{background:#fff;border:1px solid var(--line);border-left:4px solid var(--blue);
+  border-radius:var(--r);padding:14px 16px;box-shadow:var(--sh)}
+.whcard.main{border-left-color:var(--navy)}
+.whcard.repair{border-left-color:var(--warn)}
+.whcard.sales{border-left-color:var(--good)}
+.whcard .nm{font-weight:800;color:var(--navy);font-size:15px}
+.whcard .cd{font-size:11.5px;color:var(--ink3);font-family:ui-monospace,monospace}
+.whcard .big{font-size:26px;font-weight:800;line-height:1.15;margin-top:6px;font-variant-numeric:tabular-nums}
+.whcard .rw{display:flex;gap:12px;margin-top:5px;font-size:12.5px;color:var(--ink2);flex-wrap:wrap}
+.qcell{font-variant-numeric:tabular-nums;text-align:right}
+.qzero{color:var(--ink3)}
+.qneg{color:var(--crit);font-weight:700}
+.cart{border:1px dashed var(--line);border-radius:9px;padding:10px 12px;margin-top:10px}
+.cart .ln{display:flex;align-items:center;gap:9px;padding:5px 0;border-bottom:1px solid var(--line2);font-size:13.5px}
+.cart .ln:last-child{border-bottom:0}
+.cart .ln .sp{flex:1}
+.toolbar{display:flex;gap:9px;flex-wrap:wrap;align-items:center;padding:12px 18px;border-bottom:1px solid var(--line2)}
+.toolbar input[type=text]{flex:1;min-width:180px;padding:8px 12px;border:1px solid var(--line);border-radius:9px;font:inherit}
+.toolbar select{padding:8px 11px;border:1px solid var(--line);border-radius:9px;font:inherit;background:#fff}
+
+/* แถบปุ่มนำเข้า — ลอยติดขอบล่างจอ จะได้ไม่ต้องเลื่อนหาว่าปุ่มอยู่ไหน */
+.impbar{position:sticky;bottom:0;z-index:5;margin:16px -20px -16px;padding:13px 20px;
+  background:#fff;border-top:2px solid var(--line);display:flex;align-items:center;
+  gap:13px;flex-wrap:wrap;box-shadow:0 -3px 12px rgba(26,36,54,.07)}
+.impbar .btn{padding:11px 22px;font-size:15px}
+.impbar .why{font-size:13px;color:var(--ink2);flex:1;min-width:180px}
+</style>
+</head>
+<body>
+
+<!-- ============ หน้าล็อกอิน ============ -->
+<div class="gate" id="gate">
+  <div class="gbox">
+    <div class="glogo"><div class="ic">📦</div>
+      <div><b>คลังอะไหล่</b><small>ระบบคลัง · MASARU</small></div></div>
+    <form id="loginForm" autocomplete="on">
+      <div class="f"><label for="liEmail">อีเมล</label>
+        <input type="email" id="liEmail" required autocomplete="username" placeholder="you@masaru.co.th"></div>
+      <div class="f"><label for="liPass">รหัสผ่าน</label>
+        <input type="password" id="liPass" required autocomplete="current-password" placeholder="••••••••"></div>
+      <button class="btn g" id="liBtn" type="submit" style="width:100%;padding:12px;margin-top:4px">เข้าสู่ระบบ</button>
+    </form>
+    <div id="liErr" class="gerr" hidden></div>
+    <div class="gfoot">ใช้บัญชีเดียวกับระบบรับซ่อม · <a href="index.html">กลับหน้าหลัก</a></div>
+  </div>
+</div>
+
+<div class="app" id="app" hidden>
+  <aside id="side">
+    <div class="logo">
+      <div class="ic">📦</div>
+      <div><b>คลังอะไหล่</b><small>ระบบคลัง · MASARU</small></div>
+    </div>
+    <div class="navlbl">เมนูหลัก</div>
+    <nav>
+      <button data-p="ov"    class="on"><span class="e">📊</span>ภาพรวมคลัง</button>
+      <button data-p="stock"><span class="e">📦</span>สต๊อกอะไหล่</button>
+      <button data-p="tr"><span class="e">🔁</span>ใบโอนระหว่างคลัง</button>
+      <button data-p="move"><span class="e">🧾</span>รายการเคลื่อนไหว</button>
+      <button data-p="master"><span class="e">🧰</span>ทะเบียนอะไหล่</button>
+      <button data-p="whset"><span class="e">⚙️</span>ตั้งค่าคลัง</button>
+    </nav>
+    <nav style="margin-top:16px">
+      <button onclick="location.href='index.html'"><span class="e">🏠</span>กลับหน้าหลัก</button>
+    </nav>
+    <div class="sidefoot">
+      <div class="k" id="roleLbl">ผู้ใช้งาน</div>
+      <div class="v" id="userName">—</div>
+      <div class="st" id="connSt">● กำลังเชื่อมต่อ…</div>
+      <button class="btn" id="logoutBtn" style="width:100%;margin-top:11px;background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.2);color:#fff">
+        ออกจากระบบ</button>
+    </div>
+  </aside>
+
+  <div class="mainarea">
+    <div class="phead">
+      <button class="burger" onclick="document.getElementById('side').classList.toggle('open')">☰</button>
+      <div>
+        <h1 id="pgTitle">ภาพรวมคลัง</h1>
+        <div class="sub" id="pgSub">ยอดคงเหลือและมูลค่าของทุกคลัง</div>
+      </div>
+      <div class="sp"></div>
+      <button class="btn" onclick="reloadAll()">🔄 รีเฟรช</button>
+      <div class="avatar" id="avatar">—</div>
+    </div>
+
+    <div class="content">
+      <div id="authWarn" class="awarn" hidden></div>
+
+      <!-- ============ ภาพรวม ============ -->
+      <div class="page on" id="p-ov">
+        <div class="whcards" id="whCards"></div>
+        <div class="kpis" id="ovKpi"></div>
+        <div class="split">
+          <div class="card">
+            <h3>⚠️ ต้องสั่งเพิ่ม<span class="sp"></span>
+              <span class="pill tag-warn" id="lowCount">0</span></h3>
+            <div class="cb"><div id="lowList"></div></div>
+          </div>
+          <div class="card">
+            <h3>🧾 เคลื่อนไหวล่าสุด</h3>
+            <div class="cb"><div id="moveMini"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ สต๊อก ============ -->
+      <div class="page" id="p-stock">
+        <div class="card">
+          <h3>สต๊อกอะไหล่แยกตามคลัง<span class="sp"></span>
+            <button class="btn p sm" onclick="openReceive()">📥 รับของเข้า</button>
+            <button class="btn sm" onclick="openTransfer()">🔁 โอนคลัง</button>
+          </h3>
+          <div class="toolbar">
+            <input type="text" id="sSearch" placeholder="🔍 ค้นหา รหัส / ชื่ออะไหล่">
+            <select id="sState">
+              <option value="">ทุกสถานะ</option>
+              <option value="ต้องสั่ง">ต้องสั่ง</option>
+              <option value="หมด">หมด</option>
+              <option value="ติดลบ">ติดลบ</option>
+              <option value="ปกติ">ปกติ</option>
+            </select>
+          </div>
+          <div class="cb" style="padding-top:0"><div id="stockTbl"></div></div>
+        </div>
+      </div>
+
+      <!-- ============ ใบโอน ============ -->
+      <div class="page" id="p-tr">
+        <div class="card">
+          <h3>เอกสารคลัง — ใบเบิก · ใบคืน · ใบโอน<span class="sp"></span>
+            <button class="btn p sm" onclick="openTransferDoc()">➕ สร้างใบโอน</button>
+          </h3>
+          <div id="trInbox"></div>
+          <div class="box-info" style="margin:12px 18px">
+            <b>ใบเบิก</b> ฝ่ายช่าง/ฝ่ายขายตั้งมาเอง — คลังกลางกด <b>อนุมัติ+จ่าย</b> ของถึงจะถูกตัด<br>
+            <b>ใบคืน</b> ฝ่ายคืนของกลับมา ของออกจากคลังฝ่ายแล้ว รอคลังกลางกด <b>รับเข้า</b><br>
+            <b>ใบโอน</b> คลังกลางตั้งเอง ตัดของตอนกด <b>ส่งของ</b> — ของระหว่างทางไม่หายจากระบบ
+          </div>
+          <div class="chips" id="trFilter" style="margin:0 18px 4px"></div>
+          <div class="cb" style="padding-top:0"><div id="trTbl"></div></div>
+        </div>
+      </div>
+
+      <!-- ============ เคลื่อนไหว ============ -->
+      <div class="page" id="p-move">
+        <div class="card">
+          <h3>สมุดบัญชีคลัง — ทุกการเคลื่อนไหว</h3>
+          <div class="toolbar">
+            <input type="text" id="mSearch" placeholder="🔍 ค้นหา รหัส / ชื่อ / หมายเหตุ">
+            <select id="mWh"><option value="">ทุกคลัง</option></select>
+            <select id="mType">
+              <option value="">ทุกประเภท</option>
+              <option value="receive">รับเข้า</option>
+              <option value="issue">เบิกใช้</option>
+              <option value="return">คืนเข้า</option>
+              <option value="adjust">ปรับยอด</option>
+              <option value="count">ตรวจนับ</option>
+              <option value="transfer_out">โอนออก</option>
+              <option value="transfer_in">โอนเข้า</option>
+              <option value="sale">ขายออก</option>
+            </select>
+          </div>
+          <div class="cb" style="padding-top:0"><div id="moveTbl"></div></div>
+        </div>
+      </div>
+
+      <!-- ============ ทะเบียนอะไหล่ ============ -->
+      <div class="page" id="p-master">
+
+        <!-- ---------- นำเข้าจากไฟล์ ---------- -->
+        <div class="card" id="impCard" style="scroll-margin-top:86px" hidden>
+          <h3>📥 นำเข้าอะไหล่จากไฟล์<span class="sp"></span>
+            <button class="btn sm" onclick="impClose()">ปิด</button></h3>
+          <div class="cb">
+
+            <div id="impS1">
+              <div class="box-info" style="margin-bottom:14px">
+                รองรับ <b>.csv</b> และ <b>.xlsx</b> · ไฟล์ไม่ถูกส่งออกไปไหน อ่านในเครื่องคุณเองทั้งหมด<br>
+                ไฟล์ใหญ่เกิน 10 MB แนะนำให้ Save As เป็น <b>CSV UTF-8</b> ก่อน จะเร็วกว่ามาก
+              </div>
+              <label class="btn p" style="display:inline-block;cursor:pointer">
+                เลือกไฟล์…
+                <input type="file" id="impFile" accept=".csv,.txt,.xlsx,.xls" hidden
+                       onchange="impPick(this)"></label>
+              <span class="sub2" id="impName" style="margin-left:10px"></span>
+            </div>
+
+            <div id="impS2" hidden></div>
+            <div id="impS3" hidden></div>
+            <div id="impS4" hidden></div>
+
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>ทะเบียนอะไหล่<span class="sp"></span>
+            <button class="btn sm" onclick="impOpen()">📥 นำเข้าจากไฟล์</button>
+            <button class="btn p sm" onclick="editPart(null)">➕ เพิ่มอะไหล่</button>
+          </h3>
+          <div class="toolbar">
+            <input type="text" id="pmSearch" placeholder="🔍 ค้นหา รหัส / ชื่อ / กลุ่ม / รุ่นเครื่อง เช่น SCDW-165">
+            <label style="display:flex;align-items:center;gap:6px;font-size:13.5px">
+              <input type="checkbox" id="pmOff"> แสดงตัวที่ปิดใช้งานด้วย</label>
+          </div>
+          <div class="cb" style="padding-top:0"><div id="pmTbl"></div></div>
+        </div>
+      </div>
+
+      <!-- ============ ตั้งค่าคลัง ============ -->
+      <div class="page" id="p-whset">
+        <div class="card">
+          <h3>ทะเบียนคลัง<span class="sp"></span>
+            <button class="btn p sm" onclick="editWh(null)">➕ เพิ่มคลัง</button>
+          </h3>
+          <div class="box-warn" style="margin:12px 18px">
+            รหัส <b>MAIN · REPAIR · SALES</b> เป็นคลังหลักของระบบ ห้ามเปลี่ยนรหัส
+            เพราะโมดูลอื่นอ้างถึงรหัสนี้ตรง ๆ (เปลี่ยนชื่อได้)
+          </div>
+          <div class="cb" style="padding-top:0"><div id="whTbl"></div></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ============ หน้าต่างฟอร์ม (repair-ui.js ใช้ตัวนี้) ============ -->
+<div class="fmask" id="fmask">
+  <div class="fmodal">
+    <div class="fhead"><div class="ttl"><h4 id="fmTitle">—</h4><p class="sub" id="fmSub"></p></div>
+      <button class="x" type="button" id="fmX" aria-label="ปิด">✕</button></div>
+    <form id="fmForm"><div class="fbody" id="fmBody"></div>
+      <div class="ffoot">
+        <button type="button" class="btn" id="fmCancel">ยกเลิก</button>
+        <button type="submit" class="btn g" id="fmOk">บันทึก</button>
+      </div></form>
+  </div>
+</div>
+
+<script src="repair-ui.js"></script>
+<script>
+/* =====================================================================
+   MASARU · ระบบคลัง — โมดูล 2: คลังอะไหล่
+   ⚠️ ห้ามใส่ type="module" — ปุ่มทั้งหมดเรียกฟังก์ชันผ่าน onclick=
+   ต้องรัน 17_warehouse.sql ก่อนใช้งาน
+   ===================================================================== */
+const SUPABASE_URL = 'https://rmunaewdmlnsiwogmozq.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_m10p5I53UNKTZbUAEiUaCw_OCSR63mq';
+const AUTH_KEY     = 'masaru-repair-auth';   // ต้องตรงกับทุกโมดูล ถึงจะล็อกอินครั้งเดียว
+const UPLOAD_URL   = '';                     // โมดูลนี้ยังไม่ใช้รูป
+
+let sb = null;
+let ME = { id:null, email:'', name:'', role:'staff' };
+const who    = () => ME.name || ME.email || 'ไม่ระบุ';
+const isBoss = () => ME.role === 'head' || ME.role === 'admin';
+const ROLE_LABEL = { staff:'พนักงานรับเครื่อง', tech:'ช่างซ่อม', head:'หัวหน้าช่าง', admin:'ผู้ดูแลระบบ' };
+
+const S = {
+  wh:[], stock:[], byWh:[], trs:[], moves:[], master:[],
+  page:'ov', cart:[], pg:{}, per:30
+};
+window.PAGERS = {
+  stock:  () => renderStock(),
+  move:   () => renderMoves(),
+  master: () => renderMaster()
+};
+
+const PAGE_META = {
+  ov:     ['ภาพรวมคลัง',        'ยอดคงเหลือและมูลค่าของทุกคลัง'],
+  stock:  ['สต๊อกอะไหล่',        'ยอดแยกรายคลัง · รับเข้า · โอน · ปรับยอด'],
+  tr:     ['ใบโอนระหว่างคลัง',   'ย้ายของข้ามคลังแบบมีร่องรอยทุกครั้ง'],
+  move:   ['รายการเคลื่อนไหว',   'สมุดบัญชีคลัง ย้อนดูได้ทุกการเปลี่ยนแปลง'],
+  master: ['ทะเบียนอะไหล่',      'รหัส ชื่อ ราคาทุน ราคาขาย จุดสั่งซื้อ'],
+  whset:  ['ตั้งค่าคลัง',         'เพิ่ม/แก้ไขคลังที่ใช้ในระบบ']
+};
+
+/* สถานะสต๊อก → สีป้าย */
+const STATE_PILL = { 'ติดลบ':'tag-crit', 'หมด':'tag-crit', 'ต้องสั่ง':'tag-warn', 'ปกติ':'tag-good' };
+const TR_PILL    = { draft:'st0', requested:'st1', sent:'st3', received:'st6',
+                     cancelled:'tag-crit', rejected:'tag-crit' };
+const TR_LABEL   = { draft:'ร่าง', requested:'⏳ รออนุมัติ', sent:'ส่งแล้ว รอรับ',
+                     received:'รับเข้าแล้ว', cancelled:'ยกเลิก', rejected:'ไม่อนุมัติ' };
+
+/* ---------- ตัวเลขในตาราง ---------- */
+const qCell = n => {
+  const v = Number(n) || 0;
+  return `<td class="qcell ${v < 0 ? 'qneg' : (v === 0 ? 'qzero' : '')}">${money(v)}</td>`;
+};
+
+
+/* =====================================================================
+   คงสถานะล็อกอิน — ยกชุดเดียวกับโมดูลซ่อม
+   ===================================================================== */
+let _authBound  = false;
+let _userLogout = false;
+
+function authNotice(msg, kind){
+  const el = $('authWarn');
+  if (!el) return;
+  el.hidden = !msg;
+  el.className = 'awarn' + (kind ? ' ' + kind : '');
+  el.innerHTML = msg || '';
+}
+
+function bindAuthEvents(){
+  if (_authBound) return;
+  _authBound = true;
+
+  sb.auth.onAuthStateChange(async (ev, session) => {
+    if (ev === 'TOKEN_REFRESHED' || ev === 'SIGNED_IN'){ authNotice(''); return; }
+    if (ev !== 'SIGNED_OUT') return;
+    if (_userLogout){ location.reload(); return; }
+    if (!ME.id) return;
+    if (navigator.onLine === false){
+      authNotice('🔌 <b>อินเทอร์เน็ตหลุด</b> — ยังไม่ต้องปิดหน้านี้ ระบบจะเชื่อมต่อใหม่ให้เองเมื่อเน็ตกลับมา', 'warn');
+      return;
+    }
+    try { const { data } = await sb.auth.getSession();     if (data?.session){ authNotice(''); return; } } catch(e){}
+    try { const { data } = await sb.auth.refreshSession(); if (data?.session){ authNotice(''); return; } } catch(e){}
+    authNotice('🔑 <b>เซสชันหมดอายุ</b> — กำลังพากลับไปหน้าเข้าสู่ระบบ', 'crit');
+    setTimeout(() => location.reload(), 1400);
+  });
+
+  window.addEventListener('online', async () => {
+    if (!ME.id) return;
+    authNotice('');
+    try { await sb.auth.refreshSession(); await reloadAll(); } catch(e){ console.warn(e); }
+  });
+  window.addEventListener('offline', () => {
+    if (ME.id) authNotice('🔌 <b>อินเทอร์เน็ตหลุด</b> — ข้อมูลที่ยังไม่กดบันทึกอย่าปิดหน้านี้', 'warn');
+  });
+}
+
+
+/* =====================================================================
+   boot
+   ===================================================================== */
+(async function boot(){
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+    auth: { persistSession:true, autoRefreshToken:true, detectSessionInUrl:false, storageKey:AUTH_KEY }
+  });
+  bindAuthEvents();
+  try {
+    const { data:{ session } } = await sb.auth.getSession();
+    if (session) return startApp(session);
+  } catch(e){ console.warn('getSession ล้มเหลว', e); }
+  $('liEmail').focus();
+})();
+
+$('loginForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const btn = $('liBtn');
+  btn.disabled = true; btn.textContent = 'กำลังเข้าสู่ระบบ…'; $('liErr').hidden = true;
+  try {
+    const { data, error } = await sb.auth.signInWithPassword({
+      email: val('liEmail'), password: $('liPass').value });
+    if (error) throw error;
+    await startApp(data.session);
+  } catch(err){
+    const m = (err?.message || '').toLowerCase();
+    $('liErr').textContent = m.includes('invalid login')
+      ? 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' : (err?.message || 'เข้าสู่ระบบไม่สำเร็จ');
+    $('liErr').hidden = false;
+  } finally { btn.disabled = false; btn.textContent = 'เข้าสู่ระบบ'; }
+});
+
+$('logoutBtn').addEventListener('click', async () => {
+  _userLogout = true;
+  try { await sb.auth.signOut(); } catch(e){}
+  location.href = 'index.html';
+});
+
+async function startApp(session){
+  ME.id = session.user.id; ME.email = session.user.email || '';
+  try {
+    const { data, error } = await sb.from('app_users')
+      .select('full_name,role').eq('id', ME.id).maybeSingle();
+    if (error) throw error;
+    ME.name = data?.full_name || ME.email;
+    ME.role = data?.role || 'staff';
+  } catch(e){
+    console.warn('อ่านข้อมูลผู้ใช้ไม่ได้', e);
+    ME.name = ME.email;
+    authNotice('⚠️ อ่านข้อมูลผู้ใช้ไม่ได้ — บางเมนูอาจใช้ไม่ได้ · ' + esc(e.message || ''), 'warn');
+  }
+
+  /* ด่านตรวจสิทธิ์ — ต้องผ่านก่อนถึงจะเห็นอะไรในหน้านี้ */
+  if (!await canModule(sb, 'parts')) return blockModule('คลังอะไหล่');
+
+  $('gate').hidden = true; $('app').hidden = false;
+  $('userName').textContent = ME.name;
+  $('roleLbl').textContent  = ROLE_LABEL[ME.role] || ME.role;
+  $('avatar').textContent   = (ME.name || '?').trim().charAt(0).toUpperCase();
+
+  /* พนักงานทั่วไป/ช่าง ดูได้ แต่แก้ไม่ได้ */
+  if (!isBoss()){
+    document.querySelectorAll('nav button[data-p="whset"]').forEach(b => b.remove());
+    authNotice('👀 คุณเข้าดูได้อย่างเดียว — การรับของ โอนคลัง และแก้ทะเบียน ต้องเป็นหัวหน้าขึ้นไป', 'warn');
+  }
+
+  bindNav();
+  bindFilters();
+  await reloadAll();
+}
+
+
+/* =====================================================================
+   เมนู
+   ===================================================================== */
+function bindNav(){
+  document.querySelectorAll('nav button[data-p]').forEach(b =>
+    b.addEventListener('click', () => goPage(b.dataset.p)));
+}
+
+function goPage(p){
+  if (!PAGE_META[p]) return;
+  S.page = p;
+  document.querySelectorAll('nav button[data-p]').forEach(b => b.classList.toggle('on', b.dataset.p === p));
+  document.querySelectorAll('.page').forEach(el => el.classList.toggle('on', el.id === 'p-' + p));
+  $('pgTitle').textContent = PAGE_META[p][0];
+  $('pgSub').textContent   = PAGE_META[p][1];
+  $('side').classList.remove('open');
+  window.scrollTo({ top:0 });
+}
+
+function bindFilters(){
+  const redraw = (id, fn) => $(id)?.addEventListener('input', fn);
+  redraw('sSearch',  () => { S.pg.stock = 1;  renderStock(); });
+  redraw('mSearch',  () => { S.pg.move = 1;   renderMoves(); });
+  redraw('pmSearch', () => { S.pg.master = 1; renderMaster(); });
+  $('sState')?.addEventListener('change', () => { S.pg.stock = 1; renderStock(); });
+  $('mWh')?.addEventListener('change',    () => { S.pg.move = 1;  renderMoves(); });
+  $('mType')?.addEventListener('change',  () => { S.pg.move = 1;  renderMoves(); });
+  $('pmOff')?.addEventListener('change',  () => { S.pg.master = 1; renderMaster(); });
+}
+
+
+/* =====================================================================
+   โหลดข้อมูล
+   ===================================================================== */
+async function reloadAll(){
+  if (!sb || !ME.id) return;
+  $('connSt').textContent = '● กำลังโหลด…';
+  try {
+    /* ⚠️ Supabase คืนสูงสุด 1,000 แถวต่อคำขอ — ตารางที่โตเกินนั้นต้องดึงเป็นหน้า ๆ
+       (__pageAll อยู่ใน repair-ui.js) ไม่งั้นอะไหล่ตัวที่ 1,001 ขึ้นไปจะหายเงียบ ๆ */
+    const [wh, trs, moves, stock, byWh, master] = await Promise.all([
+      sb.from('v_wh_summary').select('*'),
+      sb.from('v_transfers').select('*').limit(300),
+      sb.from('v_stock_moves').select('*').limit(1000),
+      __pageAll(() => sb.from('v_stock_all').select('*')),
+      /* แถวที่ยอดเป็น 0 ไม่ต้องดึง ประหยัดไปครึ่งค่อนของตาราง */
+      __pageAll(() => sb.from('v_stock_by_wh').select('*').neq('qty', 0)),
+      __pageAll(() => sb.from('parts_master').select('*').order('part_no'))
+    ]);
+    for (const r of [wh, trs, moves]) if (r.error) throw r.error;
+
+    S.wh     = wh.data   || [];
+    S.trs    = trs.data  || [];
+    S.moves  = moves.data || [];
+    S.stock  = stock    || [];
+    S.byWh   = byWh     || [];
+    S.master = master   || [];
+
+    fillWhSelect();
+    renderOverview(); renderStock(); renderTransfers(); renderMoves(); renderMaster(); renderWh();
+    $('connSt').textContent = '● เชื่อมต่อแล้ว';
+  } catch(e){
+    $('connSt').textContent = '● โหลดไม่สำเร็จ';
+    if (/does not exist|not exist/i.test(e.message || ''))
+      toast('❌ ยังไม่ได้รัน 17_warehouse.sql ในฐานข้อมูล', true);
+    else fail(e);
+  }
+}
+
+function fillWhSelect(){
+  const sel = $('mWh');
+  if (!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">ทุกคลัง</option>' +
+    S.wh.map(w => `<option value="${esc(w.wh_code)}">${esc(w.wh_name)}</option>`).join('');
+  sel.value = cur;
+}
+
+const whOptions = () => S.wh.map(w => ({ v:w.wh_code, t:`${w.wh_name} (${w.wh_code})` }));
+const partOptions = () => S.master.filter(p => p.is_active)
+  .map(p => ({ v:p.part_no, t:`${p.part_no} — ${p.name}` }));
+
+
+/* =====================================================================
+   หน้า 1 — ภาพรวม
+   ===================================================================== */
+function renderOverview(){
+  $('whCards').innerHTML = S.wh.length ? S.wh.map(w => `
+    <div class="whcard ${esc(w.wh_kind)}">
+      <div class="nm">${esc(w.wh_name)}</div>
+      <div class="cd">${esc(w.wh_code)}</div>
+      <div class="big">${money(w.qty_total)} <small style="font-size:13px;color:var(--ink3)">ชิ้น</small></div>
+      <div class="rw">
+        <span>💵 ${money(w.stock_value)} บาท</span>
+        <span>🏷️ ${money(w.sku_count)} รายการ</span>
+        ${Number(w.low_count) ? `<span style="color:var(--warn);font-weight:700">⚠️ ต้องสั่ง ${w.low_count}</span>` : ''}
+      </div>
+    </div>`).join('')
+    : '<div class="empty">ยังไม่มีคลัง — ไปที่เมนู "ตั้งค่าคลัง"</div>';
+
+  const totQty  = S.stock.reduce((s,r) => s + (Number(r.qty_total)  || 0), 0);
+  const totVal  = S.stock.reduce((s,r) => s + (Number(r.stock_value)|| 0), 0);
+  const low     = S.stock.filter(r => r.stock_state === 'ต้องสั่ง' || r.stock_state === 'หมด');
+  const neg     = S.stock.filter(r => r.stock_state === 'ติดลบ');
+  const pending = S.trs.filter(t => t.status === 'sent');
+
+  $('ovKpi').innerHTML = [
+    ['na','🏷️','อะไหล่ในทะเบียน', money(S.stock.length), 'รายการที่เปิดใช้งาน'],
+    ['ne','📦','ของทั้งหมด',       money(totQty),        'ชิ้น รวมทุกคลัง'],
+    ['nc','💵','มูลค่าคงคลัง',      '฿' + money(totVal),  'คิดจากราคาทุน'],
+    [low.length ? 'nb' : 'nc','⚠️','ต้องสั่งเพิ่ม', money(low.length),
+      low.length ? 'รายการ' : 'ของครบทุกตัว'],
+    [neg.length ? 'nd' : 'nc','🛑','ยอดติดลบ', money(neg.length),
+      neg.length ? 'ต้องตรวจนับด่วน' : 'ไม่มี'],
+    [pending.length ? 'nb' : 'nc','🚚','ของอยู่ระหว่างทาง', money(pending.length),
+      pending.length ? 'ใบโอนรอปลายทางรับ' : 'ไม่มีค้าง']
+  ].map(([cl,e,l,n,u]) => `<div class="kpi ${cl}">
+      <div class="t"><span class="l">${l}</span><span class="e">${e}</span></div>
+      <div class="n">${n}</div><div class="sub2">${esc(u)}</div></div>`).join('');
+
+  $('lowCount').textContent = low.length;
+  $('lowList').innerHTML = low.length ? `<div class="tw"><table>
+    <thead><tr><th>อะไหล่</th><th class="num">คงเหลือ</th><th class="num">จุดสั่ง</th><th>สถานะ</th></tr></thead>
+    <tbody>${low.slice(0, 12).map(r => `<tr>
+      <td><b class="mono">${esc(r.part_no)}</b><div class="sub2">${esc(r.name)}</div></td>
+      ${qCell(r.qty_total)}
+      <td class="num">${money(r.reorder_point)}</td>
+      <td><span class="pill ${STATE_PILL[r.stock_state] || 'st0'}">${esc(r.stock_state)}</span></td>
+    </tr>`).join('')}</tbody></table></div>`
+    : '<div class="empty">ของครบทุกตัว ไม่มีอะไรต้องสั่ง 👍</div>';
+
+  $('moveMini').innerHTML = S.moves.length ? `<div class="tw"><table>
+    <thead><tr><th>เมื่อ</th><th>คลัง</th><th>อะไหล่</th><th>ทำอะไร</th><th class="num">จำนวน</th></tr></thead>
+    <tbody>${S.moves.slice(0, 12).map(m => `<tr>
+      <td class="sub2">${esc(dtth(m.created_at))}</td>
+      <td>${esc(m.wh_name || '—')}</td>
+      <td class="mono">${esc(m.part_no)}</td>
+      <td>${esc(m.move_label)}</td>
+      ${qCell(m.qty)}
+    </tr>`).join('')}</tbody></table></div>`
+    : '<div class="empty">ยังไม่มีการเคลื่อนไหว</div>';
+}
+
+
+/* =====================================================================
+   หน้า 2 — สต๊อก
+   ===================================================================== */
+function stockRows(){
+  const q  = (val('sSearch') || '').toLowerCase();
+  const st = val('sState');
+  return S.stock.filter(r => {
+    if (st && r.stock_state !== st) return false;
+    if (!q) return true;
+    return (r.part_no + ' ' + r.name).toLowerCase().includes(q);
+  });
+}
+
+function renderStock(){
+  const rows = stockRows();
+  const m = paginate(rows, 'stock');
+  const canEdit = isBoss();
+
+  $('stockTbl').innerHTML = rows.length ? `<div class="tw"><table>
+    <thead><tr>
+      <th>อะไหล่</th>
+      <th class="num">คลังกลาง</th><th class="num">ศูนย์ซ่อม</th><th class="num">ฝ่ายขาย</th>
+      <th class="num">รวม</th><th class="num">จุดสั่ง</th>
+      <th class="num">มูลค่า</th><th>สถานะ</th>${canEdit ? '<th></th>' : ''}
+    </tr></thead>
+    <tbody>${m.slice.map(r => `<tr>
+      <td><b class="mono">${esc(r.part_no)}</b><div class="sub2">${esc(r.name)} · ${esc(r.unit)}</div></td>
+      ${qCell(r.qty_main)}${qCell(r.qty_repair)}${qCell(r.qty_sales)}
+      <td class="qcell"><b>${money(r.qty_total)}</b></td>
+      <td class="num">${money(r.reorder_point)}</td>
+      <td class="num">฿${money(r.stock_value)}</td>
+      <td><span class="pill ${STATE_PILL[r.stock_state] || 'st0'}">${esc(r.stock_state)}</span></td>
+      ${canEdit ? `<td class="num" style="white-space:nowrap">
+        <button class="btn ic" title="รับของเข้า"   onclick="openReceive('${esc(r.part_no)}')">📥</button>
+        <button class="btn ic" title="โอนคลัง"      onclick="openTransfer('${esc(r.part_no)}')">🔁</button>
+        <button class="btn ic" title="ตรวจนับ/ปรับยอด" onclick="openCount('${esc(r.part_no)}')">🔢</button>
+      </td>` : ''}
+    </tr>`).join('')}</tbody></table></div>${pagerHTML(m, 'stock')}`
+    : '<div class="empty">ไม่พบอะไหล่ที่ตรงกับที่ค้นหา</div>';
+}
+
+/* ---------- รับของเข้าคลัง ---------- */
+async function openReceive(partNo){
+  if (!bossOnly()) return;
+  const f = await formModal({
+    title:'📥 รับของเข้าคลัง', subtitle:'ของใหม่ที่ซื้อเข้ามา หรือรับคืนจากซัพพลายเออร์',
+    ok:'บันทึกรับเข้า',
+    fields:[
+      { k:'wh',   label:'รับเข้าคลังไหน', type:'select', required:true,
+        value:'MAIN', options:whOptions() },
+      { k:'part', label:'อะไหล่', type:'select', required:true,
+        value:partNo || '', options:partOptions() },
+      { k:'qty',  label:'จำนวนที่รับเข้า', type:'number', required:true, min:1, value:1 },
+      { k:'note', label:'หมายเหตุ', placeholder:'เช่น ซื้อจาก JST รอบ ก.ย.' }
+    ]});
+  if (!f) return;
+  try {
+    const { data, error } = await sb.rpc('receive_parts', {
+      p_part_no:f.part, p_qty:Number(f.qty), p_note:f.note || 'รับเข้าคลัง',
+      p_by:who(), p_wh_code:f.wh });
+    if (error) throw error;
+    toast(`✅ รับเข้าแล้ว — คงเหลือในคลังนี้ ${money(data)} ชิ้น`);
+    reloadAll();
+  } catch(e){ fail(e); }
+}
+
+/* ---------- ตรวจนับ / ปรับยอด ---------- */
+async function openCount(partNo){
+  if (!bossOnly()) return;
+  const f = await formModal({
+    title:'🔢 ตรวจนับ / ปรับยอด', subtitle:'ใส่จำนวนที่นับได้จริง ระบบจะปรับส่วนต่างให้เอง',
+    ok:'บันทึกยอดที่นับได้', danger:true,
+    fields:[
+      { k:'wh',   label:'คลังที่นับ', type:'select', required:true, value:'MAIN', options:whOptions() },
+      { k:'part', label:'อะไหล่', type:'select', required:true, value:partNo || '', options:partOptions() },
+      { k:'qty',  label:'นับได้จริงกี่ชิ้น', type:'number', required:true, min:0, value:0 },
+      { k:'note', label:'เหตุผล / ผู้นับ', type:'textarea', required:true,
+        placeholder:'เช่น นับรอบสิ้นเดือน โดยพี่แดง — ของหายไป 2 ชิ้น' }
+    ]});
+  if (!f) return;
+  const cur   = S.byWh.find(r => r.part_no === f.part && r.wh_code === f.wh);
+  const now   = Number(cur?.qty) || 0;
+  const delta = Number(f.qty) - now;
+  if (!delta) return toast('ยอดตรงกับระบบอยู่แล้ว ไม่ต้องปรับ');
+
+  const okGo = await confirmModal('ยืนยันปรับยอด',
+    `${f.part} ที่ ${f.wh}\nระบบมี ${money(now)} · นับได้ ${money(f.qty)}\n` +
+    `จะปรับ ${delta > 0 ? '+' : ''}${money(delta)} ชิ้น`, { ok:'ปรับยอด' });
+  if (!okGo) return;
+
+  try {
+    const { error } = await sb.rpc('receive_parts', {
+      p_part_no:f.part, p_qty:delta,
+      p_note:'ตรวจนับ: ' + f.note, p_by:who(), p_wh_code:f.wh });
+    if (error) throw error;
+    toast('✅ ปรับยอดแล้ว');
+    reloadAll();
+  } catch(e){ fail(e); }
+}
+
+/* ---------- โอนเร็ว รายการเดียว ---------- */
+async function openTransfer(partNo){
+  if (!bossOnly()) return;
+  const f = await formModal({
+    title:'🔁 โอนของข้ามคลัง', subtitle:'รายการเดียว — ตัดต้นทางและเข้าปลายทางทันที',
+    ok:'โอนเลย',
+    fields:[
+      { k:'from', label:'จากคลัง', type:'select', required:true, value:'MAIN',  options:whOptions() },
+      { k:'to',   label:'ไปคลัง',  type:'select', required:true, value:'REPAIR', options:whOptions() },
+      { k:'part', label:'อะไหล่', type:'select', required:true, value:partNo || '', options:partOptions() },
+      { k:'qty',  label:'จำนวน', type:'number', required:true, min:1, value:1 },
+      { k:'note', label:'หมายเหตุ', placeholder:'เช่น เติมของให้ศูนย์ซ่อมประจำสัปดาห์' }
+    ]});
+  if (!f) return;
+  if (f.from === f.to) return toast('คลังต้นทางกับปลายทางซ้ำกัน', true);
+  try {
+    const { data, error } = await sb.rpc('transfer_now', {
+      p_from:f.from, p_to:f.to, p_part_no:f.part, p_qty:Number(f.qty),
+      p_note:f.note || null, p_by:who() });
+    if (error) throw error;
+    toast('✅ โอนแล้ว — ใบโอน ' + data);
+    reloadAll();
+  } catch(e){ fail(e); }
+}
+
+
+/* =====================================================================
+   หน้า 3 — ใบโอน (หลายรายการ)
+   ===================================================================== */
+S.trKind = '';                       // '' = ทั้งหมด · req · return · transfer
+function trKind(k){ S.trKind = k; renderTransfers(); }
+
+function renderTransfers(){
+  const all  = S.trs || [];
+  const waitApprove = all.filter(t => t.kind === 'req'    && t.status === 'requested');
+  const waitBack    = all.filter(t => t.kind === 'return' && t.status === 'sent');
+  const waitOut     = all.filter(t => t.kind !== 'return' && t.status === 'sent');
+
+  /* คิวงาน — เปิดหน้ามาต้องเห็นทันทีว่าค้างอะไรอยู่ */
+  $('trInbox').innerHTML = (waitApprove.length || waitBack.length)
+    ? `<div class="box-warn" style="margin:12px 18px">
+        <b>มีงานค้างที่คลังกลาง</b>
+        <div class="sub2" style="margin-top:5px">
+          ${waitApprove.length ? `⏳ ใบเบิกรออนุมัติ <b>${money(waitApprove.length)}</b> ใบ
+            (${esc(waitApprove.map(t => t.transfer_no).slice(0,4).join(', '))}${waitApprove.length>4?' …':''})<br>` : ''}
+          ${waitBack.length ? `↩️ ของคืนรอรับเข้า <b>${money(waitBack.length)}</b> ใบ
+            (${esc(waitBack.map(t => t.transfer_no).slice(0,4).join(', '))}${waitBack.length>4?' …':''})` : ''}
+        </div></div>`
+    : (waitOut.length
+        ? `<div class="box-info" style="margin:12px 18px">
+            🚚 จ่ายของออกไปแล้ว <b>${money(waitOut.length)}</b> ใบ รอปลายทางกดรับ</div>`
+        : '');
+
+  /* ตัวกรองตามชนิดเอกสาร */
+  const n = k => k ? all.filter(t => t.kind === k).length : all.length;
+  $('trFilter').innerHTML = [['','ทั้งหมด'],['req','📝 ใบเบิก'],
+                             ['return','↩️ ใบคืน'],['transfer','🔁 ใบโอน']]
+    .map(([k,l]) => `<button class="chip ${S.trKind===k?'on':''}" onclick="trKind('${k}')">
+      ${l} <b>${money(n(k))}</b></button>`).join('');
+
+  const rows = S.trKind ? all.filter(t => t.kind === S.trKind) : all;
+
+  $('trTbl').innerHTML = rows.length ? `<div class="tw"><table>
+    <thead><tr><th>เลขที่</th><th>ชนิด</th><th>จาก → ไป</th><th class="num">รายการ</th><th class="num">จำนวน</th>
+      <th>สถานะ</th><th>ล่าสุด</th><th></th></tr></thead>
+    <tbody>${rows.map(t => `<tr>
+      <td><b class="mono">${esc(t.transfer_no)}</b>
+        <div class="sub2">${esc(t.req_by || t.created_by || '')} · ${esc(dtth(t.created_at))}</div></td>
+      <td>${esc(t.kind_label || 'ใบโอน')}</td>
+      <td>${esc(t.from_name)} <b>→</b> ${esc(t.to_name)}
+        ${t.note ? `<div class="sub2">${esc(t.note)}</div>` : ''}
+        ${t.reject_reason ? `<div class="sub2" style="color:var(--crit)">
+          เหตุผล: ${esc(t.reject_reason)}</div>` : ''}</td>
+      <td class="num">${money(t.line_count)}</td>
+      <td class="num">${money(t.qty_total)}</td>
+      <td><span class="pill ${TR_PILL[t.status] || 'st0'}">${TR_LABEL[t.status] || esc(t.status)}</span></td>
+      <td class="sub2">${esc(dtth(t.received_at || t.sent_at || t.created_at))}</td>
+      <td class="num" style="white-space:nowrap">
+        <button class="btn ic" title="ดูรายการ" onclick="peekTransfer('${esc(t.transfer_no)}')">👀</button>
+        ${isBoss() && t.status === 'requested' ? `
+          <button class="btn sm g" onclick="trAction('${esc(t.transfer_no)}','approve')">✅ อนุมัติ+จ่าย</button>
+          <button class="btn sm dn" onclick="trAction('${esc(t.transfer_no)}','reject')">✕ ไม่อนุมัติ</button>` : ''}
+        ${isBoss() && t.status === 'draft' ? `
+          <button class="btn sm p" onclick="trAction('${esc(t.transfer_no)}','send')">🚚 ส่งของ</button>
+          <button class="btn ic dn" title="ยกเลิก" onclick="trAction('${esc(t.transfer_no)}','cancel')">✕</button>` : ''}
+        ${isBoss() && t.status === 'sent' ? `
+          <button class="btn sm g" onclick="trAction('${esc(t.transfer_no)}','receive')">📥 รับเข้า</button>` : ''}
+      </td></tr>`).join('')}</tbody></table></div>`
+    : `<div class="empty">${S.trKind ? 'ไม่มีเอกสารชนิดนี้' : 'ยังไม่มีเอกสารคลัง'}</div>`;
+}
+
+async function peekTransfer(no){
+  const t = S.trs.find(x => x.transfer_no === no);
+  if (!t) return;
+  try {
+    const { data, error } = await sb.from('stock_transfer_lines')
+      .select('qty,note,parts_master(part_no,name,unit)').eq('transfer_id', t.id);
+    if (error) throw error;
+    const lines = data || [];
+    await infoModal('🔁 ใบโอน ' + no,
+      `${t.from_name} → ${t.to_name} · ${TR_LABEL[t.status] || t.status}`,
+      `<div class="tw"><table>
+        <thead><tr><th>อะไหล่</th><th class="num">จำนวน</th><th>หมายเหตุ</th></tr></thead>
+        <tbody>${lines.length ? lines.map(l => `<tr>
+          <td><b class="mono">${esc(l.parts_master?.part_no || '')}</b>
+            <div class="sub2">${esc(l.parts_master?.name || '')}</div></td>
+          <td class="num">${money(l.qty)} ${esc(l.parts_master?.unit || '')}</td>
+          <td>${esc(l.note || '—')}</td></tr>`).join('')
+          : '<tr><td colspan="3" class="empty">ไม่มีรายการ</td></tr>'}</tbody></table></div>
+      <div class="box-info" style="margin-top:12px;font-size:12.5px">
+        สร้าง ${esc(dtth(t.created_at))} โดย ${esc(t.created_by || '—')}<br>
+        ${t.sent_at ? 'ส่งของ ' + esc(dtth(t.sent_at)) + ' โดย ' + esc(t.sent_by || '—') + '<br>' : ''}
+        ${t.received_at ? 'รับเข้า ' + esc(dtth(t.received_at)) + ' โดย ' + esc(t.received_by || '—') : ''}
+      </div>`, { wide:false });
+  } catch(e){ fail(e); }
+}
+
+async function trAction(no, act){
+  if (!bossOnly()) return;
+  const t = (S.trs || []).find(x => x.transfer_no === no);
+
+  /* ไม่อนุมัติ — ต้องบอกเหตุผลเสมอ ฝ่ายที่ขอจะได้รู้ว่าทำไม */
+  if (act === 'reject'){
+    const f = await formModal({
+      title:'✕ ไม่อนุมัติใบเบิก ' + no,
+      subtitle:'ของไม่ถูกตัด · ฝ่ายที่ขอจะเห็นเหตุผลนี้ในหน้าของเขา',
+      ok:'ไม่อนุมัติ', danger:true,
+      fields:[{ k:'why', label:'เหตุผล', type:'textarea', required:true,
+                placeholder:'เช่น ของไม่พอ ให้รอรอบหน้า / ขอเกินความจำเป็น' }]});
+    if (!f) return;
+    try {
+      const { error } = await sb.rpc('req_reject', { p_no:no, p_reason:f.why, p_by:who() });
+      if (error) throw error;
+      toast('✅ บันทึกว่าไม่อนุมัติแล้ว');
+      reloadAll();
+    } catch(e){ fail(e); }
+    return;
+  }
+
+  const label = {
+    approve:'อนุมัติและจ่ายของออกจากคลังกลาง',
+    send:'ส่งของออกจากคลังต้นทาง',
+    receive:'รับของเข้าคลังปลายทาง',
+    cancel:'ยกเลิกเอกสารนี้'
+  }[act];
+  const extra = act === 'approve' && t
+    ? `\n${t.from_name} → ${t.to_name} · ${money(t.line_count)} รายการ รวม ${money(t.qty_total)} ชิ้น` +
+      '\n\nกดแล้วของจะถูกตัดออกจากคลังกลางทันที'
+    : '';
+  const okGo = await confirmModal('ยืนยัน', `${label}\nเอกสาร ${no}${extra}`,
+    { ok:'ยืนยัน', danger: act === 'cancel' });
+  if (!okGo) return;
+
+  const fn = { approve:'req_approve', send:'transfer_send',
+               receive:'transfer_receive', cancel:'transfer_cancel' }[act];
+  try {
+    const { error } = await sb.rpc(fn, { p_no:no, p_by:who() });
+    if (error) throw error;
+    toast('✅ ' + label + ' เรียบร้อย');
+    reloadAll();
+  } catch(e){ fail(e); }
+}
+
+/* ---------- สร้างใบโอนหลายรายการ ---------- */
+async function openTransferDoc(){
+  if (!bossOnly()) return;
+  S.cart = [];
+  const f = await formModal({
+    title:'➕ สร้างใบโอน', subtitle:'เลือกคลังต้นทาง–ปลายทาง แล้วค่อยใส่รายการทีละบรรทัด',
+    ok:'สร้างใบโอน (ร่าง)',
+    fields:[
+      { k:'from', label:'จากคลัง', type:'select', required:true, value:'MAIN',   options:whOptions() },
+      { k:'to',   label:'ไปคลัง',  type:'select', required:true, value:'SALES',  options:whOptions() },
+      { k:'note', label:'หมายเหตุ', placeholder:'เช่น เติมของฝ่ายขายรอบเดือน' }
+    ]});
+  if (!f) return;
+  if (f.from === f.to) return toast('คลังต้นทางกับปลายทางซ้ำกัน', true);
+
+  /* ใส่รายการทีละบรรทัด จนกว่าจะกดพอ */
+  for(;;){
+    const line = await formModal({
+      title:'เพิ่มรายการ (' + S.cart.length + ' บรรทัดแล้ว)',
+      subtitle:`${f.from} → ${f.to} · กด "ยกเลิก" เมื่อใส่ครบแล้ว`,
+      ok:'เพิ่มรายการนี้',
+      fields:[
+        { k:'part', label:'อะไหล่', type:'select', required:true, options:partOptions() },
+        { k:'qty',  label:'จำนวน', type:'number', required:true, min:1, value:1 },
+        { k:'note', label:'หมายเหตุบรรทัดนี้' }
+      ]});
+    if (!line) break;
+    const have = S.byWh.find(r => r.part_no === line.part && r.wh_code === f.from);
+    if ((Number(have?.qty) || 0) < Number(line.qty)){
+      toast(`⚠️ ${line.part} ที่ ${f.from} มีแค่ ${money(have?.qty || 0)} ชิ้น — ใส่ไว้ก่อนได้ แต่ตอนส่งจะติด`, true);
+    }
+    const dup = S.cart.find(c => c.part_no === line.part);
+    if (dup) dup.qty += Number(line.qty);
+    else S.cart.push({ part_no:line.part, qty:Number(line.qty), note:line.note || null });
+  }
+
+  if (!S.cart.length) return toast('ยกเลิก — ไม่มีรายการในใบโอน');
+
+  const okGo = await confirmModal('ยืนยันสร้างใบโอน',
+    `${f.from} → ${f.to}\n${S.cart.length} รายการ · รวม ${money(S.cart.reduce((s,c) => s + c.qty, 0))} ชิ้น\n\n` +
+    S.cart.map(c => `• ${c.part_no} × ${c.qty}`).join('\n'), { ok:'สร้างใบโอน', danger:false });
+  if (!okGo) return;
+
+  try {
+    const { data, error } = await sb.rpc('create_transfer', {
+      p_from:f.from, p_to:f.to, p_lines:S.cart, p_note:f.note || null, p_by:who() });
+    if (error) throw error;
+    toast('✅ สร้างใบโอน ' + data + ' แล้ว — กด "ส่งของ" เมื่อของออกจากคลัง');
+    S.cart = [];
+    goPage('tr');
+    reloadAll();
+  } catch(e){ fail(e); }
+}
+
+
+/* =====================================================================
+   หน้า 4 — สมุดบัญชีคลัง
+   ===================================================================== */
+function renderMoves(){
+  const q  = (val('mSearch') || '').toLowerCase();
+  const wh = val('mWh'), ty = val('mType');
+  const rows = S.moves.filter(m => {
+    if (wh && m.wh_code !== wh) return false;
+    if (ty && m.move_type !== ty) return false;
+    if (!q) return true;
+    return (m.part_no + ' ' + m.part_name + ' ' + (m.note || '')).toLowerCase().includes(q);
+  });
+  const m = paginate(rows, 'move');
+
+  $('moveTbl').innerHTML = rows.length ? `<div class="tw"><table>
+    <thead><tr><th>เมื่อ</th><th>คลัง</th><th>อะไหล่</th><th>ทำอะไร</th>
+      <th class="num">จำนวน</th><th>หมายเหตุ</th><th>โดย</th></tr></thead>
+    <tbody>${m.slice.map(r => `<tr>
+      <td class="sub2" style="white-space:nowrap">${esc(dtth(r.created_at))}</td>
+      <td>${esc(r.wh_name || '—')}</td>
+      <td><b class="mono">${esc(r.part_no)}</b><div class="sub2">${esc(r.part_name)}</div></td>
+      <td>${esc(r.move_label)}</td>
+      ${qCell(r.qty)}
+      <td>${esc(r.note || '—')}</td>
+      <td class="sub2">${esc(r.created_by || '—')}</td>
+    </tr>`).join('')}</tbody></table></div>${pagerHTML(m, 'move')}`
+    : '<div class="empty">ไม่พบรายการเคลื่อนไหวที่ตรงกับที่กรอง</div>';
+}
+
+
+/* =====================================================================
+   หน้า 5 — ทะเบียนอะไหล่
+   ===================================================================== */
+function renderMaster(){
+  const q    = (val('pmSearch') || '').toLowerCase();
+  const off  = $('pmOff')?.checked;
+  const rows = S.master.filter(p => {
+    if (!off && !p.is_active) return false;
+    if (!q) return true;
+    return [p.part_no, p.name, p.jst_sku, p.category, p.fits_models]
+      .filter(Boolean).join(' ').toLowerCase().includes(q);
+  });
+  const m = paginate(rows, 'master');
+  const canEdit = isBoss();
+
+  $('pmTbl').innerHTML = rows.length ? `<div class="tw"><table>
+    <thead><tr><th>รหัส</th><th>ชื่ออะไหล่</th><th>ใส่รุ่นไหนได้</th><th>หน่วย</th>
+      <th class="num">ทุน</th><th class="num">ขาย</th><th class="num">จุดสั่ง</th>
+      <th class="num">คงเหลือรวม</th><th>สถานะ</th>${canEdit ? '<th></th>' : ''}</tr></thead>
+    <tbody>${m.slice.map(p => {
+      const st = S.stock.find(s => s.part_id === p.id);
+      return `<tr>
+        <td><b class="mono">${esc(p.part_no)}</b>${p.jst_sku ? `<div class="sub2">JST ${esc(p.jst_sku)}</div>` : ''}</td>
+        <td>${esc(p.name)}${p.category ? `<div class="sub2">${esc(p.category)}</div>` : ''}</td>
+        <td class="sub2" style="max-width:190px">${esc(p.fits_models || '—')}</td>
+        <td>${esc(p.unit)}</td>
+        <td class="num">฿${money(p.cost_price)}</td>
+        <td class="num">฿${money(p.sell_price)}</td>
+        <td class="num">${money(p.reorder_point)}</td>
+        ${qCell(st?.qty_total ?? 0)}
+        <td>${p.is_active ? '<span class="pill tag-good">ใช้งาน</span>' : '<span class="pill st0">ปิดใช้งาน</span>'}</td>
+        ${canEdit ? `<td class="num" style="white-space:nowrap">
+          <button class="btn ic" title="แก้ไข" onclick="editPart('${p.id}')">✏️</button>
+          <button class="btn ic dn" title="ลบออกจากทะเบียน"
+            onclick="askDeletePart('${p.id}')">🗑️</button></td>` : ''}
+      </tr>`;
+    }).join('')}</tbody></table></div>${pagerHTML(m, 'master')}`
+    : '<div class="empty">ไม่พบอะไหล่ — กด "เพิ่มอะไหล่" เพื่อสร้างใหม่</div>';
+}
+
+async function editPart(id){
+  if (!bossOnly()) return;
+  const p = id ? S.master.find(x => x.id === id) : null;
+  const f = await formModal({
+    title: p ? '✏️ แก้ไขอะไหล่' : '➕ เพิ่มอะไหล่',
+    subtitle: p ? p.part_no + ' — ' + p.name : 'รหัสอะไหล่ห้ามซ้ำกับตัวที่มีอยู่',
+    ok:'บันทึก',
+    fields:[
+      { k:'part_no', label:'รหัสอะไหล่', required:true, value:p?.part_no || '',
+        placeholder:'เช่น BR-00124' },
+      { k:'name',    label:'ชื่ออะไหล่', required:true, value:p?.name || '' },
+      { k:'category', label:'กลุ่มสินค้า', half:true, value:p?.category || '',
+        placeholder:'เช่น สว่าน, มอเตอร์' },
+      { k:'unit',    label:'หน่วยนับ', half:true, value:p?.unit || 'ชิ้น' },
+      { k:'fits_models', label:'ใส่รุ่นไหนได้บ้าง', value:p?.fits_models || '',
+        placeholder:'เช่น SCS-405/SCS-410/SCS-455',
+        hint:'ใช้ค้นตอนหาอะไหล่ให้เครื่อง — คั่นรุ่นด้วย / หรือเว้นวรรค' },
+      { k:'cost_price', label:'ราคาทุน (บาท)', type:'number', min:0, value:p?.cost_price ?? 0 },
+      { k:'sell_price', label:'ราคาขาย (บาท)', type:'number', min:0, value:p?.sell_price ?? 0 },
+      { k:'reorder_point', label:'จุดสั่งซื้อ — เหลือเท่านี้ให้เตือน', type:'number', min:0,
+        value:p?.reorder_point ?? 0 },
+      { k:'jst_sku', label:'SKU ใน JST', half:true, value:p?.jst_sku || '' },
+      { k:'note',    label:'หมายเหตุ', half:true, value:p?.note || '',
+        placeholder:'เช่น ขนาด 1/4' },
+      { k:'is_active', label:'เปิดใช้งาน', type:'select',
+        value: p ? String(p.is_active) : 'true',
+        options:[{ v:'true', t:'ใช้งาน' }, { v:'false', t:'ปิดใช้งาน' }] }
+    ]});
+  if (!f) return;
+  const row = {
+    part_no: f.part_no.trim(), name: f.name.trim(), unit: (f.unit || 'ชิ้น').trim(),
+    cost_price: Number(f.cost_price) || 0, sell_price: Number(f.sell_price) || 0,
+    reorder_point: Number(f.reorder_point) || 0,
+    jst_sku: f.jst_sku?.trim() || null,
+    category: f.category?.trim() || null,
+    fits_models: f.fits_models?.trim() || null,
+    note: f.note?.trim() || null,
+    is_active: f.is_active === 'true'
+  };
+  try {
+    const { error } = p
+      ? await sb.from('parts_master').update(row).eq('id', p.id)
+      : await sb.from('parts_master').insert(row);
+    if (error) throw error;
+    toast('✅ บันทึกแล้ว');
+    reloadAll();
+  } catch(e){
+    if (/duplicate|unique/i.test(e.message || '')) toast('❌ รหัสอะไหล่นี้มีอยู่แล้ว', true);
+    else fail(e);
+  }
+}
+
+
+/* ---------- ลบอะไหล่ออกจากทะเบียน ----------
+   ลบได้เฉพาะตัวที่ยังไม่เคยถูกใช้ที่ไหนเลย
+   ตัวที่เคยใช้แล้วลบไม่ได้ เพราะใบงาน/ใบขายเก่าจะอ่านไม่ออก → ให้ปิดใช้งานแทน */
+async function askDeletePart(id){
+  if (!bossOnly()) return;
+  const p = S.master.find(x => x.id === id);
+  if (!p) return;
+
+  let u = null;
+  try {
+    const { data, error } = await sb.rpc('part_usage', { p_part_id: id });
+    if (error) throw error;
+    u = Array.isArray(data) ? data[0] : data;
+  } catch(e){
+    if (/does not exist|not exist|schema cache/i.test(e.message || ''))
+      return toast('❌ ยังไม่ได้รัน 21_delete_part.sql ในฐานข้อมูล', true);
+    return fail(e);
+  }
+
+  const used = [
+    [u?.stock_qty,     'มีของในคลัง ' + money(u?.stock_qty) + ' ชิ้น'],
+    [u?.moves,         'เคลื่อนไหวในคลัง ' + money(u?.moves) + ' ครั้ง'],
+    [u?.repair_used,   'เบิกใช้ในใบงานซ่อม ' + money(u?.repair_used) + ' ครั้ง'],
+    [u?.sales_used,    'อยู่ในใบขาย ' + money(u?.sales_used) + ' รายการ'],
+    [u?.transfer_used, 'อยู่ในใบโอน ' + money(u?.transfer_used) + ' รายการ'],
+    [u?.pr_used,       'อยู่ในใบขอซื้อ ' + money(u?.pr_used) + ' รายการ'],
+    [u?.shortage,      'เคยแจ้งของขาด ' + money(u?.shortage) + ' ครั้ง']
+  ].filter(([n]) => Number(n)).map(([, t]) => t);
+
+  /* เคยถูกใช้แล้ว — เสนอทางออกที่ถูกต้องแทนการปฏิเสธเฉย ๆ */
+  if (used.length){
+    const ok = await confirmModal('ลบไม่ได้ — แต่ปิดใช้งานได้',
+      `${p.part_no} · ${p.name}\n\nอะไหล่ตัวนี้ถูกใช้ไปแล้ว:\n` +
+      used.map(t => '• ' + t).join('\n') +
+      '\n\nถ้าลบทิ้ง ใบงานและใบขายเก่าจะอ่านไม่ออก' +
+      '\n\nแนะนำให้ "ปิดใช้งาน" แทน — จะหายจากรายการเลือก' +
+      '\nแต่ประวัติเก่ายังอยู่ครบ และเปิดกลับมาใช้ได้ทุกเมื่อ',
+      { ok: p.is_active ? 'ปิดใช้งานตัวนี้' : 'เปิดใช้งานกลับ', danger:false });
+    if (!ok) return;
+    return togglePart(id, !p.is_active);
+  }
+
+  const ok = await confirmModal('ลบออกจากทะเบียนถาวร',
+    `${p.part_no} · ${p.name}\n\nอะไหล่ตัวนี้ยังไม่เคยถูกใช้ที่ไหนเลย ลบได้ปลอดภัย\n\nลบแล้วเอากลับไม่ได้`,
+    { ok:'ลบถาวร', danger:true });
+  if (!ok) return;
+
+  try {
+    const { data, error } = await sb.rpc('delete_part', { p_part_id:id, p_by:who() });
+    if (error) throw error;
+    toast('🗑️ ' + (data || 'ลบแล้ว'));
+    reloadAll();
+  } catch(e){ fail(e); }
+}
+
+async function togglePart(id, active){
+  try {
+    const { data, error } = await sb.rpc('set_part_active',
+      { p_part_id:id, p_active:active, p_by:who() });
+    if (error) throw error;
+    toast('✅ ' + (data || 'บันทึกแล้ว'));
+    reloadAll();
+  } catch(e){ fail(e); }
+}
+
+
+/* =====================================================================
+   นำเข้าอะไหล่จากไฟล์ CSV / Excel
+     · อ่านไฟล์ในเบราว์เซอร์ ไม่ส่งไฟล์ขึ้นเซิร์ฟเวอร์
+     · จับคู่คอลัมน์เองได้ เพราะไฟล์จาก JST แต่ละงวดหัวตารางไม่เหมือนกัน
+     · ส่งเข้าฐานข้อมูลทีละ 400 แถว พร้อมแถบความคืบหน้า
+   ===================================================================== */
+const IMP = {
+  wb:null, sheets:[], sheet:0, raw:[], head:[], rows:[],
+  hrow:0, map:{}, ready:[], fileName:''
+};
+
+const IMP_FIELDS = [
+  { k:'part_no',       label:'รหัสอะไหล่',  req:true,  fill:true,
+    hints:['รหัสสินค้า','รหัสอะไหล่','sku','รหัส','partno','part_no','itemcode','item','code','barcode','商品编码'] },
+  { k:'name',          label:'ชื่ออะไหล่',  req:true,
+    hints:['ชื่อสินค้า','ชื่ออะไหล่','ชื่อ','name','productname','description','desc','品名','商品名称'] },
+  { k:'category',      label:'กลุ่มสินค้า',  req:false, fill:true,
+    hints:['กลุ่มสินค้า','กลุ่ม','หมวด','ประเภท','category','group','type'] },
+  { k:'fits_models',   label:'รุ่นที่ใช้ร่วม', req:false, fill:true,
+    hints:['สินค้าที่ใช้ร่วม','รุ่นที่ใช้ร่วม','ใช้ร่วม','รุ่น','model','fits','compatible'] },
+  { k:'unit',          label:'หน่วยนับ',    req:false,
+    hints:['หน่วยนับ','หน่วย','unit','uom','单位'] },
+  { k:'cost_price',    label:'ราคาทุน',     req:false,
+    hints:['ราคาทุน','ต้นทุน','ทุน','cost','costprice','purchaseprice','成本'] },
+  { k:'sell_price',    label:'ราคาขาย',     req:false,
+    hints:['ราคาปรับใหม่','ราคาขาย','ขายปลีก','ราคา','ขาย','sellprice','price','retail','售价'] },
+  { k:'reorder_point', label:'จุดสั่งซื้อ',  req:false,
+    hints:['จุดสั่งซื้อ','จุดสั่ง','ขั้นต่ำ','reorder','minqty','safetystock'] },
+  { k:'jst_sku',       label:'SKU ใน JST',  req:false,
+    hints:['jstsku','jst','skuid'] },
+  { k:'note',          label:'หมายเหตุ',    req:false,
+    hints:['หมายเหตุ','remark','note','comment'] }
+];
+
+function impOpen(){
+  if (!bossOnly()) return;
+  Object.assign(IMP, { wb:null, sheets:[], sheet:0, raw:[], head:[], rows:[],
+                       hrow:0, map:{}, ready:[], fileName:'' });
+  $('impCard').hidden = false;
+  $('impS1').hidden = false;
+  ['impS2','impS3','impS4'].forEach(id => { $(id).hidden = true; $(id).innerHTML = ''; });
+  $('impName').textContent = '';
+  $('impFile').value = '';
+  $('impCard').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+function impClose(){ $('impCard').hidden = true; }
+
+/* ---------- ขั้น 1: อ่านไฟล์ ---------- */
+async function impPick(input){
+  const f = input.files?.[0];
+  if (!f) return;
+  $('impName').textContent = '📄 ' + f.name + ' · ' + (f.size/1048576).toFixed(1) + ' MB · กำลังอ่าน…';
+  IMP.fileName = f.name;
+
+  try {
+    if (/\.(xlsx|xls)$/i.test(f.name)){
+      await loadXLSX();
+      IMP.wb = XLSX.read(await f.arrayBuffer(), { type:'array' });
+      IMP.sheets = IMP.wb.SheetNames || [];
+      if (!IMP.sheets.length) throw new Error('ไฟล์นี้ไม่มีชีทข้อมูล');
+      IMP.sheet = 0;
+    } else {
+      IMP.wb = null;
+      IMP.sheets = ['(ไฟล์ CSV)'];
+      IMP.sheet = 0;
+      IMP.csv = parseCSV(decodeText(await f.arrayBuffer()));
+    }
+    impLoadSheet();
+  } catch(e){
+    $('impName').textContent = '📄 ' + f.name;
+    fail(e);
+  }
+}
+
+/** ดึงข้อมูลของชีทที่เลือก แล้วเดาว่าหัวตารางอยู่แถวไหน */
+function impLoadSheet(){
+  let rows;
+  if (IMP.wb){
+    const ws = IMP.wb.Sheets[IMP.sheets[IMP.sheet]];
+    rows = XLSX.utils.sheet_to_json(ws, { header:1, raw:false, defval:'' });
+  } else {
+    rows = IMP.csv || [];
+  }
+  /* ตัดแถวว่างท้ายไฟล์ทิ้ง แต่เก็บแถวว่างต้น ๆ ไว้ เพราะหัวตารางอาจไม่ได้อยู่แถวแรก */
+  while (rows.length && cellCount(rows[rows.length - 1]) === 0) rows.pop();
+  IMP.raw = rows;
+  if (rows.length < 2) { toast('ชีทนี้ไม่มีข้อมูล หรืออ่านไม่ออก', true); return; }
+
+  IMP.hrow = guessHeaderRow(rows);
+
+  /* แถวที่เดาว่าเป็นหัวตาราง แต่จับคู่ไม่ได้สักช่อง = มันไม่ใช่หัวตาราง เป็นข้อมูล
+     (ชีทราคาอะไหล่ 3 คอลัมน์เป็นแบบนี้ — แถวแรกคือ SCG-605 | หัวกระโหลก | 250.-)
+     ถ้าไม่ดักไว้ แถวแรกจะถูกกินไปเป็นหัวตารางแล้วข้อมูลหายไป 1 แถว */
+  const probe = guessMap(IMP_FIELDS, (rows[IMP.hrow] || []).map(x => cleanCell(x)));
+  if (probe.part_no < 0 && probe.name < 0) IMP.hrow = -1;
+
+  impApplyHeader();
+}
+
+function impApplyHeader(){
+  if (IMP.hrow < 0){
+    /* ชีทที่ไม่มีหัวตาราง — ตั้งชื่อคอลัมน์ให้เอง แถวแรกจะได้ไม่ถูกกินไปเป็นหัว */
+    const w = IMP.raw.reduce((m, r) => Math.max(m, r.length), 0);
+    IMP.head = Array.from({ length:w }, (_, i) => 'คอลัมน์ ' + (i + 1));
+    IMP.rows = IMP.raw;
+  } else {
+    IMP.head = (IMP.raw[IMP.hrow] || []).map(h => (h ?? '').toString().trim());
+    IMP.rows = IMP.raw.slice(IMP.hrow + 1);
+  }
+  $('impName').textContent =
+    `📄 ${IMP.fileName} · ${IMP.wb ? 'ชีท "' + IMP.sheets[IMP.sheet] + '" · ' : ''}` +
+    `${money(IMP.rows.length)} แถว · ${IMP.head.length} คอลัมน์`;
+  impRenderMap();
+}
+
+function impSetSheet(i){ IMP.sheet = Number(i); IMP.map = {}; impLoadSheet(); }
+function impSetHeader(i){ IMP.hrow = Number(i); IMP.map = {}; impApplyHeader(); }
+
+/* ---------- ขั้น 2: จับคู่คอลัมน์ ---------- */
+function impRenderMap(){
+  IMP.map = guessMap(IMP_FIELDS, IMP.head);
+  IMP.sniffed = false;
+
+  /* เดาจากชื่อหัวตารางไม่ได้เลย → เดาจาก "หน้าตาข้อมูล" ในคอลัมน์แทน
+     คอลัมน์ที่เป็นภาษาไทย = ชื่ออะไหล่ · เป็นรหัสอังกฤษ+ตัวเลข = รุ่น · เป็นตัวเลขล้วน = ราคา */
+  if (IMP.map.name < 0 && IMP.map.part_no < 0){
+    const prof = profileColumns(IMP.rows, IMP.head.length).filter(Boolean);
+    const used = new Set();
+    const take = test => {
+      const c = prof.find(x => !used.has(x.j) && test(x));
+      if (c) used.add(c.j);
+      return c ? c.j : -1;
+    };
+    const nameC = take(c => c.thai >= 0.5);
+    if (nameC >= 0){
+      IMP.map.name        = nameC;
+      IMP.map.fits_models = take(c => c.code >= 0.6);
+      IMP.map.sell_price  = take(c => c.num  >= 0.7);
+      IMP.sniffed = true;
+    }
+  }
+
+  /* มีคอลัมน์ "SKU" อยู่ในหัวตาราง แต่ว่างทั้งแผ่น — ชีทฝ่ายการช่างเป็นแบบนี้
+     ถือว่าไม่มีรหัส ติ๊กตั้งรหัสอัตโนมัติให้เลย จะได้ไม่ต้องมานั่งงงว่าทำไมนำเข้าไม่ได้ */
+  IMP.emptyCode = IMP.map.part_no >= 0 &&
+                  !IMP.rows.some(r => cleanCell(r[IMP.map.part_no]));
+  /* ชีทที่ไม่มีหัวตาราง ชื่อคอลัมน์จะเป็น "คอลัมน์ 1/2/3" ซึ่งดูไม่ออกว่าคืออะไร
+     เลยเอาค่าจริงแถวแรก ๆ มาต่อท้ายให้ เลือกได้ถูกตั้งแต่ครั้งแรก */
+  const sampleOf = j => {
+    for (let i = 0; i < Math.min(20, IMP.rows.length); i++){
+      const v = cleanCell(IMP.rows[i][j]);
+      if (v) return '  (' + v.slice(0, 18) + ')';
+    }
+    return '';
+  };
+  const opts = i => ['<option value="-1">— ไม่ใช้ —</option>']
+    .concat(IMP.head.map((h, j) =>
+      `<option value="${j}" ${j === i ? 'selected' : ''}>${
+        esc((h || 'คอลัมน์ ' + (j+1)) + sampleOf(j))}</option>`))
+    .join('');
+
+  const rowOpts = `<option value="-1" ${IMP.hrow < 0 ? 'selected' : ''}>
+      — ชีทนี้ไม่มีหัวตาราง (แถว 1 เป็นข้อมูลเลย) —</option>` +
+    IMP.raw.slice(0, 8).map((r, i) =>
+      `<option value="${i}" ${i === IMP.hrow ? 'selected' : ''}>แถว ${i+1}: ${
+        esc(r.filter(c => (c ?? '').toString().trim()).slice(0, 4).join(' | ').slice(0, 48) || '(ว่าง)')
+      }</option>`).join('');
+
+  $('impS2').hidden = false;
+  $('impS2').innerHTML = `
+    <div style="font-weight:700;color:var(--navy);margin:18px 0 8px">ขั้น 2 · บอกว่าข้อมูลอยู่ตรงไหน</div>
+    <div class="grid g2" style="margin-bottom:14px">
+      ${IMP.wb ? `<div class="f"><label>ชีทที่จะนำเข้า</label>
+        <select id="impSheet" onchange="impSetSheet(this.value)">
+          ${IMP.sheets.map((s, i) =>
+            `<option value="${i}" ${i === IMP.sheet ? 'selected' : ''}>${esc(s)}</option>`).join('')}
+        </select></div>` : ''}
+      <div class="f"><label>หัวตารางอยู่แถวไหน</label>
+        <select id="impHrow" onchange="impSetHeader(this.value)">${rowOpts}</select></div>
+    </div>
+
+    ${IMP.sniffed ? `<div class="box-info" style="margin-bottom:12px">
+      ชีทนี้ไม่มีหัวตาราง — ระบบเดาให้จาก<b>หน้าตาข้อมูลในแต่ละคอลัมน์</b>
+      แล้วติ๊ก "เซลล์ผสาน" กับ "ตั้งรหัสอัตโนมัติ" ให้ด้วย<br>
+      <b>ตรวจตัวอย่างข้างล่างให้ชัวร์ก่อนกดนำเข้า</b> ถ้าเดาผิดเปลี่ยนได้ทุกช่อง
+    </div>` : IMP.emptyCode ? `<div class="box-info" style="margin-bottom:12px">
+      ชีทนี้มีคอลัมน์ <b>${esc(IMP.head[IMP.map.part_no] || 'รหัส')}</b> อยู่ แต่<b>ว่างทั้งแผ่น</b> —
+      ระบบติ๊ก "ตั้งรหัสให้อัตโนมัติ" ให้แล้ว จะตั้งรหัสจาก รุ่น + เลขรัน<br>
+      <b>ดูตัวอย่างรหัสข้างล่างก่อนกดนำเข้า</b>
+    </div>` : `<div class="sub2" style="margin-bottom:10px">
+      ระบบเดาการจับคู่ให้แล้วจากหัวตาราง ถ้าเดาผิดเปลี่ยนได้เลย ·
+      ช่องที่มี <span class="req">*</span> ต้องเลือก</div>`}
+    <div class="grid g3">
+      ${IMP_FIELDS.map(fd => `<div class="f">
+        <label>${esc(fd.label)}${fd.req ? ' <span class="req">*</span>' : ''}</label>
+        <select id="impm_${fd.k}" onchange="impPreview()">${opts(IMP.map[fd.k])}</select>
+      </div>`).join('')}
+    </div>
+
+    <div style="font-weight:700;color:var(--navy);margin:16px 0 6px">
+      ตัวอย่าง 3 แถวแรกที่จะนำเข้า</div>
+    <div class="tw"><table>
+      <thead><tr>${IMP.head.map(h => `<th>${esc(h || '—')}</th>`).join('')}</tr></thead>
+      <tbody>${IMP.rows.slice(0, 3).map(r => `<tr>${IMP.head.map((_, j) =>
+        `<td>${esc((r[j] ?? '').toString().slice(0, 40))}</td>`).join('')}</tr>`).join('')}</tbody>
+    </table></div>
+
+    <div class="grid g2" style="margin-top:16px">
+      <div class="f"><label>ถ้ารหัสซ้ำกับที่มีอยู่แล้ว</label>
+        <select id="impMode" onchange="impPreview()">
+          <option value="skip">ข้ามไป ไม่แตะของเดิม</option>
+          <option value="update">อัปเดตทับด้วยข้อมูลในไฟล์</option>
+        </select></div>
+      <div class="f"><label>เอาเฉพาะรหัสที่มีคำว่า</label>
+        <input type="text" id="impFilter" placeholder="เว้นว่าง = เอาทั้งหมด" oninput="impPreview()"></div>
+      <div class="f"><label>สถานะที่นำเข้า</label>
+        <select id="impActive" onchange="impPreview()">
+          <option value="true">เปิดใช้งานทันที</option>
+          <option value="false">นำเข้าแบบปิดใช้งานไว้ก่อน</option>
+        </select></div>
+      <div class="f"><label>เซลล์ผสาน (merged)</label>
+        <label style="display:flex;gap:7px;align-items:flex-start;font-weight:400;font-size:13px">
+          <input type="checkbox" id="impFill" onchange="impPreview()" style="margin-top:3px"
+                 ${IMP.sniffed ? 'checked' : ''}>
+          <span>เติมค่าจากแถวบนเมื่อเซลล์ว่าง<br>
+            <span class="sub2">ใช้กับ รหัส · กลุ่มสินค้า · รุ่นที่ใช้ร่วม เท่านั้น
+            (ราคาและชื่อไม่เติมให้ เดี๋ยวได้ราคาผิด)</span></span></label></div>
+      <div class="f"><label>ชีทนี้ไม่มีคอลัมน์รหัส</label>
+        <label style="display:flex;gap:7px;align-items:flex-start;font-weight:400;font-size:13px">
+          <input type="checkbox" id="impAuto" onchange="impPreview()" style="margin-top:3px"
+                 ${IMP.sniffed || IMP.emptyCode ? 'checked' : ''}>
+          <span>ตั้งรหัสให้อัตโนมัติจาก <b>รุ่น + เลขรัน</b><br>
+            <span class="sub2">เช่น DR-14-01 · DR-14-02 · SCM-530-07 ·
+            ต้องจับคู่ช่อง "รุ่นที่ใช้ร่วม" ก่อน<br>
+            นำเข้าไฟล์เดิมซ้ำจะใช้รหัสเดิม ไม่สร้างรหัสใหม่ทับ</span></span></label></div>
+    </div>`;
+  impPreview();
+}
+
+/** แถบปุ่มนำเข้า — ต้องโผล่ทุกกรณี แม้ตอนที่ยังกดไม่ได้
+    ไม่งั้นคนใช้จะหาปุ่มไม่เจอแล้วไม่รู้ว่าต้องทำอะไรต่อ */
+function impBar(n, why){
+  return `<div class="impbar">
+    <button class="btn g" onclick="impRun()" ${n ? '' : 'disabled'}>
+      🚀 ${n ? 'นำเข้า ' + money(n) + ' รายการ' : 'ยังนำเข้าไม่ได้'}</button>
+    <span class="why">${why}</span>
+  </div>`;
+}
+
+/* ---------- ขั้น 3: ตรวจก่อนนำเข้า ---------- */
+function impPreview(){
+  /* val() คืน '' ถ้าไม่เจอช่อง — ต้องกลายเป็น -1 ไม่ใช่ 0 ไม่งั้นจะไปหยิบคอลัมน์แรกผิด ๆ */
+  IMP_FIELDS.forEach(fd => { IMP.map[fd.k] = Number(val('impm_' + fd.k) || -1); });
+  const cPart = IMP.map.part_no, cName = IMP.map.name;
+  const autoCode = !!$('impAuto')?.checked;
+
+  $('impS3').hidden = false;
+  if (cName < 0 || (cPart < 0 && !autoCode)){
+    const need = [];
+    if (cName < 0) need.push('<b>ชื่ออะไหล่</b>');
+    if (cPart < 0 && !autoCode) need.push('<b>รหัสอะไหล่</b>');
+    $('impS3').innerHTML = `<div class="box-warn" style="margin-top:16px">
+      ยังไม่ได้เลือกว่า ${need.join(' และ ')} อยู่คอลัมน์ไหน<br>
+      <span class="sub2">ดูตัวอย่างข้อมูลในวงเล็บท้ายแต่ละตัวเลือกได้ว่าคอลัมน์นั้นมีอะไรอยู่</span>
+      ${cPart < 0 && !autoCode ? `<div style="margin-top:8px">
+        ถ้าชีทนี้<b>ไม่มีคอลัมน์รหัสเลย</b> ให้ติ๊ก
+        <b>"ตั้งรหัสให้อัตโนมัติ"</b> ที่มุมขวาล่างของกล่องข้างบนแทน</div>` : ''}
+    </div>` + impBar(0, 'เลือกคอลัมน์ให้ครบก่อน แล้วปุ่มนี้จะกดได้');
+    return;
+  }
+
+  const q      = (val('impFilter') || '').toLowerCase();
+  const mode   = val('impMode') || 'skip';
+  const active = (val('impActive') || 'true') === 'true';
+  const fill   = !!$('impFill')?.checked;
+
+  /* เซลล์ผสานใน Excel อ่านออกมาได้ค่าแค่แถวแรก ที่เหลือว่าง — เติมลงมาให้เฉพาะคอลัมน์จัดกลุ่ม */
+  const fillCols = fill
+    ? IMP_FIELDS.filter(f => f.fill && IMP.map[f.k] >= 0).map(f => IMP.map[f.k])
+    : [];
+  const carry = {};
+  const cell = (r, c) => {
+    if (c < 0) return '';
+    let v = cleanCell(r[c]);
+    if (fillCols.includes(c)){
+      if (v) carry[c] = v; else v = carry[c] || '';
+    }
+    return v;
+  };
+
+  const have = new Set(S.master.map(p => p.part_no));
+  const seen = new Set();
+  const bad = [];
+  let dupFile = 0, exist = 0, filtered = 0, noCode = 0, noName = 0, oddPrice = 0;
+  const ready = [];
+
+  /* ---------- ตั้งรหัสอัตโนมัติ ----------
+     รหัส = <รุ่น>-<เลขรัน>  เช่น DR-14-01
+     กติกาที่ทำให้นำเข้าซ้ำได้โดยไม่สร้างรหัสซ้อน:
+       จำคู่ (รุ่น + ชื่ออะไหล่) ของที่มีอยู่แล้ว ถ้าเจอคู่เดิมให้ใช้รหัสเดิม
+       คู่ใหม่เท่านั้นถึงจะได้เลขรันถัดไป */
+  const mKey = s => String(s || '').split(/[\/\n,]/)[0]
+                      .replace(/\s+/g, ' ').trim().toUpperCase()
+                      .replace(/[^A-Z0-9\-]/g, '');
+  const nKey = s => String(s || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  const knownKey = new Map();     // "รุ่น|ชื่อ" → รหัสที่เคยตั้งไว้
+  const maxNo    = new Map();     // "รุ่น" → เลขรันสูงสุดที่ใช้ไปแล้ว
+  if (autoCode) S.master.forEach(pm => {
+    /* ต้องใช้สูตรคีย์เดียวกับตอนสร้างรหัส (รวม fallback 'RP')
+       ไม่งั้นแถวที่ไม่มีรุ่นจะจำไม่ได้ แล้วได้รหัสใหม่ทุกครั้งที่นำเข้าซ้ำ */
+    if (pm.name) knownKey.set((mKey(pm.fits_models) || 'RP') + '|' + nKey(pm.name), pm.part_no);
+    const mm = /^(.+)-(\d+)$/.exec(pm.part_no || '');
+    if (mm) maxNo.set(mm[1], Math.max(maxNo.get(mm[1]) || 0, Number(mm[2])));
+  });
+  const makeCode = (model, name) => {
+    const pre = mKey(model) || 'RP';
+    const k = pre + '|' + nKey(name);
+    if (knownKey.has(k)) return knownKey.get(k);
+    const n = (maxNo.get(pre) || 0) + 1;
+    maxNo.set(pre, n);
+    const code = pre + '-' + String(n).padStart(2, '0');
+    knownKey.set(k, code);
+    return code;
+  };
+
+  IMP.rows.forEach((r, i) => {
+    if (cellCount(r) === 0) return;                            // แถวว่างล้วน ไม่นับเป็นปัญหา
+    let pn = cell(r, cPart), nm = cell(r, cName);
+    const fits = cell(r, IMP.map.fits_models);
+    if (!pn && !nm) return;
+    if (!nm){ noName++; if (bad.length < 8) bad.push({ line:IMP.hrow + 2 + i, why:'ไม่มีชื่อ', what:pn }); return; }
+    if (!pn && autoCode) pn = makeCode(fits, nm);
+    if (q && !pn.toLowerCase().includes(q)){ filtered++; return; }
+    if (!pn){ noCode++; if (bad.length < 8) bad.push({ line:IMP.hrow + 2 + i, why:'ไม่มีรหัส', what:nm }); return; }
+    if (seen.has(pn)){ dupFile++; return; }
+    seen.add(pn);
+    const already = have.has(pn);
+    if (already){ exist++; if (mode === 'skip') return; }
+
+    const row = { part_no:pn, name:nm, is_active:active };
+    [['unit','unit'], ['jst_sku','jst_sku'], ['category','category'],
+     ['fits_models','fits_models'], ['note','note']].forEach(([k, col]) => {
+      const v = cell(r, IMP.map[col]);
+      /* เซลล์ "รุ่นที่ใช้ร่วม" ในชีทจริงขึ้นบรรทัดใหม่แทนการคั่น — ทำให้เป็นบรรทัดเดียว */
+      if (v) row[k] = k === 'fits_models' ? v.replace(/\s*\n\s*/g, ' / ') : v;
+    });
+    if (priceLooksOdd(cell(r, IMP.map.sell_price)) ||
+        priceLooksOdd(cell(r, IMP.map.cost_price))) oddPrice++;
+    if (IMP.map.cost_price    >= 0) row.cost_price    = numOf(cell(r, IMP.map.cost_price));
+    if (IMP.map.sell_price    >= 0) row.sell_price    = numOf(cell(r, IMP.map.sell_price));
+    if (IMP.map.reorder_point >= 0) row.reorder_point = Math.round(numOf(cell(r, IMP.map.reorder_point)));
+    ready.push(row);
+  });
+
+  IMP.ready = ready;
+  const isNew    = ready.filter(r => !have.has(r.part_no)).length;
+  const upd      = ready.length - isNew;
+  const badCount = noCode + noName + dupFile;
+
+  $('impS3').innerHTML = `
+    <div style="font-weight:700;color:var(--navy);margin:18px 0 8px">ขั้น 3 · ตรวจก่อนนำเข้า</div>
+    <div class="kpis" style="margin-bottom:12px">
+      ${[['na','📄','แถวในชีท', money(IMP.rows.length), ''],
+         ['nc','🆕','อะไหล่ตัวใหม่', money(isNew), 'จะถูกเพิ่ม'],
+         [upd ? 'nb' : 'nc','♻️','มีอยู่แล้ว', money(exist),
+           mode === 'skip' ? 'จะข้ามทั้งหมด' : 'จะอัปเดตทับ ' + money(upd) + ' ตัว'],
+         [badCount ? 'nd' : 'nc','⚠️','แถวที่ใช้ไม่ได้', money(badCount),
+           [noCode ? 'ไม่มีรหัส ' + money(noCode) : '',
+            noName ? 'ไม่มีชื่อ ' + money(noName) : '',
+            dupFile ? 'รหัสซ้ำในไฟล์ ' + money(dupFile) : ''
+           ].filter(Boolean).join(' · ') || 'ไม่มี']
+        ].map(([cl,e,l,n,u]) => `<div class="kpi ${cl}" style="padding:11px 13px">
+          <div class="t"><span class="l" style="font-size:11.5px">${l}</span><span class="e">${e}</span></div>
+          <div class="n" style="font-size:21px">${n}</div>
+          <div class="sub2">${esc(u)}</div></div>`).join('')}
+    </div>
+    ${filtered ? `<div class="box-info">ตัวกรองคัดออก ${money(filtered)} แถว</div>` : ''}
+    ${autoCode && IMP.map.fits_models < 0 ? `<div class="box-warn" style="margin-top:10px">
+      ยังไม่ได้จับคู่ช่อง <b>"รุ่นที่ใช้ร่วม"</b> — รหัสที่ได้จะเป็น RP-01, RP-02 … เรียงกันไปเฉย ๆ<br>
+      จับคู่ก่อนจะได้รหัสที่อ่านออก เช่น DR-14-01
+    </div>` : ''}
+    ${oddPrice ? `<div class="box-warn" style="margin-top:10px">
+      มี <b>${money(oddPrice)} แถว</b> ที่ช่องราคาเขียนเป็นประโยค เช่น
+      "ตัวข้างบน40 ข้างล่าง10บาท" — ระบบหยิบ<b>ตัวเลขก้อนแรก</b>มาใช้<br>
+      นำเข้าได้ แต่ควรไล่ตรวจราคาพวกนี้อีกรอบหลังนำเข้าเสร็จ
+    </div>` : ''}
+    ${noCode > 3 && !$('impFill')?.checked ? `<div class="box-warn" style="margin-top:10px">
+      มี ${money(noCode)} แถวที่ <b>ไม่มีรหัสอะไหล่</b> จะถูกข้าม<br>
+      ถ้าชีทนี้ใช้เซลล์ผสาน (รหัสเดียวครอบหลายแถว) ให้ติ๊ก
+      <b>"เติมค่าจากแถวบน"</b> ข้างบน · ถ้าชีทนี้ไม่มีคอลัมน์รหัสเลย ต้องไปเติมในชีทก่อน
+    </div>` : ''}
+    ${fill && dupFile > 2 ? `<div class="box-warn" style="margin-top:10px">
+      เติมค่าจากแถวบนแล้วได้ <b>รหัสซ้ำ ${money(dupFile)} แถว</b><br>
+      ถ้าคอลัมน์ที่ผสานคือ <b>รุ่นเครื่อง</b> (เช่น SCDR-170 ครอบอะไหล่หลายตัว)
+      ไม่ใช่รหัสอะไหล่ ให้จับคู่คอลัมน์นั้นไปที่ <b>"รุ่นที่ใช้ร่วม"</b> แทน
+      แล้วหา/เติมคอลัมน์รหัสอะไหล่จริง ๆ
+    </div>` : ''}
+    ${bad.length ? `<div class="box-warn" style="margin-top:10px">
+      <b>แถวที่ข้อมูลไม่ครบ</b> (แสดง ${bad.length} ตัวอย่างแรก) — จะไม่ถูกนำเข้า
+      <div class="sub2" style="margin-top:5px">${bad.map(b =>
+        `บรรทัด ${b.line}: ${esc(b.why)}${b.what ? ' (' + esc(String(b.what).slice(0,24)) + ')' : ''}`).join(' · ')}</div>
+    </div>` : ''}
+
+    ${ready.length ? `<div class="tw" style="margin-top:12px"><table>
+      <thead><tr><th>รหัส</th><th>ชื่อ</th><th>กลุ่ม</th><th>รุ่นที่ใช้ร่วม</th>
+        <th class="num">ทุน</th><th class="num">ขาย</th><th></th></tr></thead>
+      <tbody>${ready.slice(0, 5).map(r => `<tr>
+        <td><b class="mono">${esc(r.part_no)}</b></td>
+        <td>${esc(r.name)}</td>
+        <td class="sub2">${esc(r.category || '—')}</td>
+        <td class="sub2">${esc((r.fits_models || '—').slice(0, 28))}</td>
+        <td class="num">฿${money(r.cost_price ?? 0)}</td>
+        <td class="num">฿${money(r.sell_price ?? 0)}</td>
+        <td>${have.has(r.part_no)
+          ? '<span class="pill tag-warn">อัปเดต</span>'
+          : '<span class="pill tag-good">ใหม่</span>'}</td></tr>`).join('')}</tbody>
+    </table></div>
+    <div class="sub2" style="margin-top:6px">แสดง ${Math.min(5, ready.length)} แถวแรกจาก ${money(ready.length)} แถวที่จะนำเข้า</div>`
+    : `<div class="empty" style="padding:22px">ยังไม่มีแถวที่นำเข้าได้</div>`}
+
+    ` + impBar(ready.length, ready.length
+        ? 'ตรวจตัวอย่างข้างบนให้เรียบร้อยก่อนกด'
+        : (noCode
+            ? 'ชีทนี้ไม่มีรหัสอะไหล่ ' + money(noCode) + ' แถว — ติ๊ก <b>"ตั้งรหัสให้อัตโนมัติ"</b> ข้างบน'
+            : 'ลองเปลี่ยนชีท แถวหัวตาราง หรือการจับคู่คอลัมน์ข้างบน'));
+}
+
+/* คอลัมน์ที่เพิ่มทีหลังด้วย 19_parts_fields.sql — ถ้ายังไม่ได้รัน ฐานข้อมูลจะไม่มี */
+const IMP_EXTRA = ['category', 'fits_models', 'note'];
+
+/** ถามฐานข้อมูลว่ามีคอลัมน์เสริมตัวไหนบ้าง — คืนรายชื่อตัวที่ "ไม่มี"
+    ยิงทีละคอลัมน์เพราะ PostgREST บอกชื่อที่หายทีละตัวเท่านั้น */
+async function impMissingCols(){
+  const miss = [];
+  for (const c of IMP_EXTRA){
+    try {
+      const { error } = await sb.from('parts_master').select(c).limit(1);
+      if (error && /could not find|schema cache|does not exist/i.test(error.message || '')) miss.push(c);
+    } catch(e){ /* เน็ตล่ม — ปล่อยให้ไปพังตอนส่งจริงแล้วค่อยตัดคอลัมน์ */ }
+  }
+  return miss;
+}
+
+/** ตัดคอลัมน์ที่ฐานข้อมูลไม่มีออกจากทุกแถว (แก้ในที่เดิม) */
+function impDropCols(rows, cols){
+  if (!cols.length) return;
+  rows.forEach(r => cols.forEach(c => { delete r[c]; }));
+}
+
+/** ดึงชื่อคอลัมน์ออกจากข้อความ error ของ PostgREST
+    ตัวอย่าง: Could not find the 'fits_models' column of 'parts_master' in the schema cache */
+function impColFromErr(msg){
+  const m = /could not find the '([^']+)' column/i.exec(msg || '');
+  return m ? m[1] : null;
+}
+
+/* ---------- ขั้น 4: ส่งเข้าฐานข้อมูล ---------- */
+async function impRun(){
+  if (!bossOnly() || !IMP.ready.length) return;
+  const okGo = await confirmModal('ยืนยันนำเข้า',
+    `จะนำเข้า ${money(IMP.ready.length)} รายการ\n` +
+    `จากไฟล์ ${IMP.fileName}${IMP.wb ? ' ชีท "' + IMP.sheets[IMP.sheet] + '"' : ''}\n\n` +
+    'ทำแล้วย้อนกลับอัตโนมัติไม่ได้ — ถ้ายังไม่แน่ใจให้กดยกเลิกแล้วตรวจการจับคู่คอลัมน์อีกรอบ',
+    { ok:'นำเข้าเลย', danger:false });
+  if (!okGo) return;
+
+  const rows = IMP.ready, CH = 400;
+  const errs = [];
+  const dropped = [];
+  let done = 0, okRows = 0;
+
+  $('impS4').hidden = false;
+  const draw = () => {
+    const pct = Math.round(done / rows.length * 100);
+    $('impS4').innerHTML = `
+      <div style="font-weight:700;color:var(--navy);margin:18px 0 8px">ขั้น 4 · กำลังนำเข้า</div>
+      <div style="background:var(--line2);border-radius:999px;height:14px;overflow:hidden">
+        <div style="background:var(--good);height:100%;width:${pct}%;transition:width .2s"></div></div>
+      <div class="sub2" style="margin-top:6px">${money(done)} / ${money(rows.length)} รายการ · ${pct}%</div>`;
+  };
+  draw();
+
+  /* ฐานข้อมูลที่ยังไม่ได้รัน 19_parts_fields.sql จะไม่มี กลุ่มสินค้า/รุ่นที่ใช้ร่วม/หมายเหตุ
+     ตัดออกก่อนส่ง จะได้นำเข้าข้อมูลหลักเข้าไปได้ ไม่ใช่พังทั้งชุด */
+  const miss = await impMissingCols();
+  if (miss.length){ impDropCols(rows, miss); dropped.push(...miss); }
+
+  const send = async chunk => {
+    const { error } = await sb.from('parts_master').upsert(chunk, { onConflict:'part_no' });
+    return error;
+  };
+
+  for (let i = 0; i < rows.length; i += CH){
+    const chunk = rows.slice(i, i + CH);
+    try {
+      let error = await send(chunk);
+
+      /* เผื่อ schema cache ยังไม่อัปเดตตอนที่เช็ค — ตัดคอลัมน์ที่มันบ่นแล้วลองใหม่ */
+      let guard = 0;
+      while (error && impColFromErr(error.message) && guard++ < IMP_EXTRA.length + 2){
+        const bad = impColFromErr(error.message);
+        impDropCols(rows, [bad]);
+        if (!dropped.includes(bad)) dropped.push(bad);
+        error = await send(rows.slice(i, i + CH));
+      }
+
+      if (error) throw error;
+      okRows += chunk.length;
+    } catch(e){
+      errs.push(`แถว ${i + 1}–${i + chunk.length}: ${e.message || e}`);
+    }
+    done += chunk.length;
+    draw();
+  }
+
+  const dropNote = dropped.length ? `
+    <div class="box-warn" style="margin-top:12px">
+      ⚠️ ฐานข้อมูลยังไม่มีช่อง
+      <b>${dropped.map(c => esc((IMP_FIELDS.find(f => f.k === c) || {}).label || c)).join(' · ')}</b>
+      — ข้ามไป ข้อมูลส่วนอื่นนำเข้าครบ
+      <div class="sub2" style="margin-top:5px">
+        วิธีเปิดใช้: Supabase → SQL Editor → รัน <b class="mono">19_parts_fields.sql</b>
+        แล้วนำเข้าไฟล์เดิมซ้ำอีกรอบ โดยตั้ง "ถ้ารหัสซ้ำ" เป็น
+        <b>อัปเดตทับด้วยข้อมูลในไฟล์</b> ระบบจะเติมช่องที่ขาดให้เอง ไม่สร้างรายการซ้ำ</div>
+    </div>` : '';
+
+  $('impS4').innerHTML = (errs.length
+    ? `<div class="box-crit" style="margin-top:18px">
+        <b>นำเข้าไม่ครบ</b> — สำเร็จ ${money(okRows)} จาก ${money(rows.length)} รายการ
+        <div class="sub2" style="margin-top:6px">${errs.slice(0, 5).map(esc).join('<br>')}</div>
+        <div class="sub2" style="margin-top:6px">
+          สาเหตุที่เจอบ่อย: ไม่ได้เป็นหัวหน้า/แอดมิน · รหัสอะไหล่ยาวเกิน ·
+          ยังไม่ได้รัน SQL ตัวล่าสุด</div></div>`
+    : `<div class="box-ok" style="margin-top:18px">
+        ✅ <b>นำเข้าสำเร็จ ${money(rows.length)} รายการ</b>
+        <div class="sub2" style="margin-top:4px">ตัวที่นำเข้ายอดคงเหลือยังเป็น 0 —
+          ไปที่ "สต๊อกอะไหล่" แล้วรับของเข้าคลัง หรือใช้ "ตรวจนับ" ใส่ยอดตั้งต้น</div></div>`)
+    + dropNote;
+
+  toast(errs.length ? '⚠️ นำเข้าไม่ครบ ดูรายละเอียดด้านล่าง' : '✅ นำเข้าเรียบร้อย', !!errs.length);
+  await reloadAll();
+}
+
+/* =====================================================================
+   หน้า 6 — ตั้งค่าคลัง
+   ===================================================================== */
+const WH_KIND = { main:'คลังกลาง', repair:'ศูนย์ซ่อม', sales:'ฝ่ายขาย', stock:'คลังอื่น ๆ' };
+const LOCKED  = ['MAIN','REPAIR','SALES'];
+
+async function renderWh(){
+  try {
+    const { data, error } = await sb.from('warehouses').select('*').order('sort_order');
+    if (error) throw error;
+    const rows = data || [];
+    $('whTbl').innerHTML = rows.length ? `<div class="tw"><table>
+      <thead><tr><th>รหัส</th><th>ชื่อคลัง</th><th>ประเภท</th><th class="num">ลำดับ</th>
+        <th>สถานะ</th>${isBoss() ? '<th></th>' : ''}</tr></thead>
+      <tbody>${rows.map(w => `<tr>
+        <td><b class="mono">${esc(w.code)}</b>
+          ${LOCKED.includes(w.code) ? '<div class="sub2">คลังหลักของระบบ</div>' : ''}</td>
+        <td>${esc(w.name)}${w.note ? `<div class="sub2">${esc(w.note)}</div>` : ''}</td>
+        <td>${esc(WH_KIND[w.kind] || w.kind)}</td>
+        <td class="num">${w.sort_order}</td>
+        <td>${w.is_active ? '<span class="pill tag-good">ใช้งาน</span>' : '<span class="pill st0">ปิด</span>'}</td>
+        ${isBoss() ? `<td class="num"><button class="btn ic" title="แก้ไข"
+          onclick="editWh('${w.id}')">✏️</button></td>` : ''}
+      </tr>`).join('')}</tbody></table></div>`
+      : '<div class="empty">ยังไม่มีคลัง</div>';
+  } catch(e){
+    $('whTbl').innerHTML = '<div class="empty">อ่านทะเบียนคลังไม่ได้ — ' + esc(e.message || '') + '</div>';
+  }
+}
+
+async function editWh(id){
+  if (!bossOnly()) return;
+  let w = null;
+  if (id){
+    const { data } = await sb.from('warehouses').select('*').eq('id', id).maybeSingle();
+    w = data;
+  }
+  const locked = w && LOCKED.includes(w.code);
+  const f = await formModal({
+    title: w ? '✏️ แก้ไขคลัง' : '➕ เพิ่มคลัง',
+    subtitle: locked ? 'คลังหลักของระบบ — เปลี่ยนรหัสไม่ได้' : 'รหัสคลังใช้อ้างอิงในโค้ด ตั้งเป็นตัวอังกฤษพิมพ์ใหญ่',
+    ok:'บันทึก',
+    fields:[
+      ...(locked ? [] : [{ k:'code', label:'รหัสคลัง', required:true, value:w?.code || '',
+        placeholder:'เช่น BRANCH2' }]),
+      { k:'name', label:'ชื่อคลัง', required:true, value:w?.name || '' },
+      { k:'kind', label:'ประเภท', type:'select', value:w?.kind || 'stock',
+        options:Object.entries(WH_KIND).map(([v,t]) => ({ v, t })) },
+      { k:'sort_order', label:'ลำดับการแสดง', type:'number', min:0, value:w?.sort_order ?? 100 },
+      { k:'note', label:'หมายเหตุ', value:w?.note || '' },
+      { k:'is_active', label:'สถานะ', type:'select', value:w ? String(w.is_active) : 'true',
+        options:[{ v:'true', t:'ใช้งาน' }, { v:'false', t:'ปิดใช้งาน' }] }
+    ]});
+  if (!f) return;
+  const row = {
+    name: f.name.trim(), kind: f.kind, sort_order: Number(f.sort_order) || 100,
+    note: f.note?.trim() || null, is_active: f.is_active === 'true'
+  };
+  if (!locked && f.code) row.code = f.code.trim().toUpperCase();
+  try {
+    const { error } = w
+      ? await sb.from('warehouses').update(row).eq('id', w.id)
+      : await sb.from('warehouses').insert(row);
+    if (error) throw error;
+    toast('✅ บันทึกแล้ว');
+    reloadAll();
+  } catch(e){
+    if (/duplicate|unique/i.test(e.message || '')) toast('❌ รหัสคลังนี้มีอยู่แล้ว', true);
+    else fail(e);
+  }
+}
+
+
+/* ---------- กันคนที่ไม่ใช่หัวหน้ากดปุ่มแก้ ---------- */
+function bossOnly(){
+  if (isBoss()) return true;
+  toast('เมนูนี้ต้องเป็นหัวหน้าช่างหรือผู้ดูแลระบบ', true);
+  return false;
+}
+</script>
+</body>
+</html>
