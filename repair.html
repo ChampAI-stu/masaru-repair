@@ -6,7 +6,6 @@
 <title>ระบบรับซ่อมเครื่องมือช่าง · MASARU</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <link rel="stylesheet" href="repair.css" onerror="window.__cssFail=1">
 </head>
 <body>
@@ -343,7 +342,7 @@
               <input type="hidden" id="nCustId">
               <div class="row" style="justify-content:flex-end;margin-top:16px">
                 <button class="btn" onclick="clearIntake()">ยกเลิก</button>
-                <button class="btn g" onclick="saveJob()">สร้างใบงาน &amp; QR Code</button>
+                <button class="btn g" onclick="saveJob()">สร้างใบงาน</button>
               </div>
             </div>
           </div>
@@ -927,7 +926,7 @@ let UNBOX_DAYS = 3;
    ประกาศเป็น function ไม่ใช่ const เพราะถูกเรียกจากโค้ดที่อยู่ก่อนหน้านี้ในไฟล์ */
 
 /* เลขที่ใช้เรียกใบงานในหน้าจอ — เอาเลขออเดอร์ขึ้นก่อน
-     เลขระบบ REP-xxxx ยังมีอยู่ในฐานข้อมูล ใช้เป็นกุญแจ ใช้บนใบพิมพ์และ QR
+     เลขระบบ REP-xxxx ยังมีอยู่ในฐานข้อมูล ใช้เป็นกุญแจ และใช้บนใบพิมพ์
      แต่คนทำงานจำเลขออเดอร์ ไม่ใช่เลขระบบ จอจึงโชว์เลขออเดอร์เป็นหลัก
      ไม่มีออเดอร์ (พัสดุไม่ทราบที่มา / หน้าร้าน) ค่อยไล่ลงไปเลขพัสดุ แล้วเลขระบบ */
 function jobRef(j){
@@ -1053,7 +1052,7 @@ const PGT = {
   dash:   ['แดชบอร์ดหัวหน้าช่าง','ภาพรวมงานซ่อมทั้งหมด'],
   jobs:   ['ใบงานซ่อม','รายการงานทั้งหมดในระบบ'],
   dispatch:['จ่ายงานช่าง','ช่องรับงานตามระดับความยาก · คิวรอจ่าย'],
-  intake: ['รับเครื่อง / บันทึกงาน','ขั้นตอนที่ 1/6 — สร้างใบงานซ่อมและ QR Code'],
+  intake: ['รับเครื่อง / บันทึกงาน','ขั้นตอนที่ 1/6 — สร้างใบงานซ่อม'],
   cust:   ['ลูกค้า','ประวัติลูกค้าและการซ่อม'],
   parts:  ['คลังอะไหล่','สต็อกและการเบิกใช้'],
   whreq:  ['เบิก / คืน คลังกลาง','ขอของชุดใหญ่จากคลังกลาง แล้วบริหารในคลังช่างเอง'],
@@ -2017,10 +2016,8 @@ function renderJobPage(){
 
         <div style="margin-top:15px">${photoBox('before','รูปภาพก่อนซ่อม',6)}</div>
 
-        <div class="noprint" style="margin-top:6px;text-align:center">
-          <label style="text-align:left">QR Code ใบงาน</label>
-          <div id="qrbox"></div>
-          <div class="row" style="justify-content:center;margin-top:9px">
+        <div class="noprint" style="margin-top:12px;text-align:center">
+          <div class="row" style="justify-content:center">
             <button class="btn sm" onclick="printJob('intake')">🖨️ ใบรับเครื่อง</button>
             <button class="btn sm g" onclick="printJob('delivery')">🖨️ ใบส่งมอบ</button>
           </div>
@@ -2034,11 +2031,6 @@ function renderJobPage(){
     </div>
   </div>`;
 
-  const qb = $('qrbox');
-  if (qb && window.QRCode){
-    qb.innerHTML = '';
-    new QRCode(qb, { text: location.origin + location.pathname + '?job=' + j.id, width:118, height:118, correctLevel: QRCode.CorrectLevel.M });
-  }
   bindStepForm(view, pc);
 }
 
@@ -4920,7 +4912,7 @@ window.addEventListener('resize', () => {
   }, 220);
 });
 
-/* เปิดใบงานจาก QR */
+/* เปิดใบงานจากลิงก์ ?job=<id> — ยังใช้ส่งลิงก์ให้กันในแชทได้ */
 window.addEventListener('load', () => {
   const id = new URLSearchParams(location.search).get('job');
   if (id) setTimeout(() => { if (sb) openJob(id); }, 900);
