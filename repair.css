@@ -534,3 +534,20 @@ table.ptab td.n{text-align:right;font-variant-numeric:tabular-nums}
   body{background:#fff}.mask{position:static;background:none;padding:0}
   .modal{box-shadow:none;max-width:none}.card{break-inside:avoid;box-shadow:none}
 }
+
+/* =====================================================================
+   สวิตช์ "เคสในระบบ / เคสนอกระบบ" บนฟอร์มรับเครื่อง
+   ปุ่มใหญ่ 2 อัน ไม่ใช่ดรอปดาวน์ — คนกรอกต้องเห็นตั้งแต่แรกว่ากำลังกรอกเคสแบบไหน
+   เพราะช่องที่ต้องกรอกต่างกัน เลือกผิดแล้วกรอกใหม่ทั้งใบ
+   ===================================================================== */
+.oswitch{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.obtn{
+  text-align:left;padding:11px 13px;border:2px solid var(--line);border-radius:10px;
+  background:#fff;cursor:pointer;font:inherit;color:var(--ink2);transition:.12s}
+.obtn b{display:block;font-size:14.5px;margin-bottom:2px}
+.obtn span{display:block;font-size:12px;line-height:1.45;color:var(--ink3);font-weight:400}
+.obtn:hover{border-color:var(--blue);background:var(--blue-l)}
+.obtn.on{border-color:var(--navy);background:var(--gold-l);color:var(--navy);
+  box-shadow:0 1px 4px rgba(0,0,0,.07)}
+.obtn.on b{color:var(--navy)}
+@media(max-width:640px){ .oswitch{grid-template-columns:1fr} }
