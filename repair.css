@@ -438,7 +438,6 @@ form[hidden]{display:none}
 .rolepill{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--gold);color:#3a2d05;margin-left:6px}
 
 .setup{background:#fff;border:2px solid var(--gold);border-radius:var(--r);padding:22px;margin-bottom:18px}
-#qrbox{display:flex;justify-content:center;padding:6px}
 
 /* ---------- โมบายล์ ---------- */
 @media(max-width:640px){
@@ -524,7 +523,6 @@ table.ptab td.n{text-align:right;font-variant-numeric:tabular-nums}
 .psign .c{font-size:11px;color:#444}
 .pfoot{display:flex;justify-content:space-between;align-items:flex-end;margin-top:14px;
   border-top:1px solid #bbb;padding-top:7px;font-size:10px;color:#666}
-.pqr img,.pqr canvas{width:64px;height:64px}
 .pph{display:flex;gap:5px;flex-wrap:wrap}
 .pph img{width:31mm;height:31mm;object-fit:cover;border:1px solid #bbb;border-radius:3px}
 
