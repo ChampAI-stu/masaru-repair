@@ -151,7 +151,7 @@
         <div class="card">
           <h3>กรองรายการ <span class="sp"></span>
             <select id="fTech" class="mini" style="width:auto"><option value="">ช่างทั้งหมด</option></select>
-            <select id="fAdmin" class="mini" style="width:auto"><option value="">แอดมินทุกคน</option></select>
+            <select id="fAdmin" class="mini" style="width:auto"><option value="">แอดมิน</option></select>
             <button class="btn sm" onclick="reloadAll()">🔄 รีเฟรช</button>
             <button class="btn sm" onclick="unknownParcel()" title="SOP A9.2 — พัสดุถึงศูนย์แต่หาเจ้าของไม่เจอ">📦 พัสดุไม่ทราบที่มา</button>
             <button class="btn sm g" onclick="goPage('intake')">+ รับเครื่องใหม่</button>
@@ -1739,7 +1739,7 @@ function refreshAdminList(){
   const sel = $('fAdmin');
   if (sel){
     const cur = sel.value;
-    sel.innerHTML = '<option value="">แอดมินทุกคน</option>'
+    sel.innerHTML = '<option value="">แอดมิน</option>'
       + (who() && names.includes(who()) ? `<option value="${esc(who())}">⭐ เคสของฉัน (${esc(who())})</option>` : '')
       + names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
     sel.value = cur;
@@ -2341,9 +2341,12 @@ function stepForm(nStep, j, pc){
           ? (j.notified_at ? '' : `<button class="btn" onclick="notifyCustomer()">📞 แจ้งลูกค้าแล้ว</button>`)
             + `<button class="btn p" onclick="receiveParcel()">📦 รับพัสดุเข้าศูนย์</button>`
           : `<button class="btn g" onclick="moveStep(2)">ไปตรวจเช็ค →</button>`)
-      /* เคสในระบบ ลูกค้าส่งหลักฐานเข้าแพลตฟอร์มมาแล้ว — ไม่ต้องขอคลิปซ้ำ */
-      + (isInternal(j) ? ''
-          : `<button class="btn dn" data-ext-only="1" onclick="requestClip()">📹 ไม่รับเคลม (ขอคลิป)</button>`)
+      /* ขอคลิปเป็นเรื่องของ "เคสในระบบ" — ลูกค้าแจ้งผ่านแพลตฟอร์ม ไม่ได้ส่งเครื่องมา
+         จะตัดสินว่าเคลมไหมต้องดูจากคลิป · เคสนอกระบบเครื่องอยู่ในมือช่างแล้ว ไม่ต้องขอ
+         (ยังไม่ได้รัน 30 = ยังไม่รู้ว่าเคสไหนเป็นแบบไหน จึงโชว์ไว้เหมือนเดิม) */
+      + ((!HAS_ORIGIN || isInternal(j))
+          ? `<button class="btn dn" data-int-only="1" onclick="requestClip()">📹 ไม่รับเคลม (ขอคลิป)</button>`
+          : '')
       + `<button class="btn dn" onclick="rejectClaim()">ไม่รับเคลม</button>`);
   }
 
@@ -2674,7 +2677,7 @@ function jobOriginChanged(){
   if ($('jBoxCase'))     $('jBoxCase').hidden     = int_;
   if ($('jBoxWarranty')) $('jBoxWarranty').hidden = int_;
   if ($('wBox'))         $('wBox').innerHTML      = int_ ? '' : warrantyBox(val('sWarranty'));
-  document.querySelectorAll('[data-ext-only]').forEach(el => { el.hidden = int_; });
+  document.querySelectorAll('[data-int-only]').forEach(el => { el.hidden = !int_; });
 }
 
 /** ตัวเลือกชื่อร้านสำหรับ datalist ในหน้าใบงาน */
