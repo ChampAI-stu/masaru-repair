@@ -135,17 +135,11 @@ function printJob(kind){
 
     <div class="pfoot">
       <div>${esc(COMPANY.name)} · เอกสารนี้ออกจากระบบรับซ่อมอัตโนมัติ · ผู้พิมพ์ ${esc(who())}</div>
-      <div class="pqr" id="pqr"></div>
+      <div class="mono">${esc(j.job_no || '')}</div>
     </div>
   </div>`;
 
-  const q = $('pqr');
-  if (q && window.QRCode){
-    q.innerHTML = '';
-    new QRCode(q, { text: location.origin + location.pathname + '?job=' + j.id,
-      width:64, height:64, correctLevel: QRCode.CorrectLevel.L });
-  }
-  setTimeout(() => window.print(), 350);   // รอ QR + รูปโหลด
+  setTimeout(() => window.print(), 350);   // รอรูปโหลดก่อนสั่งพิมพ์
 }
 
 /* ---------- ใบขอจัดซื้ออะไหล่ (SOP แบบฟอร์ม A11b.1) ---------- */
