@@ -70,7 +70,7 @@
       <div class="sp"></div>
       <div class="search">
         <span class="mg">🔍</span>
-        <input type="text" id="gSearch" placeholder="ค้นหา ใบงาน / Order / Tracking"
+        <input type="text" id="gSearch" placeholder="ค้นหา ใบงาน / Order / Tracking / แอดมิน"
                title="ค้นได้จากเลขออเดอร์ เลขพัสดุ เลขในระบบ ชื่อลูกค้า ชื่อร้าน SKU Serial รุ่น หรืออาการเสีย">
       </div>
       <button class="bell" id="bellBtn" title="การแจ้งเตือน" aria-haspopup="true" aria-expanded="false">
@@ -152,6 +152,7 @@
         <div class="card">
           <h3>กรองรายการ <span class="sp"></span>
             <select id="fTech" class="mini" style="width:auto"><option value="">ช่างทั้งหมด</option></select>
+            <select id="fAdmin" class="mini" style="width:auto"><option value="">แอดมินทุกคน</option></select>
             <button class="btn sm" onclick="reloadAll()">🔄 รีเฟรช</button>
             <button class="btn sm" onclick="unknownParcel()" title="SOP A9.2 — พัสดุถึงศูนย์แต่หาเจ้าของไม่เจอ">📦 พัสดุไม่ทราบที่มา</button>
             <button class="btn sm g" onclick="goPage('intake')">+ รับเครื่องใหม่</button>
@@ -168,7 +169,8 @@
           </h3>
           <div class="cb">
             <div class="tw"><table id="tblJobs">
-              <thead><tr><th>เลขออเดอร์</th><th>ลูกค้า</th><th>เครื่องมือ</th><th>อาการ</th><th>ช่าง</th><th>สถานะ</th><th>กำหนดเสร็จ</th><th class="num">รวม</th><th class="num noprint">จัดการ</th></tr></thead>
+              <thead><tr><th>เลขออเดอร์</th><th>ลูกค้า</th><th>เครื่องมือ</th><th>อาการ</th>
+                <th>แอดมิน / CS</th><th>ช่าง</th><th>สถานะ</th><th>กำหนดเสร็จ</th><th class="num">รวม</th></tr></thead>
               <tbody></tbody></table></div>
             <div id="jobsEmpty" class="empty" style="display:none">ไม่มีใบงานที่ตรงเงื่อนไข</div>
             <div id="pgJobs"></div>
@@ -240,6 +242,15 @@
           <div class="cb">
             <div class="split" style="grid-template-columns:1fr 1fr">
               <div style="grid-column:1/-1">
+                <div class="oswitch">
+                  <button type="button" class="obtn on" id="nOrgExt" onclick="setOrigin('external')">
+                    <b>🟠 เคสนอกระบบ</b>
+                    <span>ลูกค้าทักมาเอง / ส่งเครื่องเข้าศูนย์ตรง — ต้องตัดสินประกันแล้วซ่อม</span></button>
+                  <button type="button" class="obtn" id="nOrgInt" onclick="setOrigin('internal')">
+                    <b>🟢 เคสในระบบ</b>
+                    <span>ลูกค้าเปิดเรื่องผ่านแพลตฟอร์ม — มีหลักฐานแล้ว บันทึกสาเหตุพอ</span></button>
+                </div>
+                <input type="hidden" id="nOrigin" value="external">
                 <div style="font-weight:700;color:var(--navy);margin-bottom:11px">🧾 ข้อมูลอ้างอิงตาม SOP</div>
                 <div class="grid g3" style="gap:11px">
                   <div><label>เลขคำสั่งซื้อ (Order No.)</label>
@@ -253,9 +264,14 @@
                   <div><label>แพลตฟอร์ม / ช่องทาง</label><select id="nPlatform">
                     <option value="">— ไม่ระบุ —</option>
                     ${''}</select></div>
-                  <div><label>ประเภทเคส <span class="req">*</span></label><select id="nCaseType"></select></div>
-                  <div><label>เงื่อนไขประกัน <span class="req">*</span></label><select id="nWarranty"></select></div>
-                  <div><label>แอดมินที่รับเรื่อง</label><input type="text" id="nAdmin" placeholder="ชื่อแอดมิน"></div>
+                  <div id="nBoxCase"><label>ประเภทเคส <span class="req">*</span></label><select id="nCaseType"></select></div>
+                  <div id="nBoxWarranty"><label>เงื่อนไขประกัน <span class="req">*</span></label><select id="nWarranty"></select></div>
+                  <div id="nBoxCause" hidden><label>สาเหตุ <span class="req">*</span></label>
+                    <select id="nCause"></select>
+                    <span class="hint">แก้รายการนี้ได้ที่หน้าตั้งค่า</span></div>
+                  <div><label>แอดมิน / CS เจ้าของเคส</label>
+                    <input type="text" id="nAdmin" list="adminList" autocomplete="off" placeholder="ชื่อผู้รับเรื่อง">
+                    <datalist id="adminList"></datalist></div>
                 </div>
                 <div id="warnBox" style="margin-top:11px"></div>
               </div>
@@ -291,11 +307,18 @@
                     <div><label>รุ่น</label><input type="text" id="nModel" placeholder="เช่น GBH 2-26"></div>
                     <div><label>Serial No.</label><input type="text" id="nSerial" placeholder="—"></div>
                   </div>
+                  <div class="grid g2" style="gap:11px">
+                    <div><label>SKU</label>
+                      <input type="text" id="nSku" placeholder="รหัสสินค้าของตัวเครื่อง"
+                             style="text-transform:uppercase"></div>
+                    <div></div>
+                  </div>
                   <div class="grid g3" style="gap:11px">
                     <div><label>📦 วันที่ขนส่งมาถึงศูนย์</label>
                       <input type="date" id="nArrived">
                       <span class="hint">เริ่มนับเวลาแกะกล่อง</span></div>
-                    <div><label>วันที่รับ</label><input type="date" id="nRecv"></div>
+                    <div><label>วันที่รับเคส</label><input type="date" id="nRecv">
+                      <span class="hint">วันที่ CS รับเรื่อง</span></div>
                     <div><label>กำหนดเสร็จ (ประมาณการ)
                       <span class="muted" style="font-weight:400">· ระบบคิดจริงตอนมอบหมายช่าง</span></label>
                       <input type="date" id="nDue"></div>
@@ -308,9 +331,6 @@
               <div class="grid">
                 <div><label>อาการเสียที่ลูกค้าแจ้ง</label>
                   <textarea id="nSymptom" placeholder="อธิบายอาการเสีย… (ยังไม่แกะกล่อง ข้ามได้)"></textarea></div>
-                <div><label>SKU</label>
-                  <input type="text" id="nSku" placeholder="รหัสสินค้าของตัวเครื่อง"
-                         style="text-transform:uppercase"></div>
                 <div><label>หมายเหตุ</label>
                   <textarea id="nNote" placeholder="เช่น กล่องบุบมาแต่แรก · ลูกค้าขอด่วน · ไม่มีใบเสร็จ · ตกลงกับลูกค้าว่า…"
                             style="min-height:62px"></textarea></div>
@@ -633,6 +653,22 @@
           </div>
         </div>
 
+        <div class="card" id="cardCause">
+          <h3>🏷️ รายการสาเหตุ (เคสในระบบ) <span class="sp"></span>
+            <button class="btn sm g" onclick="editCause()">+ เพิ่มสาเหตุ</button></h3>
+          <div class="cb">
+            <div class="box-info" style="margin-bottom:11px;font-size:12.5px">
+              รายการนี้คือตัวเลือกที่ CS เห็นตอนเลือก <b>"เคสในระบบ"</b> ·
+              สาเหตุที่มีใบงานใช้อยู่แล้วจะลบไม่ได้ ระบบจะ<b>ปิดไม่ให้เลือกใหม่</b>แทน
+              เพื่อให้ใบงานเก่ายังอ่านออก
+            </div>
+            <div class="tw"><table id="tblCause">
+              <thead><tr><th class="num">ลำดับ</th><th>สาเหตุ</th><th class="mono">รหัส</th>
+                <th>สถานะ</th><th class="num noprint">จัดการ</th></tr></thead>
+              <tbody></tbody></table></div>
+          </div>
+        </div>
+
         <div class="card" id="cardUnboxCfg">
           <h3>📦 กติกาแกะกล่อง</h3>
           <div class="cb">
@@ -841,6 +877,27 @@ const STEPS = [
 ];
 /* ---------- ตาม SOP-CLM-01 ---------- */
 const PLATFORMS = ['TikTok','Shopee','Lazada','Facebook','LINE','หน้าร้าน','ดีลเลอร์','อื่น ๆ'];
+/* ---------------------------------------------------------------------
+   ที่มาของเคส (30_cs_feedback.sql)
+     external = ลูกค้าทักมาเอง / ส่งเครื่องเข้ามาตรง  → ต้องตัดสินประกัน + ซ่อม
+     internal = ลูกค้าเปิดเรื่องในแพลตฟอร์ม           → มีหลักฐานแล้ว บันทึกสาเหตุพอ
+   แยกคนละคอลัมน์กับ "ประเภทเคส" เพราะคนละคำถามกัน
+   --------------------------------------------------------------------- */
+const ORIGIN = {
+  external: { l:'เคสนอกระบบ', ico:'🟠', cls:'tag-warn' },
+  internal: { l:'เคสในระบบ',  ico:'🟢', cls:'tag-good' }
+};
+/** เคสในระบบไหม — ใบงานเก่าที่ยังไม่ได้รัน 30 จะไม่มีคอลัมน์นี้ ถือเป็นนอกระบบ */
+function isInternal(j){ return (j && j.case_origin) === 'internal'; }
+/* 30_cs_feedback.sql รันแล้วหรือยัง — ยังไม่รัน ต้องซ่อนของใหม่ทั้งชุด
+   ไม่งั้นกดบันทึกแล้วเจอ "Could not find the 'case_origin' column" ทั้งใบ */
+window.HAS_ORIGIN = false;
+/** ชื่อสาเหตุที่อ่านออก — ลบออกจากรายการแล้วยังต้องอ่านของเก่าได้ */
+function causeName(j){
+  if (!j || !j.cause_code) return '';
+  return j.cause_label || (S.causes.find(c => c.code === j.cause_code) || {}).label || j.cause_code;
+}
+
 const CASE_TYPE = {
   claim:     'เคลม / ส่งซ่อม',
   part_only: 'ส่งอะไหล่ให้ลูกค้าเปลี่ยนเอง',
@@ -961,7 +1018,7 @@ const stepOf = st => STEP_OF[st] || 0;
 let sb = null;
 const S = { jobs:[], techs:[], cats:[], parts:[], custs:[], stock:[], job:null, lines:[], photos:[], slog:[], filter:'open', range:'all', seen:null, peek:null, custView:null, pg:{jobs:1,cust:1,parts:1}, per:30,
   adjust:[], shortage:[], shortDaily:[], prs:[], salvage:[], score:[], repTab:'work',
-  refund:[], refundMonth:[], rfTab:'pending',
+  refund:[], refundMonth:[], rfTab:'pending', causes:[], fAdmin:'',
   board:[], queue:[] };
 
 /* ตารางที่แบ่งหน้า — repair-ui.js เรียกผ่านทะเบียนนี้ (ใช้ร่วมกับโมดูลอื่นได้) */
@@ -1018,7 +1075,7 @@ function goPage(p){
   if (p === 'parts')  loadParts();
   if (p === 'whreq')  { mywhSetup({ wh:'REPAIR', label:'คลังอะไหล่ช่าง', mount:'whRoot' }); mywhLoad(); }
   if (p === 'report') loadReport();
-  if (p === 'setting') loadSettings();
+  if (p === 'setting'){ loadSettings(); loadCauses(); }
 }
 
 /* =====================================================================
@@ -1216,6 +1273,12 @@ async function startApp(session){
     ME.techId = prof.data.technician_id || null;
     S.techs = techs.data || []; S.cats = cats.data || []; S.parts = parts.data || [];
 
+    /* รายการสาเหตุ มาจาก 30_cs_feedback.sql — ยังไม่ได้รันก็ใช้ระบบต่อได้
+       แค่สลับเป็นเคสในระบบแล้วจะไม่มีตัวเลือกให้เลือก */
+    const cz = await sb.from('repair_causes').select('*').eq('is_active', true).order('sort_no');
+    if (cz.error){ S.causes = []; console.warn('ยังไม่มีตาราง repair_causes — รัน 30_cs_feedback.sql', cz.error.message); }
+    else { S.causes = (cz.data || []).filter(c => c.is_active !== false); HAS_ORIGIN = true; }
+
     // role ใน token ไม่ตรงกับในตาราง → ต่ออายุ token 1 รอบ ไม่งั้น RLS ฝั่ง DB จะมองเป็นสิทธิ์เก่า
     if (jwtRole !== ME.role){
       /* ทำครั้งเดียวต่อการเปิดแท็บ — เดิมยิงทุกครั้งที่เปิดหน้า
@@ -1274,6 +1337,9 @@ async function startApp(session){
   $('fTech').insertAdjacentHTML('beforeend', to);
   $('nSymCat').insertAdjacentHTML('beforeend', S.cats.map(c => `<option value="${c.code}">${esc(c.name_th)}</option>`).join(''));
   $('nPlatform').insertAdjacentHTML('beforeend', PLATFORMS.map(p => `<option>${esc(p)}</option>`).join(''));
+  fillCauses();
+  /* ยังไม่ได้รัน 30 — เอาสวิตช์ออกไปเลย ดีกว่าให้กดแล้วพัง */
+  if (!HAS_ORIGIN) document.querySelectorAll('.oswitch').forEach(el => { el.hidden = true; });
   $('nCaseType').innerHTML  = opts(CASE_TYPE, 'claim');
   $('nWarranty').innerHTML  = opts(WARRANTY, 'unknown');
   $('nWarranty').addEventListener('change', showWarrantyBox);
@@ -1286,6 +1352,7 @@ async function startApp(session){
     renderJobs();
   });
   $('fTech').addEventListener('change', () => { S.pg.jobs = 1; renderJobs(); });
+  $('fAdmin').addEventListener('change', () => { S.pg.jobs = 1; renderJobs(); });
   $('cSearch').addEventListener('input',  () => { S.pg.cust = 1; renderCust(); });
   $('pSearch').addEventListener('input',  () => { S.pg.parts = 1; renderParts(); });
   try { S.per = Number(localStorage.getItem('repair_per')) || 30; } catch(e){}
@@ -1480,7 +1547,10 @@ function filterCounts(){
     clip:       S.jobs.filter(j => j.clip_waiting).length,
     unboxlate:  S.jobs.filter(j => unboxPending(j) && j.unbox_days_left < 0).length,
     nowarranty: open.filter(j => j.warranty_case === 'out_warranty').length,
-    nocondition:open.filter(j => !j.warranty_case || j.warranty_case === 'unknown').length
+    nocondition:open.filter(j => !j.warranty_case || j.warranty_case === 'unknown').length,
+    mine:       S.jobs.filter(j => (j.admin_name || '').trim() === who()).length,
+    internal:   S.jobs.filter(isInternal).length,
+    external:   S.jobs.filter(j => !isInternal(j)).length
   };
   const sc = stepCounts();
   STEPS.forEach(s => c['step' + s.n] = sc[s.n]);
@@ -1498,13 +1568,16 @@ function refreshShopList(){
 function renderChips(){
   renderUnbox();
   refreshShopList();
+  refreshAdminList();
   const c = filterCounts();
   const A = [['all','ทั้งหมด'],['open','งานค้าง'],['waiting','รอลูกค้าส่งของ'],['overdue','เกินกำหนด'],
              ['wait_parts','รออะไหล่'],['unassigned','ยังไม่มอบหมาย'],['ready','พร้อมส่งมอบ'],
              ['nowarranty','นอกประกัน'],['nocondition','ยังไม่ระบุประกัน'],
              ['unknown','พัสดุไม่ทราบที่มา'],['notnotified','ยังไม่แจ้งลูกค้า'],
              ['unbox','📦 กล่องค้างแกะ'],['unboxlate','🚨 เกินกำหนดแกะ'],
-             ['clip','📹 รอคลิปจากลูกค้า']];
+             ['clip','📹 รอคลิปจากลูกค้า'],
+             ['mine','⭐ เคสของฉัน'],
+             ['internal','🟢 เคสในระบบ'],['external','🟠 เคสนอกระบบ']];
   $('chipsA').innerHTML = A.map(([k,l]) =>
     `<button class="chip ${S.filter===k?'on':''}" onclick="setFilter('${k}')">${l}<span class="c">${c[k]}</span></button>`).join('');
   $('chipsB').innerHTML = STEPS.map(s =>
@@ -1526,6 +1599,9 @@ function matchFilter(j){
   if (f === 'unknown')    return j.status === 'unknown_parcel';
   if (f === 'notnotified')return j.status === 'awaiting_parcel' && !j.notified_at;
   if (f === 'clip')       return !!j.clip_waiting;
+  if (f === 'mine')       return (j.admin_name || '').trim() === who();
+  if (f === 'internal')   return isInternal(j);
+  if (f === 'external')   return !isInternal(j);
   if (f === 'unbox')      return unboxPending(j);
   if (f === 'unboxlate')  return unboxPending(j) && j.unbox_days_left < 0;
   if (f === 'nowarranty') return !CLOSED.includes(j.status) && j.warranty_case === 'out_warranty';
@@ -1535,12 +1611,13 @@ function matchFilter(j){
 }
 
 function renderJobs(){
-  const q = val('gSearch').toLowerCase(), tc = val('fTech');
+  const q = val('gSearch').toLowerCase(), tc = val('fTech'), ad = val('fAdmin');
   const rows = S.jobs.filter(j => {
     if (!matchFilter(j)) return false;
     if (tc && j.technician_id !== tc) return false;
+    if (ad && (j.admin_name || '').trim() !== ad) return false;
     if (q && ![j.job_no,j.customer_name,j.serial_no,j.sku,j.model,j.brand,j.tool_type,j.symptom,
-               j.order_no,j.tracking_in,j.tracking_out,j.platform,j.shop_name]
+               j.order_no,j.tracking_in,j.tracking_out,j.platform,j.shop_name,j.admin_name]
       .join(' ').toLowerCase().includes(q)) return false;
     return true;
   });
@@ -1556,14 +1633,18 @@ function renderJobs(){
       onkeydown="if(event.key==='Enter'){event.preventDefault();openJob('${j.id}')}">
       <td class="mono"><b>${esc(jobRef(j))}</b>
         <div class="sub2">${esc(jobRefKind(j))} · ${esc(dth(j.received_at))}</div></td>
-      <td>${j.clip_waiting ? '<span class="pill tag-warn">📹 รอคลิป</span> ' : ''}
+      <td>${unboxPending(j) ? `<span class="pill ${j.unbox_days_left < 0 ? 'tag-crit' : 'tag-warn'}">📦 ${j.unbox_days_left < 0 ? 'เกินกำหนดแกะ' : 'รอแกะกล่อง'}</span> ` : ''}
+        ${j.clip_waiting ? '<span class="pill tag-warn">📹 รอคลิป</span> ' : ''}
         ${j.status === 'unknown_parcel'
         ? '<span class="pill st-unknown">ยังไม่ทราบเจ้าของ</span>'
         : esc(j.customer_name || '—')}
         <div class="sub2">${esc(j.customer_phone || (j.tracking_in ? 'พัสดุ ' + j.tracking_in : ''))}</div></td>
       <td>${esc([j.brand,j.model].filter(Boolean).join(' ') || j.tool_type || '—')}
         <div class="sub2">${esc(j.serial_no || '')}</div></td>
-      <td>${esc((j.symptom||'').slice(0,34))}${(j.symptom||'').length>34?'…':''}</td>
+      <td>${esc((j.symptom||'').slice(0,34))}${(j.symptom||'').length>34?'…':''}
+        ${causeName(j) ? `<div class="sub2">สาเหตุ: ${esc(causeName(j))}</div>` : ''}</td>
+      <td>${esc(j.admin_name || '—')}
+        ${isInternal(j) ? '<div class="sub2">🟢 เคสในระบบ</div>' : ''}</td>
       <td>${j.tech_name
         ? esc(j.tech_name) + (/อัตโนมัติ/.test(j.assign_note||'') ? ''
             : '<div class="sub2">หัวหน้าเลือกเอง</div>')
@@ -1610,7 +1691,61 @@ function warrantyBox(code){
     <div class="muted" style="font-size:12px;margin-top:3px">
       ค่าส่งเป็นต้นทุนของฝ่ายที่รับผิดชอบ ไม่ใช่รายได้ของใคร</div></div>`;
 }
-function showWarrantyBox(){ $('warnBox').innerHTML = warrantyBox(val('nWarranty')); }
+function showWarrantyBox(){
+  /* เคสในระบบไม่ได้ส่งซ่อม กล่องอธิบายใครออกค่าอะไรจึงไม่เกี่ยว */
+  $('warnBox').innerHTML = val('nOrigin') === 'internal' ? '' : warrantyBox(val('nWarranty'));
+}
+
+/** เติมดรอปดาวน์สาเหตุ ใช้ทั้งฟอร์มรับเครื่องและในใบงาน */
+function fillCauses(){
+  const el = $('nCause'); if (!el) return;
+  el.innerHTML = S.causes.length
+    ? '<option value="">— เลือกสาเหตุ —</option>' +
+      S.causes.map(c => `<option value="${esc(c.code)}">${esc(c.label)}</option>`).join('')
+    : '<option value="">— ยังไม่มีรายการ (รัน 30_cs_feedback.sql) —</option>';
+}
+
+/** ตัวเลือกสาเหตุสำหรับ select ในใบงาน — เก็บของเก่าที่ถูกปิดไปแล้วไว้ด้วย */
+function causeOpts(cur){
+  const list = S.causes.slice();
+  if (cur && !list.some(c => c.code === cur)) list.push({ code:cur, label:cur + ' (ปิดใช้แล้ว)' });
+  return '<option value="">— ไม่ระบุ —</option>' + list.map(c =>
+    `<option value="${esc(c.code)}" ${c.code === cur ? 'selected' : ''}>${esc(c.label)}</option>`).join('');
+}
+
+/**
+ * สลับ เคสในระบบ / นอกระบบ ในฟอร์มรับเครื่อง
+ * เคสในระบบ: ไม่ถามประเภทเคส/เงื่อนไขประกัน (ไม่ได้ส่งซ่อม) — ถามสาเหตุแทน
+ */
+function setOrigin(v){
+  const int_ = v === 'internal';
+  $('nOrigin').value = int_ ? 'internal' : 'external';
+  $('nOrgInt').classList.toggle('on', int_);
+  $('nOrgExt').classList.toggle('on', !int_);
+  $('nBoxCase').hidden     = int_;
+  $('nBoxWarranty').hidden = int_;
+  $('nBoxCause').hidden    = !int_;
+  showWarrantyBox();
+}
+
+/** ชื่อแอดมินที่เคยใช้ — เอาไว้เติมให้ในฟอร์มและใช้ทำตัวกรอง */
+function adminNames(){
+  return [...new Set((S.jobs || []).map(j => (j.admin_name || '').trim()).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, 'th'));
+}
+function refreshAdminList(){
+  const names = adminNames();
+  const dl = $('adminList');
+  if (dl) dl.innerHTML = names.map(n => `<option value="${esc(n)}"></option>`).join('');
+  const sel = $('fAdmin');
+  if (sel){
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">แอดมินทุกคน</option>'
+      + (who() && names.includes(who()) ? `<option value="${esc(who())}">⭐ เคสของฉัน (${esc(who())})</option>` : '')
+      + names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+    sel.value = cur;
+  }
+}
 
 async function lookupCustomer(){
   const ph = val('nPhone');
@@ -1628,7 +1763,8 @@ function clearIntake(){
    'nOrder','nTrackIn','nAdmin'].forEach(id => $(id).value = '');
   $('nSymCat').value = ''; $('nPlatform').value = ''; $('nArrived').value = '';
   $('nCaseType').value = 'claim'; $('nWarranty').value = 'unknown';
-  showWarrantyBox();
+  if ($('nCause')) $('nCause').value = '';
+  setOrigin('external');
   const t = new Date(), d = n => String(n).padStart(2,'0');
   const iso = x => x.getFullYear() + '-' + d(x.getMonth()+1) + '-' + d(x.getDate());
   $('nRecv').value = iso(t);
@@ -1665,6 +1801,10 @@ async function saveJob(){
     if (!okGo) return;
   }
 
+  const internal = val('nOrigin') === 'internal';
+  if (internal && S.causes.length && !val('nCause'))
+    return toast('เคสในระบบต้องเลือกสาเหตุก่อน', true);
+
   try {
     let cid = val('nCustId');
     if (!cid && hasCust){
@@ -1688,8 +1828,10 @@ async function saveJob(){
       tracking_in:   val('nTrackIn')  || null,
       platform:      val('nPlatform') || null,
       shop_name:     val('nShop')     || null,
-      case_type:     val('nCaseType'),
-      warranty_case: val('nWarranty'),
+      case_type:     val('nCaseType')  || 'claim',
+      warranty_case: internal ? 'unknown' : val('nWarranty'),
+      ...(HAS_ORIGIN ? { case_origin: internal ? 'internal' : 'external',
+                         cause_code:  internal ? (val('nCause') || null) : null } : {}),
       admin_name:    val('nAdmin') || who(),
       /* ไม่รู้เจ้าของ = พัสดุไม่ทราบที่มา (SOP A9.2) ตามเรื่องต่อด้วยปุ่ม "พบเจ้าของแล้ว" */
       status: !cid ? 'unknown_parcel'
@@ -1841,14 +1983,17 @@ function renderJobPage(){
         ${j.tracking_out ? `<div class="kv"><span class="k">พัสดุขาออก</span><span class="v mono">${esc(j.tracking_out)}</span></div>` : ''}
         <div class="kv"><span class="k">ช่องทาง</span><span class="v">${esc(j.platform||'—')}</span></div>
         <div class="kv"><span class="k">ชื่อร้าน</span><span class="v">${esc(j.shop_name||'—')}</span></div>
-        <div class="kv"><span class="k">ประเภทเคส</span><span class="v">${esc(CASE_TYPE[j.case_type]||'—')}</span></div>
+        <div class="kv"><span class="k">ที่มาของเคส</span><span class="v">
+          <span class="pill ${(ORIGIN[j.case_origin]||ORIGIN.external).cls}">${(ORIGIN[j.case_origin]||ORIGIN.external).ico} ${(ORIGIN[j.case_origin]||ORIGIN.external).l}</span></span></div>
+        ${causeName(j) ? `<div class="kv"><span class="k">สาเหตุ</span><span class="v">${esc(causeName(j))}</span></div>` : ''}
+        ${isInternal(j) ? '' : `<div class="kv"><span class="k">ประเภทเคส</span><span class="v">${esc(CASE_TYPE[j.case_type]||'—')}</span></div>`}
         <div class="kv"><span class="k">ประกัน</span><span class="v">
           <span class="pill ${(WARRANTY[j.warranty_case]||WARRANTY.unknown).cls}">${esc((WARRANTY[j.warranty_case]||WARRANTY.unknown).l)}</span></span></div>
         <div class="kv"><span class="k">ประเภทเครื่อง</span><span class="v">${esc(j.tool_type||'—')}</span></div>
         <div class="kv"><span class="k">แบรนด์ / รุ่น</span><span class="v">${esc([j.brand,j.model].filter(Boolean).join(' ')||'—')}</span></div>
         <div class="kv"><span class="k">SKU</span><span class="v mono">${esc(j.sku||'—')}</span></div>
         <div class="kv"><span class="k">Serial No.</span><span class="v mono">${esc(j.serial_no||'—')}</span></div>
-        <div class="kv"><span class="k">วันที่รับ</span><span class="v">${dth(j.received_at)}</span></div>
+        <div class="kv"><span class="k">วันที่รับเคส</span><span class="v">${dth(j.received_at)}</span></div>
         <div class="kv"><span class="k">ระดับความยาก</span><span class="v">
           ${j.severity
             ? `<span class="pill st${j.severity === 'heavy' ? 6 : j.severity === 'medium' ? 4 : 2}">${esc(SEVERITY[j.severity])} · ${diffDays(j.severity)} วัน</span>`
@@ -2137,20 +2282,30 @@ function stepForm(nStep, j, pc){
         <input type="text" id="sShop" value="${esc(j.shop_name||'')}" list="shopListJob" autocomplete="off"
                placeholder="${unknown ? 'ร้านที่ต้องประสานหาเจ้าของ' : 'ร้านที่ลูกค้าซื้อของมา'}">
         <datalist id="shopListJob">${shopOptions()}</datalist></div>
-      <div><label>ประเภทเคส</label><select id="sCaseType">${opts(CASE_TYPE, j.case_type)}</select></div>
-      <div><label>เงื่อนไขประกัน <span class="req">*</span></label>
+      <div ${HAS_ORIGIN ? '' : 'hidden'}><label>ที่มาของเคส</label>
+        <select id="sOrigin" onchange="jobOriginChanged()">
+          <option value="external" ${isInternal(j) ? '' : 'selected'}>🟠 เคสนอกระบบ — ส่งเข้าศูนย์ตรง</option>
+          <option value="internal" ${isInternal(j) ? 'selected' : ''}>🟢 เคสในระบบ — เปิดเรื่องในแพลตฟอร์ม</option>
+        </select></div>
+      <div id="jBoxCause" ${HAS_ORIGIN && isInternal(j) ? '' : 'hidden'}><label>สาเหตุ</label>
+        <select id="sCause">${causeOpts(j.cause_code)}</select></div>
+      <div id="jBoxCase" ${isInternal(j) ? 'hidden' : ''}><label>ประเภทเคส</label>
+        <select id="sCaseType">${opts(CASE_TYPE, j.case_type)}</select></div>
+      <div id="jBoxWarranty" ${isInternal(j) ? 'hidden' : ''}><label>เงื่อนไขประกัน <span class="req">*</span></label>
         <select id="sWarranty" onchange="document.getElementById('wBox').innerHTML=warrantyBox(this.value)">
           ${opts(WARRANTY, j.warranty_case)}</select></div>
-      <div><label>แอดมินที่รับเรื่อง</label><input type="text" id="sAdmin" value="${esc(j.admin_name||'')}"></div>
+      <div><label>แอดมิน / CS เจ้าของเคส</label>
+        <input type="text" id="sAdmin" value="${esc(j.admin_name||'')}" list="adminListJob" autocomplete="off">
+        <datalist id="adminListJob">${adminNames().map(n => `<option value="${esc(n)}"></option>`).join('')}</datalist></div>
     </div>
-    <div id="wBox" style="margin-top:13px">${warrantyBox(j.warranty_case)}</div>
+    <div id="wBox" style="margin-top:13px">${isInternal(j) ? '' : warrantyBox(j.warranty_case)}</div>
 
     <div class="grid g3" style="margin-top:14px">
       <div><label>📦 วันที่ขนส่งมาถึงศูนย์</label>
         <input type="date" id="sArrived" value="${j.arrived_at ? String(j.arrived_at).slice(0,10) : ''}"
                max="${new Date().toISOString().slice(0,10)}">
         <span class="hint">เริ่มนับเวลาแกะกล่องจากวันนี้ — กรอกตามวันที่ขนส่งเอามาส่งจริง</span></div>
-      <div><label>วันที่รับ <span class="muted" style="font-weight:400">(ล็อกไว้ แก้ไม่ได้)</span></label>
+      <div><label>วันที่รับเคส <span class="muted" style="font-weight:400">(ล็อกไว้ แก้ไม่ได้)</span></label>
         <input type="text" value="${dth(j.received_at)}" disabled></div>
       <div><label>กำหนดเสร็จ</label>
         <input type="text" value="${j.assigned_at ? dth(j.due_date) : 'กำหนดที่ขั้น 3 มอบหมายงาน'}" disabled></div>
@@ -2194,7 +2349,9 @@ function stepForm(nStep, j, pc){
           ? (j.notified_at ? '' : `<button class="btn" onclick="notifyCustomer()">📞 แจ้งลูกค้าแล้ว</button>`)
             + `<button class="btn p" onclick="receiveParcel()">📦 รับพัสดุเข้าศูนย์</button>`
           : `<button class="btn g" onclick="moveStep(2)">ไปตรวจเช็ค →</button>`)
-      + `<button class="btn dn" onclick="requestClip()">📹 ไม่รับเคลม (ขอคลิป)</button>`
+      /* เคสในระบบ ลูกค้าส่งหลักฐานเข้าแพลตฟอร์มมาแล้ว — ไม่ต้องขอคลิปซ้ำ */
+      + (isInternal(j) ? ''
+          : `<button class="btn dn" data-ext-only="1" onclick="requestClip()">📹 ไม่รับเคลม (ขอคลิป)</button>`)
       + `<button class="btn dn" onclick="rejectClaim()">ไม่รับเคลม</button>`);
   }
 
@@ -2408,6 +2565,10 @@ function collectStep(){
   if ($('sCaseType')) p.case_type       = g('sCaseType');
   if ($('sWarranty')) p.warranty_case   = g('sWarranty');
   if ($('sAdmin'))    p.admin_name      = g('sAdmin') || null;
+  if (HAS_ORIGIN && $('sOrigin')){
+    p.case_origin = g('sOrigin') || 'external';
+    p.cause_code  = p.case_origin === 'internal' ? (g('sCause') || null) : null;
+  }
   if ($('sSeverity')) p.severity        = g('sSeverity') || null;
   if ($('sShop'))     p.shop_name       = g('sShop') || null;
   if ($('sBrandU'))   p.brand           = g('sBrandU') || null;
@@ -2512,6 +2673,16 @@ async function editRefund(){
     toast('✅ แก้ยอดแล้ว');
     S.peek = null; openJob(S.job.id); reloadAll();
   } catch(e){ fail(e); }
+}
+
+/** สลับช่องในใบงานเมื่อเปลี่ยนที่มาของเคส */
+function jobOriginChanged(){
+  const int_ = val('sOrigin') === 'internal';
+  if ($('jBoxCause'))    $('jBoxCause').hidden    = !int_;
+  if ($('jBoxCase'))     $('jBoxCase').hidden     = int_;
+  if ($('jBoxWarranty')) $('jBoxWarranty').hidden = int_;
+  if ($('wBox'))         $('wBox').innerHTML      = int_ ? '' : warrantyBox(val('sWarranty'));
+  document.querySelectorAll('[data-ext-only]').forEach(el => { el.hidden = int_; });
 }
 
 /** ตัวเลือกชื่อร้านสำหรับ datalist ในหน้าใบงาน */
@@ -3453,6 +3624,89 @@ async function receiveParts(){
    รายงาน
    ===================================================================== */
 /* =====================================================================
+   จัดการรายการสาเหตุ — หน้าตั้งค่า
+   ===================================================================== */
+async function loadCauses(){
+  const { data, error } = await sb.from('repair_causes').select('*').order('sort_no').order('code');
+  const tb = $('tblCause') && $('tblCause').querySelector('tbody');
+  if (!tb) return;
+  if (error){
+    S.causes = [];
+    tb.innerHTML = `<tr><td colspan="5" class="empty">
+      ยังไม่มีตาราง repair_causes — รัน <b>30_cs_feedback.sql</b> ก่อน</td></tr>`;
+    return;
+  }
+  S.causes = (data || []).filter(c => c.is_active);
+  fillCauses();
+  tb.innerHTML = (data || []).length ? data.map(c => `<tr>
+    <td class="num">${c.sort_no}</td>
+    <td><b>${esc(c.label)}</b></td>
+    <td class="mono sub2">${esc(c.code)}</td>
+    <td>${c.is_active ? '<span class="pill tag-good">เปิดใช้</span>'
+                      : '<span class="pill st0">ปิด — เลือกใหม่ไม่ได้</span>'}</td>
+    <td class="num noprint">
+      <button class="btn sm" onclick="editCause('${esc(c.code)}')">✏️ แก้</button>
+      <button class="btn sm ${c.is_active ? 'dn' : 'g'}"
+              onclick="toggleCause('${esc(c.code)}', ${c.is_active ? 'false' : 'true'})">
+        ${c.is_active ? 'ปิด' : 'เปิด'}</button>
+      <button class="btn sm dn" onclick="delCause('${esc(c.code)}','${esc(c.label)}')">🗑️</button>
+    </td></tr>`).join('')
+    : '<tr><td colspan="5" class="empty">ยังไม่มีรายการสาเหตุ</td></tr>';
+}
+
+async function editCause(code){
+  const cur = code ? (S.causes.find(c => c.code === code)
+              || { code, label:code, sort_no:100 }) : null;
+  const f = await formModal({
+    title: cur ? '✏️ แก้สาเหตุ' : '+ เพิ่มสาเหตุ',
+    subtitle:'ชื่อคือสิ่งที่ CS เห็นในดรอปดาวน์ · รหัสใช้เก็บในฐานข้อมูล เปลี่ยนแล้วใบงานเก่าจะไม่ตามมา',
+    ok:'บันทึก',
+    fields:[
+      { k:'label', label:'ชื่อสาเหตุ', required:true, value: cur ? cur.label : '',
+        placeholder:'เช่น ชำรุด / เสียหาย' },
+      { k:'code',  label:'รหัส (a-z, 0-9, _)', required:true, value: cur ? cur.code : '',
+        placeholder:'เช่น damaged' },
+      { k:'sort',  label:'ลำดับที่แสดง', type:'number', min:1,
+        value: cur ? cur.sort_no : 100 }
+    ]});
+  if (!f) return;
+  try {
+    const { error } = await sb.rpc('set_cause', {
+      p_code: f.code, p_label: f.label,
+      p_sort: Number(f.sort) || 100, p_active: true, p_by: who() });
+    if (error) throw error;
+    toast('✅ บันทึกสาเหตุแล้ว');
+    await loadCauses();
+  } catch(e){ fail(e); }
+}
+
+async function toggleCause(code, on){
+  try {
+    const c = S.causes.find(x => x.code === code) || {};
+    const { error } = await sb.rpc('set_cause', {
+      p_code: code, p_label: c.label || code,
+      p_sort: c.sort_no ?? 100, p_active: !!on, p_by: who() });
+    if (error) throw error;
+    toast(on ? '✅ เปิดใช้แล้ว' : '⏸️ ปิดแล้ว — ใบงานเก่ายังอ่านได้');
+    await loadCauses();
+  } catch(e){ fail(e); }
+}
+
+async function delCause(code, label){
+  const go = await confirmModal('ลบสาเหตุ "' + label + '"?',
+    'ถ้ามีใบงานใช้สาเหตุนี้อยู่ ระบบจะปิดไม่ให้เลือกใหม่แทนการลบ — ประวัติเดิมจะยังอ่านได้',
+    { ok:'ลบ', danger:true });
+  if (!go) return;
+  try {
+    const { data, error } = await sb.rpc('del_cause', { p_code: code });
+    if (error) throw error;
+    toast('✅ ' + (data || 'ลบแล้ว'));
+    await loadCauses();
+  } catch(e){ fail(e); }
+}
+
+
+/* =====================================================================
    Export รายการใบงานเป็น Excel
      ได้เฉพาะใบที่กรองอยู่ตอนนี้ (ชิป + ค้นหา + ช่าง) — เห็นอะไรได้อันนั้น
      ใช้ SheetJS เขียน .xlsx จริง · โหลดไลบรารีไม่ได้ก็ถอยไปเป็น CSV
@@ -3476,6 +3730,8 @@ const XL_COLS = [
   ['อาการที่ลูกค้าแจ้ง', j => j.symptom || ''],
   ['อาการที่พบ',       j => j.inspect_result || ''],
   ['หมวดอาการ',       j => j.symptom_name || ''],
+  ['ที่มาของเคส',      j => (ORIGIN[j.case_origin] || ORIGIN.external).l],
+  ['สาเหตุ',           j => causeName(j)],
   ['เงื่อนไขประกัน',    j => (WARRANTY[j.warranty_case] || {}).l || ''],
   ['ประเภทเคส',       j => CASE_TYPE[j.case_type] || ''],
   ['ระดับความยาก',    j => SEVERITY[j.severity] || ''],
@@ -3504,17 +3760,20 @@ const XL_COLS = [
   ['รอคลิปจากลูกค้า',  j => j.clip_waiting ? 'รออยู่ ' + (j.clip_days_waiting || 0) + ' วัน' : ''],
   ['เหตุผลที่ไม่รับเคลม', j => j.reject_reason || ''],
   ['หมายเหตุตอนรับ',   j => j.intake_note || ''],
-  ['แอดมินที่รับเรื่อง',  j => j.admin_name || '']
+  ['แอดมิน / CS เจ้าของเคส', j => j.admin_name || ''],
+  ['สถานะกล่อง', j => j.unboxed_at ? 'แกะแล้ว'
+                        : (j.arrived_at ? 'รอแกะ ' + (j.unbox_days_left < 0 ? '(เกินกำหนด)' : '') : '')]
 ];
 
 /** ใบงานที่กรองอยู่ตอนนี้ — ตรรกะเดียวกับที่ renderJobs ใช้ จะได้ไม่หลุดกัน */
 function jobsInView(){
-  const q = (val('gSearch') || '').toLowerCase(), tc = val('fTech');
+  const q = (val('gSearch') || '').toLowerCase(), tc = val('fTech'), ad = val('fAdmin');
   return S.jobs.filter(j => {
     if (!matchFilter(j)) return false;
     if (tc && j.technician_id !== tc) return false;
+    if (ad && (j.admin_name || '').trim() !== ad) return false;
     if (q && ![j.job_no,j.customer_name,j.serial_no,j.sku,j.model,j.brand,j.tool_type,j.symptom,
-               j.order_no,j.tracking_in,j.tracking_out,j.platform,j.shop_name]
+               j.order_no,j.tracking_in,j.tracking_out,j.platform,j.shop_name,j.admin_name]
       .join(' ').toLowerCase().includes(q)) return false;
     return true;
   });
