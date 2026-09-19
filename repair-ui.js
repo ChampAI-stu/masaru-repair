@@ -699,7 +699,11 @@ function hBarsSVG(items, w = 640){
    ===================================================================== */
 const MYWH = {
   wh:'REPAIR', label:'คลังอะไหล่ช่าง', mount:'whRoot',
-  all:[], docs:[], cart:[], tab:'stock', q:'', lowOnly:false, loaded:false
+  all:[], docs:[], tab:'stock', q:'', lowOnly:false, loaded:false,
+  /* ตะกร้าใบเบิก/ใบคืน — เก็บไว้ในหน้าเลย ไม่ใช้ป๊อบอัพทีละบรรทัด
+     เพราะคนเบิกต้องเห็นทั้งใบพร้อมกัน ถึงจะตรวจได้ว่าใส่ครบหรือซ้ำ */
+  cart:[], cartKind:'req', team:'', note:'',
+  teams:[], sheetUrl:'', sheetLabel:'ชีทรูป/รหัสอะไหล่'
 };
 
 const WH_ST = {
@@ -711,19 +715,29 @@ const WH_ST = {
 function mywhSetup(cfg){ Object.assign(MYWH, cfg); }
 
 /** ยอดในคลังตัวเอง — v_stock_all เก็บเป็นคอลัมน์ qty_main / qty_repair / qty_sales */
-const mywhQty  = r => Number(r['qty_' + MYWH.wh.toLowerCase()]) || 0;
-const mywhMain = r => Number(r.qty_main) || 0;
+/* บรรทัดที่ยังไม่ได้เลือกอะไหล่จะส่ง undefined เข้ามา — ต้องไม่พัง */
+const mywhQty  = r => r ? Number(r['qty_' + MYWH.wh.toLowerCase()]) || 0 : 0;
+const mywhMain = r => r ? Number(r.qty_main) || 0 : 0;
 
 async function mywhLoad(){
   try {
-    const [all, docs] = await Promise.all([
+    const [all, docs, cfg] = await Promise.all([
       __pageAll(() => sb.from('v_stock_all').select('*')),
       sb.from('v_transfers').select('*')
-        .or(`from_code.eq.${MYWH.wh},to_code.eq.${MYWH.wh}`).limit(300)
+        .or(`from_code.eq.${MYWH.wh},to_code.eq.${MYWH.wh}`).limit(300),
+      sb.from('sys_config').select('key,value').in('key', ['req_teams','parts_sheet_url'])
     ]);
     if (docs.error) throw docs.error;
     MYWH.all    = all || [];
     MYWH.docs   = docs.data || [];
+    /* 31_sales_req.sql ยังไม่รันก็ใช้ได้ แค่ไม่มีรายการทีมกับลิงก์ชีท */
+    (cfg.data || []).forEach(r => {
+      if (r.key === 'req_teams')       MYWH.teams = (r.value && r.value.list) || [];
+      if (r.key === 'parts_sheet_url'){
+        MYWH.sheetUrl   = (r.value && r.value.url)   || '';
+        MYWH.sheetLabel = (r.value && r.value.label) || MYWH.sheetLabel;
+      }
+    });
     MYWH.loaded = true;
   } catch(e){
     // ยังไม่ได้รัน 22_requisition.sql → ยังดูยอดได้ แค่ทำใบเบิกไม่ได้
@@ -777,9 +791,13 @@ function mywhRender(){
       ที่ Supabase → SQL Editor ก่อน (ตอนนี้ดูยอดคงเหลือได้อย่างเดียว)</div>` : ''}
 
     <div class="card"><h3>🏬 ${esc(MYWH.label)}<span class="sp"></span>
+      ${MYWH.sheetUrl ? `<a class="btn sm" target="_blank" rel="noopener"
+         href="${esc(MYWH.sheetUrl)}">📗 ${esc(MYWH.sheetLabel)}</a>` : ''}
       ${MYWH.docs !== null ? `
-        <button class="btn p sm" onclick="mywhAskReq()">📝 ทำใบเบิก</button>
-        <button class="btn sm" onclick="mywhAskReturn()">↩️ คืนของกลับคลังกลาง</button>` : ''}
+        <button class="btn p sm" onclick="mywhStart('req')">📝 ทำใบเบิก</button>
+        <button class="btn sm" onclick="mywhStart('return')">↩️ คืนของกลับคลังกลาง</button>` : ''}
+      ${isBoss() ? `<button class="btn ic" title="ตั้งค่าทีม / ลิงก์ชีท"
+         onclick="mywhConfig()">⚙️</button>` : ''}
     </h3>
     <div class="cb">
       <div class="gtabs" style="margin-bottom:14px">
@@ -787,8 +805,11 @@ function mywhRender(){
           📦 ยอดคงเหลือ</button>
         <button class="gtab ${MYWH.tab==='doc'?'on':''}" onclick="mywhTab('doc')">
           📄 ใบเบิก / ใบคืน ${docs.length ? '(' + money(docs.length) + ')' : ''}</button>
+        ${MYWH.tab === 'cart' ? `<button class="gtab on">
+          ${MYWH.cartKind === 'req' ? '📝 ใบเบิกที่กำลังทำ' : '↩️ ใบคืนที่กำลังทำ'}</button>` : ''}
       </div>
-      ${MYWH.tab === 'stock' ? mywhStockHTML() : mywhDocHTML()}
+      ${MYWH.tab === 'cart' ? mywhCartHTML()
+        : MYWH.tab === 'stock' ? mywhStockHTML() : mywhDocHTML()}
     </div></div>`;
 }
 
@@ -816,7 +837,7 @@ function mywhStockHTML(){
     ${rows.length ? `<div class="tw"><table>
       <thead><tr><th>รหัส</th><th>ชื่ออะไหล่</th><th>ใส่รุ่นไหนได้</th>
         <th class="num">มีในคลังนี้</th><th class="num">จุดสั่ง</th>
-        <th class="num">คลังกลางมี</th>${can?'<th></th>':''}</tr></thead>
+        <th class="num">คลังกลางมี</th><th></th></tr></thead>
       <tbody>${m.slice.map(r => {
         const n = mywhQty(r), lo = r.reorder_point > 0 && n < r.reorder_point;
         return `<tr>
@@ -827,12 +848,12 @@ function mywhStockHTML(){
             ${money(n)}</b> <span class="sub2">${esc(r.unit || '')}</span></td>
           <td class="num sub2">${r.reorder_point > 0 ? money(r.reorder_point) : '—'}</td>
           <td class="num sub2">${money(mywhMain(r))}</td>
-          ${can ? `<td class="num" style="white-space:nowrap">
-            <button class="btn ic" title="ตรวจนับ / ปรับยอด"
-                    onclick="mywhCount('${esc(r.part_no)}')">🔢</button>
+          <td class="num" style="white-space:nowrap">
+            ${can ? `<button class="btn ic" title="ตรวจนับ / ปรับยอด"
+                    onclick="mywhCount('${esc(r.part_no)}')">🔢</button>` : ''}
             ${MYWH.docs !== null ? `<button class="btn ic" title="เบิกตัวนี้เพิ่ม"
-                    onclick="mywhAskReq('${esc(r.part_no)}')">📝</button>` : ''}
-          </td>` : ''}</tr>`;
+                    onclick="mywhStart('req','${esc(r.part_no)}')">📝</button>` : ''}
+          </td></tr>`;
       }).join('')}</tbody></table></div>${pagerHTML(m, 'mywh')}`
       : `<div class="empty">${MYWH.lowOnly
           ? 'ไม่มีรายการที่ต่ำกว่าจุดสั่ง 👍'
@@ -840,10 +861,19 @@ function mywhStockHTML(){
 }
 
 function mywhDocHTML(){
-  const docs = MYWH.docs || [];
-  if (!docs.length) return '<div class="empty">ยังไม่มีใบเบิกหรือใบคืน</div>';
-  return `<div class="tw"><table>
-    <thead><tr><th>เลขที่</th><th>ชนิด</th><th>จาก → ไป</th><th class="num">จำนวน</th>
+  const q = (MYWH.q || '').toLowerCase();
+  const all = MYWH.docs || [];
+  const docs = q ? all.filter(d => [d.transfer_no, d.team, d.order_nos, d.req_by, d.note]
+    .filter(Boolean).join(' ').toLowerCase().includes(q)) : all;
+  if (!all.length) return '<div class="empty">ยังไม่มีใบเบิกหรือใบคืน</div>';
+  return `<div class="search" style="margin-bottom:12px">
+      <input type="text" id="mywhQ" placeholder="ค้นหา เลขใบ / ทีม / เลขออเดอร์ / คนเบิก"
+             value="${esc(MYWH.q)}" oninput="mywhFind()">
+    </div>
+    ${docs.length ? '' : '<div class="empty">ไม่มีใบที่ตรงคำค้น</div>'}
+    <div class="tw"><table>
+    <thead><tr><th>เลขที่</th><th>ชนิด</th><th>ทีม</th><th>เลขออเดอร์</th>
+      <th>จาก → ไป</th><th class="num">จำนวน</th>
       <th>สถานะ</th><th>ล่าสุด</th><th></th></tr></thead>
     <tbody>${docs.map(d => {
       const [cl, lb] = WH_ST[d.status] || ['st0', d.status];
@@ -852,6 +882,8 @@ function mywhDocHTML(){
         <td><b class="mono">${esc(d.transfer_no)}</b>
           <div class="sub2">${esc(d.req_by || d.created_by || '')}</div></td>
         <td>${esc(d.kind_label || '')}</td>
+        <td>${d.team ? `<span class="pill st2">${esc(d.team)}</span>` : '<span class="muted">—</span>'}</td>
+        <td class="mono sub2" style="max-width:190px">${esc(d.order_nos || '—')}</td>
         <td class="sub2">${esc(d.from_name)} <b>→</b> ${esc(d.to_name)}
           ${d.note ? `<div class="sub2">${esc(d.note)}</div>` : ''}
           ${d.reject_reason ? `<div class="sub2" style="color:var(--crit)">
@@ -881,105 +913,249 @@ function mywhPartOptions(showMain){
                    : '  (มี ' + money(mywhQty(r)) + ')') }));
 }
 
-/* ---------- ใบเบิก ---------- */
-async function mywhAskReq(preset){
-  if (!isBoss()) return toast('ทำใบเบิกได้เฉพาะหัวหน้าฝ่าย', true);
+/* =====================================================================
+   ใบเบิก / ใบคืน — ตะกร้าอยู่ในหน้า ไม่ใช่ป๊อบอัพทีละบรรทัด
+     ป๊อบอัพแบบเดิมเห็นได้ทีละรายการ ตรวจว่าใส่ครบหรือซ้ำไม่ได้เลย
+     แบบใหม่เห็นทั้งใบพร้อมกัน แก้บรรทัดไหนก็ได้ก่อนส่ง
+   ===================================================================== */
+
+/** เริ่มทำใบใหม่ — kind = 'req' (เบิก) | 'return' (คืน) */
+function mywhStart(kind, preset){
   if (MYWH.docs === null) return toast('ยังไม่ได้รัน 22_requisition.sql', true);
-  MYWH.cart = [];
+  if (kind === 'return' && !isBoss())
+    return toast('คืนของกลับคลังกลางได้เฉพาะหัวหน้าฝ่าย', true);
 
-  const head = await formModal({
-    title:'📝 ทำใบเบิกจากคลังกลาง',
-    subtitle:'ใส่รายการให้ครบก่อน แล้วส่งเป็นใบเดียว — คลังกลางอนุมัติแล้วของถึงจะถูกตัด',
-    ok:'ใส่รายการต่อ →',
-    fields:[{ k:'note', label:'เบิกไปทำอะไร',
-              placeholder:'เช่น เติมของประจำเดือน / งานซ่อมด่วนรุ่น SCDR-170' }]
-  });
-  if (!head) return;
-
-  for(;;){
-    const line = await formModal({
-      title:'เพิ่มรายการ (ใส่แล้ว ' + MYWH.cart.length + ' บรรทัด)',
-      subtitle:'กด "ยกเลิก" เมื่อใส่ครบ แล้วระบบจะสรุปให้ตรวจอีกที',
-      ok:'เพิ่มรายการนี้',
-      fields:[
-        { k:'part', label:'อะไหล่', type:'select', required:true,
-          value:preset && !MYWH.cart.length ? preset : '', options:mywhPartOptions(true) },
-        { k:'qty',  label:'จำนวนที่ขอเบิก', type:'number', required:true, min:1, value:1 }
-      ]});
-    if (!line) break;
-    const r = MYWH.all.find(x => x.part_no === line.part);
-    if (mywhMain(r) < Number(line.qty))
-      toast(`⚠️ คลังกลางมี ${esc(line.part)} แค่ ${money(mywhMain(r))} — ใส่ไว้ได้ แต่อาจถูกปฏิเสธ`, true);
-    const dup = MYWH.cart.find(c => c.part_no === line.part);
-    if (dup) dup.qty += Number(line.qty);
-    else MYWH.cart.push({ part_no:line.part, qty:Number(line.qty) });
+  /* กำลังทำใบอยู่แล้ว แล้วกดเบิกอะไหล่ตัวใหม่จากตาราง = ต่อบรรทัดให้เลย */
+  const same = MYWH.tab === 'cart' && MYWH.cartKind === kind && MYWH.cart.length;
+  if (!same){
+    MYWH.cart = []; MYWH.cartKind = kind; MYWH.note = '';
+    MYWH.team = MYWH.team || '';
   }
-  if (!MYWH.cart.length) return toast('ยกเลิก — ใบเบิกไม่มีรายการ');
+  MYWH.cart.push({ part_no: preset || '', qty:1, order_no:'' });
+  MYWH.tab = 'cart';
+  mywhRender();
+}
 
-  const ok = await confirmModal('ยืนยันส่งใบเบิก',
-    `ขอเบิกเข้า ${MYWH.label}\n${MYWH.cart.length} รายการ · รวม ` +
-    `${money(MYWH.cart.reduce((s,c) => s + c.qty, 0))} ชิ้น\n\n` +
-    MYWH.cart.map(c => `• ${c.part_no} × ${c.qty}`).join('\n') +
-    '\n\nส่งแล้วรอคลังกลางอนุมัติ ของยังไม่ถูกตัดตอนนี้',
-    { ok:'ส่งใบเบิก', danger:false });
+function mywhAddLine(){ MYWH.cart.push({ part_no:'', qty:1, order_no:'' }); mywhRender(); }
+function mywhDelLine(i){ MYWH.cart.splice(i, 1); mywhRender(); }
+
+/** แก้ค่าในบรรทัด — ไม่ re-render เพื่อไม่ให้เคอร์เซอร์เด้งออกจากช่องที่พิมพ์อยู่ */
+function mywhSetLine(i, key, v){
+  if (!MYWH.cart[i]) return;
+  MYWH.cart[i][key] = key === 'qty' ? Number(v) || 0 : v;
+  if (key === 'part_no' || key === 'qty') mywhSyncWarn();
+}
+function mywhSetHead(key, v){ MYWH[key] = v; }
+
+/** เตือนของไม่พอแบบสด ๆ โดยไม่วาดทั้งตารางใหม่ */
+function mywhSyncWarn(){
+  const box = $('mywhWarn');
+  if (box) box.innerHTML = mywhWarnHTML();
+  const sum = $('mywhSum');
+  if (sum) sum.innerHTML = mywhSumHTML();
+}
+
+/** ของพอไหม — รวมทุกบรรทัดที่เป็นอะไหล่ตัวเดียวกัน (คนละออเดอร์ก็ตัดจากกองเดียวกัน) */
+function mywhShortages(){
+  const need = {}, out = [];
+  MYWH.cart.forEach(c => { if (c.part_no) need[c.part_no] = (need[c.part_no] || 0) + (Number(c.qty) || 0); });
+  Object.entries(need).forEach(([pn, q]) => {
+    const r = MYWH.all.find(x => x.part_no === pn);
+    const have = MYWH.cartKind === 'req' ? mywhMain(r) : mywhQty(r);
+    if (q > have) out.push({ part_no:pn, need:q, have });
+  });
+  return out;
+}
+
+function mywhWarnHTML(){
+  const sh = mywhShortages();
+  if (!sh.length) return '';
+  const where = MYWH.cartKind === 'req' ? 'คลังกลาง' : 'คลังนี้';
+  return `<div class="box-${MYWH.cartKind === 'req' ? 'warn' : 'crit'}" style="margin-bottom:12px">
+    ⚠️ <b>${where}มีของไม่พอ ${sh.length} รายการ</b>
+    <div class="sub2" style="margin-top:4px">${sh.map(s =>
+      `${esc(s.part_no)} — ขอ ${money(s.need)} มี ${money(s.have)}`).join(' · ')}</div>
+    <div class="sub2" style="margin-top:4px">${MYWH.cartKind === 'req'
+      ? 'ส่งใบได้ แต่คลังกลางอาจไม่อนุมัติบรรทัดที่ของไม่พอ'
+      : 'คืนเกินที่มีไม่ได้ ต้องแก้จำนวนก่อน'}</div></div>`;
+}
+
+function mywhSumHTML(){
+  const lines = MYWH.cart.filter(c => c.part_no && Number(c.qty) > 0);
+  const qty   = lines.reduce((s,c) => s + Number(c.qty), 0);
+  const orders = [...new Set(lines.map(c => (c.order_no || '').trim()).filter(Boolean))];
+  return `รวม <b>${money(lines.length)}</b> บรรทัด · <b>${money(qty)}</b> ชิ้น`
+    + (orders.length ? ` · <b>${money(orders.length)}</b> ออเดอร์` : '')
+    + (MYWH.cartKind === 'req' && lines.some(c => !(c.order_no || '').trim())
+        ? ' · <span style="color:var(--crit)">ยังมีบรรทัดที่ไม่ได้ใส่เลขออเดอร์</span>' : '');
+}
+
+/** ฟอร์มใบเบิก/ใบคืนทั้งใบ */
+function mywhCartHTML(){
+  const isReq = MYWH.cartKind === 'req';
+  const needOrder = isReq && MYWH.wh === 'SALES';   // ฝ่ายขายต้องระบุออเดอร์เสมอ
+  const opts = mywhPartOptions(isReq);
+  const teamOpts = MYWH.teams.length
+    ? MYWH.teams.map(t => `<option value="${esc(t)}" ${t === MYWH.team ? 'selected' : ''}>${esc(t)}</option>`).join('')
+    : '';
+
+  return `
+  <div class="box-info" style="margin-bottom:13px;font-size:12.5px">
+    ${isReq
+      ? 'ใส่ให้ครบทั้งใบก่อน แล้วค่อยกดส่ง — คลังกลางอนุมัติแล้วของถึงจะถูกตัด'
+      : 'ของจะถูกตัดออกจากคลังนี้ทันทีที่ส่งใบ คลังกลางกดรับเมื่อของไปถึง'}
+    ${MYWH.sheetUrl ? ` · ไม่แน่ใจว่าอะไหล่หน้าตายังไง เปิด
+      <a href="${esc(MYWH.sheetUrl)}" target="_blank" rel="noopener"><b>📗 ${esc(MYWH.sheetLabel)}</b></a>` : ''}
+  </div>
+
+  <div class="grid g2" style="margin-bottom:13px">
+    <div><label>ทีมที่เบิก ${needOrder ? '<span class="req">*</span>' : ''}</label>
+      ${MYWH.teams.length
+        ? `<select id="mywhTeam" onchange="mywhSetHead('team', this.value)">
+             <option value="">— เลือกทีม —</option>${teamOpts}</select>`
+        : `<input type="text" id="mywhTeam" value="${esc(MYWH.team)}"
+             placeholder="เช่น TikTok / Shopee" oninput="mywhSetHead('team', this.value)">
+           <span class="hint">รัน 31_sales_req.sql แล้วจะมีรายการให้เลือก</span>`}
+    </div>
+    <div><label>${isReq ? 'เบิกไปทำอะไร' : 'คืนเพราะอะไร'}</label>
+      <input type="text" id="mywhNote" value="${esc(MYWH.note)}"
+        oninput="mywhSetHead('note', this.value)"
+        placeholder="${isReq ? 'เช่น เติมของประจำสัปดาห์' : 'เช่น เบิกมาเกิน / ใช้ไม่ตรงรุ่น'}"></div>
+  </div>
+
+  <div id="mywhWarn">${mywhWarnHTML()}</div>
+
+  <div class="tw"><table>
+    <thead><tr><th style="min-width:230px">อะไหล่</th><th class="num" style="width:110px">จำนวน</th>
+      <th style="width:190px">เลขออเดอร์${needOrder ? ' <span class="req">*</span>' : ''}</th>
+      <th class="num" style="width:56px"></th></tr></thead>
+    <tbody>${MYWH.cart.map((c, i) => {
+      const r = MYWH.all.find(x => x.part_no === c.part_no);
+      const have = isReq ? mywhMain(r) : mywhQty(r);
+      return `<tr>
+        <td><select onchange="mywhSetLine(${i},'part_no',this.value)">
+            <option value="">— เลือกอะไหล่ —</option>
+            ${opts.map(o => `<option value="${esc(o.v)}" ${o.v === c.part_no ? 'selected' : ''}>${esc(o.t)}</option>`).join('')}
+          </select>
+          ${c.part_no ? `<div class="sub2">${isReq ? 'คลังกลางมี' : 'ในคลังนี้มี'} ${money(have)}</div>` : ''}</td>
+        <td class="num"><input type="number" min="1" value="${Number(c.qty) || 1}"
+            oninput="mywhSetLine(${i},'qty',this.value)" style="text-align:right"></td>
+        <td><input type="text" value="${esc(c.order_no || '')}"
+            oninput="mywhSetLine(${i},'order_no',this.value)"
+            placeholder="${needOrder ? 'เช่น 2609110XXXX' : 'ถ้ามี'}"></td>
+        <td class="num"><button class="btn ic dn" title="ลบบรรทัดนี้"
+            onclick="mywhDelLine(${i})">✕</button></td></tr>`;
+    }).join('')}</tbody></table></div>
+
+  <div style="margin-top:11px;display:flex;gap:9px;flex-wrap:wrap;align-items:center">
+    <button class="btn" onclick="mywhAddLine()">＋ เพิ่มบรรทัด</button>
+    <span class="sp" style="flex:1"></span>
+    <span class="sub2" id="mywhSum">${mywhSumHTML()}</span>
+  </div>
+
+  <div style="margin-top:14px;display:flex;gap:9px;flex-wrap:wrap;justify-content:flex-end">
+    <button class="btn" onclick="mywhCancelCart()">ยกเลิกทั้งใบ</button>
+    <button class="btn ${isReq ? 'p' : 'dn'}" onclick="mywhSubmit()">
+      ${isReq ? '📤 ส่งใบเบิก' : '↩️ ส่งใบคืน'}</button>
+  </div>`;
+}
+
+async function mywhCancelCart(){
+  if (MYWH.cart.some(c => c.part_no) &&
+      !await confirmModal('ทิ้งใบที่กำลังทำ?', 'รายการที่ใส่ไว้จะหายทั้งหมด', { ok:'ทิ้งเลย', danger:true }))
+    return;
+  MYWH.cart = []; MYWH.tab = 'stock'; mywhRender();
+}
+
+async function mywhSubmit(){
+  const isReq = MYWH.cartKind === 'req';
+  const needOrder = isReq && MYWH.wh === 'SALES';
+  const lines = MYWH.cart.filter(c => c.part_no && Number(c.qty) > 0);
+
+  if (!lines.length) return toast('ยังไม่มีรายการในใบนี้', true);
+  const dupKey = c => c.part_no + '|' + (c.order_no || '').trim();
+  const seen = new Set(), dup = [];
+  lines.forEach(c => { const k = dupKey(c); if (seen.has(k)) dup.push(c.part_no); seen.add(k); });
+  if (dup.length) return toast('มีบรรทัดซ้ำ (อะไหล่+ออเดอร์เดียวกัน): ' + [...new Set(dup)].join(', ')
+    + ' — รวมเป็นบรรทัดเดียวก่อน', true);
+
+  if (needOrder && !MYWH.team) return toast('เลือกทีมที่เบิกก่อน', true);
+  if (needOrder && lines.some(c => !(c.order_no || '').trim()))
+    return toast('ฝ่ายขายต้องใส่เลขออเดอร์ทุกบรรทัด — ระบบนี้มีไว้ตามว่าอะไหล่ไปออเดอร์ไหน', true);
+
+  const short = mywhShortages();
+  if (!isReq && short.length)
+    return toast('คืนเกินที่มีในคลังไม่ได้: ' + short.map(s => s.part_no).join(', '), true);
+
+  const qty = lines.reduce((s,c) => s + Number(c.qty), 0);
+  const body = lines.map(c => `• ${c.part_no} × ${c.qty}`
+      + (c.order_no ? '  → ' + c.order_no : '')).join('\n');
+  const ok = await confirmModal(isReq ? 'ยืนยันส่งใบเบิก' : 'ยืนยันคืนของ',
+    (isReq ? `ขอเบิกเข้า ${MYWH.label}` : `คืนจาก ${MYWH.label} → คลังกลาง`)
+    + (MYWH.team ? `\nทีม: ${MYWH.team}` : '')
+    + `\n${lines.length} บรรทัด · รวม ${money(qty)} ชิ้น\n\n${body}\n\n`
+    + (isReq ? 'ส่งแล้วรอคลังกลางอนุมัติ ของยังไม่ถูกตัดตอนนี้'
+             : 'กดยืนยันแล้วของจะออกจากคลังนี้ทันที ยกเลิกไม่ได้')
+    + (isReq && short.length ? '\n\n⚠️ มีบรรทัดที่คลังกลางของไม่พอ อาจถูกปฏิเสธ' : ''),
+    { ok: isReq ? 'ส่งใบเบิก' : 'คืนของเลย', danger: !isReq });
   if (!ok) return;
 
+  const payload = lines.map(c => ({
+    part_no: c.part_no, qty: Number(c.qty),
+    order_no: (c.order_no || '').trim() || null
+  }));
+
   try {
-    const { data, error } = await sb.rpc('create_request', {
-      p_to:MYWH.wh, p_lines:MYWH.cart, p_note:head.note || null, p_by:who() });
-    if (error) throw error;
-    toast('✅ ส่งใบเบิก ' + data + ' แล้ว — รอคลังกลางอนุมัติ');
-    MYWH.cart = []; MYWH.tab = 'doc';
+    let res;
+    if (isReq){
+      res = await sb.rpc('create_request', {
+        p_to:MYWH.wh, p_lines:payload, p_note:MYWH.note || null,
+        p_by:who(), p_from:'MAIN', p_team:MYWH.team || null });
+      /* ยังไม่ได้รัน 31 → ฟังก์ชันเก่าไม่มี p_team ลองใหม่แบบไม่มีทีม */
+      if (res.error && /p_team|order_no|function/i.test(res.error.message || '')){
+        toast('⚠️ ยังไม่ได้รัน 31_sales_req.sql — ส่งใบโดยไม่มีทีม/เลขออเดอร์', true);
+        res = await sb.rpc('create_request', {
+          p_to:MYWH.wh, p_lines:payload.map(l => ({ part_no:l.part_no, qty:l.qty })),
+          p_note:MYWH.note || null, p_by:who() });
+      }
+    } else {
+      res = await sb.rpc('create_return', {
+        p_from:MYWH.wh, p_lines:payload, p_note:MYWH.note || null, p_by:who() });
+    }
+    if (res.error) throw res.error;
+    toast(isReq ? '✅ ส่งใบเบิก ' + res.data + ' แล้ว — รอคลังกลางอนุมัติ'
+                : '✅ ส่งใบคืน ' + res.data + ' แล้ว — ของออกจากคลังนี้ รอคลังกลางรับ');
+    MYWH.cart = []; MYWH.note = ''; MYWH.tab = 'doc';
     mywhLoad();
   } catch(e){ fail(e); }
 }
 
-/* ---------- ใบคืน ---------- */
-async function mywhAskReturn(){
-  if (!isBoss()) return toast('คืนของได้เฉพาะหัวหน้าฝ่าย', true);
-  if (MYWH.docs === null) return toast('ยังไม่ได้รัน 22_requisition.sql', true);
-  MYWH.cart = [];
-
-  const head = await formModal({
-    title:'↩️ คืนของกลับคลังกลาง',
-    subtitle:'ของจะถูกตัดออกจากคลังนี้ทันทีที่ส่งใบ คลังกลางกดรับเมื่อของไปถึง',
-    ok:'ใส่รายการต่อ →',
-    fields:[{ k:'note', label:'คืนเพราะอะไร', placeholder:'เช่น เบิกมาเกิน / ใช้ไม่ตรงรุ่น' }]
-  });
-  if (!head) return;
-
-  for(;;){
-    const line = await formModal({
-      title:'เพิ่มรายการที่จะคืน (ใส่แล้ว ' + MYWH.cart.length + ' บรรทัด)',
-      subtitle:'กด "ยกเลิก" เมื่อใส่ครบ', ok:'เพิ่มรายการนี้',
-      fields:[
-        { k:'part', label:'อะไหล่', type:'select', required:true, options:mywhPartOptions(false) },
-        { k:'qty',  label:'จำนวนที่คืน', type:'number', required:true, min:1, value:1 }
-      ]});
-    if (!line) break;
-    const r = MYWH.all.find(x => x.part_no === line.part);
-    if (mywhQty(r) < Number(line.qty))
-      toast(`⚠️ ในคลังนี้มี ${esc(line.part)} แค่ ${money(mywhQty(r))} — คืนเกินที่มีไม่ได้`, true);
-    const dup = MYWH.cart.find(c => c.part_no === line.part);
-    if (dup) dup.qty += Number(line.qty);
-    else MYWH.cart.push({ part_no:line.part, qty:Number(line.qty) });
-  }
-  if (!MYWH.cart.length) return toast('ยกเลิก — ใบคืนไม่มีรายการ');
-
-  const ok = await confirmModal('ยืนยันคืนของ',
-    `คืนจาก ${MYWH.label} → คลังกลาง\n${MYWH.cart.length} รายการ · รวม ` +
-    `${money(MYWH.cart.reduce((s,c) => s + c.qty, 0))} ชิ้น\n\n` +
-    MYWH.cart.map(c => `• ${c.part_no} × ${c.qty}`).join('\n') +
-    '\n\nกดยืนยันแล้วของจะออกจากคลังนี้ทันที ยกเลิกไม่ได้',
-    { ok:'คืนของเลย', danger:true });
-  if (!ok) return;
-
+/* ---------- ตั้งค่าทีม + ลิงก์ชีท (หัวหน้าเท่านั้น) ---------- */
+async function mywhConfig(){
+  if (!isBoss()) return toast('แก้ค่าตั้งได้เฉพาะหัวหน้าฝ่าย', true);
+  const f = await formModal({
+    title:'⚙️ ตั้งค่าใบเบิก',
+    subtitle:'ลิงก์ชีทจะโผล่ให้คนเบิกกดดูตอนทำใบ · รายชื่อทีมใช้ในช่อง "ทีมที่เบิก"',
+    ok:'บันทึก',
+    fields:[
+      { k:'url',   label:'ลิงก์ชีทรูป/รหัสอะไหล่', value:MYWH.sheetUrl,
+        placeholder:'https://docs.google.com/spreadsheets/…',
+        hint:'เว้นว่าง = ไม่โชว์ปุ่ม' },
+      { k:'label', label:'ชื่อที่ขึ้นบนปุ่ม', value:MYWH.sheetLabel, half:true },
+      { k:'teams', label:'รายชื่อทีม (บรรทัดละทีม)', type:'textarea',
+        value:MYWH.teams.join('\n'), placeholder:'TikTok\nShopee\nLazada' }
+    ]});
+  if (!f) return;
+  const teams = (f.teams || '').split('\n').map(s => s.trim()).filter(Boolean);
   try {
-    const { data, error } = await sb.rpc('create_return', {
-      p_from:MYWH.wh, p_lines:MYWH.cart, p_note:head.note || null, p_by:who() });
+    const { error } = await sb.from('sys_config').upsert([
+      { key:'parts_sheet_url', value:{ url:(f.url || '').trim(), label:(f.label || '').trim() || 'ชีทรูป/รหัสอะไหล่' },
+        updated_by:who(), updated_at:new Date().toISOString() },
+      { key:'req_teams', value:{ list:teams },
+        updated_by:who(), updated_at:new Date().toISOString() }
+    ], { onConflict:'key' });
     if (error) throw error;
-    toast('✅ ส่งใบคืน ' + data + ' แล้ว — ของออกจากคลังนี้ รอคลังกลางรับ');
-    MYWH.cart = []; MYWH.tab = 'doc';
+    toast('✅ บันทึกค่าตั้งแล้ว');
     mywhLoad();
   } catch(e){ fail(e); }
 }
@@ -1044,15 +1220,18 @@ async function mywhPeek(no){
     const [, lb] = WH_ST[d.status] || ['', d.status];
     await infoModal(`${d.kind_label || 'เอกสาร'} ${no}`,
       `${d.from_name} → ${d.to_name} · ${lb}`,
-      `<div class="tw"><table>
-        <thead><tr><th>อะไหล่</th><th class="num">จำนวน</th>
+      `${d.team ? `<div class="box-info" style="margin-bottom:11px">
+          ทีมที่เบิก <b>${esc(d.team)}</b></div>` : ''}
+      <div class="tw"><table>
+        <thead><tr><th>อะไหล่</th><th class="num">จำนวน</th><th>เลขออเดอร์</th>
           <th class="num">ต้นทางมี</th></tr></thead>
         <tbody>${lines.length ? lines.map(l => `<tr>
           <td><b class="mono">${esc(l.part_no)}</b>
             <div class="sub2">${esc(l.part_name || '')}</div></td>
           <td class="num">${money(l.qty)} ${esc(l.unit || '')}</td>
+          <td class="mono sub2">${esc(l.order_no || '—')}</td>
           <td class="num sub2">${money(l.from_qty)}</td></tr>`).join('')
-          : '<tr><td colspan="3" class="empty">ไม่มีรายการ</td></tr>'}</tbody></table></div>
+          : '<tr><td colspan="4" class="empty">ไม่มีรายการ</td></tr>'}</tbody></table></div>
       ${d.reject_reason ? `<div class="box-crit" style="margin-top:12px">
         ไม่อนุมัติ: ${esc(d.reject_reason)}</div>` : ''}
       <div class="box-info" style="margin-top:12px;font-size:12.5px">
