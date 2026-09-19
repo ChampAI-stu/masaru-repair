@@ -705,7 +705,8 @@ function renderTransfers(){
         <b>มีงานค้างที่คลังกลาง</b>
         <div class="sub2" style="margin-top:5px">
           ${waitApprove.length ? `⏳ ใบเบิกรออนุมัติ <b>${money(waitApprove.length)}</b> ใบ
-            (${esc(waitApprove.map(t => t.transfer_no).slice(0,4).join(', '))}${waitApprove.length>4?' …':''})<br>` : ''}
+            (${esc(waitApprove.map(t => t.transfer_no + (t.team ? ' · ' + t.team : ''))
+                  .slice(0,4).join(', '))}${waitApprove.length>4?' …':''})<br>` : ''}
           ${waitBack.length ? `↩️ ของคืนรอรับเข้า <b>${money(waitBack.length)}</b> ใบ
             (${esc(waitBack.map(t => t.transfer_no).slice(0,4).join(', '))}${waitBack.length>4?' …':''})` : ''}
         </div></div>`
@@ -724,12 +725,15 @@ function renderTransfers(){
   const rows = S.trKind ? all.filter(t => t.kind === S.trKind) : all;
 
   $('trTbl').innerHTML = rows.length ? `<div class="tw"><table>
-    <thead><tr><th>เลขที่</th><th>ชนิด</th><th>จาก → ไป</th><th class="num">รายการ</th><th class="num">จำนวน</th>
+    <thead><tr><th>เลขที่</th><th>ชนิด</th><th>ทีม</th><th>เลขออเดอร์</th>
+      <th>จาก → ไป</th><th class="num">รายการ</th><th class="num">จำนวน</th>
       <th>สถานะ</th><th>ล่าสุด</th><th></th></tr></thead>
     <tbody>${rows.map(t => `<tr>
       <td><b class="mono">${esc(t.transfer_no)}</b>
         <div class="sub2">${esc(t.req_by || t.created_by || '')} · ${esc(dtth(t.created_at))}</div></td>
       <td>${esc(t.kind_label || 'ใบโอน')}</td>
+      <td>${t.team ? `<span class="pill st2">${esc(t.team)}</span>` : '<span class="muted">—</span>'}</td>
+      <td class="mono sub2" style="max-width:190px">${esc(t.order_nos || '—')}</td>
       <td>${esc(t.from_name)} <b>→</b> ${esc(t.to_name)}
         ${t.note ? `<div class="sub2">${esc(t.note)}</div>` : ''}
         ${t.reject_reason ? `<div class="sub2" style="color:var(--crit)">
@@ -756,20 +760,29 @@ async function peekTransfer(no){
   const t = S.trs.find(x => x.transfer_no === no);
   if (!t) return;
   try {
-    const { data, error } = await sb.from('stock_transfer_lines')
-      .select('qty,note,parts_master(part_no,name,unit)').eq('transfer_id', t.id);
-    if (error) throw error;
-    const lines = data || [];
-    await infoModal('🔁 ใบโอน ' + no,
+    /* order_no มาจาก 31_sales_req.sql — ยังไม่รันก็ยังดูใบได้ แค่ไม่มีคอลัมน์นั้น */
+    let lines = [];
+    let r = await sb.from('stock_transfer_lines')
+      .select('qty,note,order_no,parts_master(part_no,name,unit)').eq('transfer_id', t.id);
+    if (r.error && /order_no|column/i.test(r.error.message || ''))
+      r = await sb.from('stock_transfer_lines')
+        .select('qty,note,parts_master(part_no,name,unit)').eq('transfer_id', t.id);
+    if (r.error) throw r.error;
+    lines = r.data || [];
+    await infoModal((t.kind_label || '🔁 ใบโอน') + ' ' + no,
       `${t.from_name} → ${t.to_name} · ${TR_LABEL[t.status] || t.status}`,
-      `<div class="tw"><table>
-        <thead><tr><th>อะไหล่</th><th class="num">จำนวน</th><th>หมายเหตุ</th></tr></thead>
+      `${t.team ? `<div class="box-info" style="margin-bottom:11px">
+          ทีมที่เบิก <b>${esc(t.team)}</b></div>` : ''}
+      <div class="tw"><table>
+        <thead><tr><th>อะไหล่</th><th class="num">จำนวน</th><th>เลขออเดอร์</th>
+          <th>หมายเหตุ</th></tr></thead>
         <tbody>${lines.length ? lines.map(l => `<tr>
           <td><b class="mono">${esc(l.parts_master?.part_no || '')}</b>
             <div class="sub2">${esc(l.parts_master?.name || '')}</div></td>
           <td class="num">${money(l.qty)} ${esc(l.parts_master?.unit || '')}</td>
+          <td class="mono sub2">${esc(l.order_no || '—')}</td>
           <td>${esc(l.note || '—')}</td></tr>`).join('')
-          : '<tr><td colspan="3" class="empty">ไม่มีรายการ</td></tr>'}</tbody></table></div>
+          : '<tr><td colspan="4" class="empty">ไม่มีรายการ</td></tr>'}</tbody></table></div>
       <div class="box-info" style="margin-top:12px;font-size:12.5px">
         สร้าง ${esc(dtth(t.created_at))} โดย ${esc(t.created_by || '—')}<br>
         ${t.sent_at ? 'ส่งของ ' + esc(dtth(t.sent_at)) + ' โดย ' + esc(t.sent_by || '—') + '<br>' : ''}
