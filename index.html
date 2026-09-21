@@ -567,6 +567,10 @@ table.ptab td.n{text-align:right;font-variant-numeric:tabular-nums}
   <div class="gbox">
     <div class="glogo"><div class="ic">🔧</div>
       <div><b>TOOL REPAIR</b><small>ระบบรับซ่อมเครื่องมือ · MASARU</small></div></div>
+    <div class="gtabs">
+      <button type="button" class="gtab on" id="gtLogin" onclick="gateTab('login')">เข้าสู่ระบบ</button>
+      <button type="button" class="gtab" id="gtSign" onclick="gateTab('signup')">สมัครสมาชิก</button>
+    </div>
     <form id="loginForm" autocomplete="on">
       <div class="f"><label for="liEmail">อีเมล</label>
         <input type="email" id="liEmail" required autocomplete="username" placeholder="you@masaru.co.th"></div>
@@ -575,9 +579,22 @@ table.ptab td.n{text-align:right;font-variant-numeric:tabular-nums}
       <button class="btn g" id="liBtn" type="submit" style="width:100%;padding:12px;margin-top:4px">เข้าสู่ระบบ</button>
     </form>
 
+    <form id="signForm" autocomplete="on" hidden>
+      <div class="f"><label for="suCode">โค้ดเชิญ <span class="req">*</span></label>
+        <input type="text" id="suCode" required placeholder="MASARU-XXXX-XXXX"
+               style="text-transform:uppercase" autocomplete="off"></div>
+      <div id="suCodeMsg" class="gok" hidden></div>
+      <div class="f"><label for="suName">ชื่อ-สกุล / ชื่อเล่น <span class="req">*</span></label>
+        <input type="text" id="suName" required placeholder="เช่น แชมป์"></div>
+      <div class="f"><label for="suEmail">อีเมล <span class="req">*</span></label>
+        <input type="email" id="suEmail" required autocomplete="username" placeholder="you@masaru.co.th"></div>
+      <div class="f"><label for="suPass">รหัสผ่าน <span class="req">*</span>
+        <span style="font-weight:400;color:var(--ink3)">(อย่างน้อย 6 ตัว)</span></label>
+        <input type="password" id="suPass" required minlength="6" autocomplete="new-password" placeholder="••••••••"></div>
+      <button class="btn g" id="suBtn" type="submit" style="width:100%;padding:12px;margin-top:4px">สมัครและเข้าใช้งาน</button>
+    </form>
     <div id="liErr" class="gerr" hidden></div>
-    <div class="gfoot" id="gFoot">ยังไม่มีบัญชี —
-      <a href="index.html" style="color:var(--blue);font-weight:600">สมัครที่หน้าหลักของระบบ</a></div>
+    <div class="gfoot" id="gFoot">ยังไม่มีบัญชี — ขอโค้ดเชิญจากผู้ดูแลระบบ แล้วกดแท็บ "สมัครสมาชิก"</div>
   </div>
 </div>
 
@@ -596,9 +613,6 @@ table.ptab td.n{text-align:right;font-variant-numeric:tabular-nums}
       <button data-p="cust"><span class="e">👥</span>ลูกค้า</button>
       <button data-p="report"><span class="e">📈</span>รายงาน</button>
       <button data-p="setting"><span class="e">⚙️</span>ตั้งค่า</button>
-    </nav>
-    <nav style="margin-top:16px">
-      <button onclick="location.href='index.html'"><span class="e">🏠</span>กลับหน้าหลัก</button>
     </nav>
     <div class="sidefoot">
       <div class="k" id="roleLbl">ผู้ใช้งาน</div>
@@ -1270,6 +1284,19 @@ table.ptab td.n{text-align:right;font-variant-numeric:tabular-nums}
             <tbody></tbody></table></div></div>
         </div>
 
+        <div class="card" id="cardPerm" hidden>
+          <h3>🔐 สิทธิ์เข้าระบบแต่ละตัว <span class="sp"></span>
+            <span class="muted" style="font-weight:400;font-size:13px">
+              เดิมอยู่ที่หน้าหลัก — ย้ายมาที่นี่ตอนแยก repo</span></h3>
+          <div class="cb">
+            <div class="box-info" style="margin-bottom:12px;font-size:12.5px">
+              ติ๊กว่าตำแหน่งไหนเข้าระบบไหนได้ · <b>ผู้ดูแลระบบเข้าได้เสมอ</b> แก้ไม่ได้ ·
+              เปลี่ยนแล้วคนที่เปิดหน้าค้างไว้ต้องรีเฟรช 1 ครั้ง
+            </div>
+            <div id="permBody"></div>
+          </div>
+        </div>
+
         <div class="card">
           <h3>🎫 โค้ดเชิญ <span class="sp"></span>
             <button class="btn sm g" onclick="addInvite()">+ สร้างโค้ด</button></h3>
@@ -1669,8 +1696,8 @@ function blockModule(name){
         บัญชีของคุณยังไม่ได้รับสิทธิ์เข้า <b>${esc(name)}</b><br>
         ขอสิทธิ์ได้ที่ผู้ดูแลระบบ
       </p>
-      <a class="btn g" href="index.html"
-         style="display:inline-block;text-decoration:none;padding:11px 24px">← กลับหน้าหลัก</a>
+      <button class="btn g" onclick="forceLogout()"
+         style="padding:11px 24px">ออกจากระบบ</button>
     </div></div>`;
 }
 
@@ -2456,7 +2483,7 @@ function goPage(p){
   if (p === 'cust')   { closeCust(); renderCust(); }
   if (p === 'dispatch') loadDispatch();
   if (p === 'report') loadReport();
-  if (p === 'setting'){ loadSettings(); loadCauses(); }
+  if (p === 'setting'){ loadSettings(); loadCauses(); loadPerm(); }
 }
 
 /* =====================================================================
@@ -2536,6 +2563,95 @@ function bindAuthEvents(){
 }
 
 
+
+/* =====================================================================
+   สมัครสมาชิกด้วยโค้ดเชิญ — เดิมอยู่ที่ index.html
+   ตอนนี้ทุกระบบแยก repo กันแล้ว แต่ละไฟล์จึงต้องสมัครได้ในตัวเอง
+   ===================================================================== */
+let codeOk = false;
+
+function gateTab(t){
+  const login = t === 'login';
+  $('loginForm').hidden = !login;
+  $('signForm').hidden  = login;
+  $('gtLogin').classList.toggle('on', login);
+  $('gtSign').classList.toggle('on', !login);
+  if ($('liErr')) $('liErr').hidden = true;
+}
+
+async function checkCode(){
+  const box = $('suCodeMsg'), code = $('suCode').value.trim().toUpperCase();
+  $('suCode').value = code;
+  codeOk = false;
+  if (!code){ box.hidden = true; return; }
+  try {
+    const { data, error } = await sb.rpc('check_invite', { p_code: code });
+    if (error) throw error;
+    const r = Array.isArray(data) ? data[0] : data;
+    box.hidden = false;
+    if (r && r.valid){
+      codeOk = true;
+      box.className = 'gok';
+      box.textContent = '✅ โค้ดถูกต้อง — สิทธิ์: ' + (r.label || ROLE_LABEL[r.role] || r.role);
+    } else {
+      box.className = 'gok bad';
+      box.textContent = '❌ โค้ดไม่ถูกต้อง หมดอายุ หรือถูกใช้ครบแล้ว';
+    }
+  } catch(e){
+    box.hidden = false; box.className = 'gok bad';
+    box.textContent = 'ตรวจโค้ดไม่สำเร็จ: ' + (e.message || e);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const c = $('suCode'); if (!c) return;
+  c.addEventListener('blur', checkCode);
+  c.addEventListener('change', checkCode);
+  $('signForm').addEventListener('submit', doSignUp);
+});
+
+async function doSignUp(e){
+  e.preventDefault();
+  const btn = $('suBtn'), err = $('liErr');
+  err.hidden = true;
+  if (!codeOk){ await checkCode(); if (!codeOk){ $('suCode').focus(); return; } }
+
+  btn.disabled = true; btn.textContent = 'กำลังสมัคร…';
+  try {
+    const email = $('suEmail').value.trim();
+    const pass  = $('suPass').value;
+    const name  = $('suName').value.trim();
+
+    const { data, error } = await sb.auth.signUp({ email, password: pass });
+    if (error) throw error;
+
+    /* ถ้าตั้งให้ยืนยันอีเมล จะยังไม่มี session ต้องเข้าระบบเองอีกที */
+    let sess = data.session;
+    if (!sess){
+      const r = await sb.auth.signInWithPassword({ email, password: pass });
+      if (r.error) throw new Error('สมัครแล้วแต่เข้าระบบอัตโนมัติไม่ได้ — ผู้ดูแลต้องปิด "Confirm email" ใน Supabase');
+      sess = r.data.session;
+    }
+
+    const { error: rErr } = await sb.rpc('redeem_invite',
+      { p_code: $('suCode').value.trim(), p_name: name });
+    if (rErr){ await sb.auth.signOut(); throw rErr; }
+
+    const { data: fresh } = await sb.auth.refreshSession();   // ดึง role เข้า token
+    await startApp(fresh?.session || sess);
+  } catch(e2){
+    const m = (e2?.message || '').toLowerCase();
+    err.textContent =
+      m.includes('already registered') || m.includes('already been registered')
+        ? 'อีเมลนี้สมัครไว้แล้ว — กดแท็บ "เข้าสู่ระบบ" แทน' :
+      m.includes('signups not allowed') || m.includes('signup is disabled')
+        ? 'ยังปิดการสมัครอยู่ — ผู้ดูแลต้องเปิด Enable email signups ใน Supabase' :
+      m.includes('password') ? 'รหัสผ่านสั้นเกินไป — ต้องอย่างน้อย 6 ตัวอักษร'
+        : (e2?.message || 'สมัครไม่สำเร็จ');
+    err.hidden = false;
+  } finally { btn.disabled = false; btn.textContent = 'สมัครและเข้าใช้งาน'; }
+}
+
 /* =====================================================================
    boot
    ===================================================================== */
@@ -2602,9 +2718,6 @@ $('loginForm').addEventListener('submit', async e => {
   } finally { btn.disabled = false; btn.textContent = 'เข้าสู่ระบบ'; }
 });
 
-/* ---------- สลับแท็บ เข้าสู่ระบบ / สมัครสมาชิก ---------- */
-/* การสมัครสมาชิกย้ายไปอยู่หน้าหลัก (index.html) แล้ว
-   เพราะระบบมี 3 โมดูล คนที่ไม่ได้ทำงานซ่อมไม่ควรต้องเดินผ่านหน้านี้เพื่อสมัคร */
 
 $('logoutBtn').addEventListener('click', async () => {
   if (!await confirmModal('ออกจากระบบ?', 'ครั้งหน้าต้องกรอกอีเมลและรหัสผ่านใหม่', { ok:'ออกจากระบบ' })) return;
@@ -5908,6 +6021,73 @@ function renderSettings(){
         onclick="toggleSym('${esc(s.code)}',${!s.is_active})">${s.is_active ? '🚫' : '✓'}</button></td>
     </tr>`;
   }).join('') || '<tr><td colspan="6" class="empty">ยังไม่มีหมวดอาการ</td></tr>';
+}
+
+/* ---------------------------------------------------------------------
+   สิทธิ์เข้าระบบแต่ละตัว — ย้ายมาจาก index.html ตอนแยก repo
+   --------------------------------------------------------------------- */
+let MODS = [];
+const PERM_ROLES = ['staff','tech','head','admin','test'];
+
+async function loadPerm(){
+  const card = $('cardPerm');
+  if (!card) return;
+  if (ME.role !== 'admin'){ card.hidden = true; return; }
+  try {
+    const { data, error } = await sb.from('module_access').select('*').order('sort_order');
+    if (error) throw error;
+    MODS = data || [];
+    card.hidden = false;
+    renderPerm();
+  } catch(e){
+    card.hidden = false;
+    $('permBody').innerHTML = `<div class="box-warn">อ่านตารางสิทธิ์ไม่ได้ —
+      รัน <b class="mono">20_access.sql</b> แล้วหรือยัง
+      <div class="sub2" style="margin-top:4px">${esc(e.message || e)}</div></div>`;
+  }
+}
+
+function renderPerm(){
+  $('permBody').innerHTML = `<div class="tw"><table>
+    <thead><tr><th>ระบบ</th>
+      ${PERM_ROLES.map(r => `<th class="num">${esc(ROLE_LABEL[r] || r)}</th>`).join('')}
+      <th class="num">เปิดใช้</th></tr></thead>
+    <tbody>${MODS.map(m => `<tr ${m.is_active ? '' : 'style="opacity:.55"'}>
+      <td><b>${esc(m.icon || '')} ${esc(m.name)}</b>
+        <div class="sub2 mono">${esc(m.module)} · ${esc(m.href || '')}</div></td>
+      ${PERM_ROLES.map(r => `<td class="num"><input type="checkbox"
+        data-m="${esc(m.module)}" data-r="${r}"
+        ${(m.roles || []).includes(r) || r === 'admin' ? 'checked' : ''}
+        ${r === 'admin' ? 'disabled title="ผู้ดูแลระบบเข้าได้ทุกระบบเสมอ"' : ''}></td>`).join('')}
+      <td class="num"><input type="checkbox" data-m="${esc(m.module)}" data-act="1"
+        ${m.is_active ? 'checked' : ''}></td></tr>`).join('')}</tbody></table></div>
+    <div style="margin-top:13px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <button class="btn p" id="permSave" onclick="savePerm()">💾 บันทึกสิทธิ์</button>
+      <span id="permMsg" class="sub2"></span>
+    </div>`;
+}
+
+async function savePerm(){
+  const btn = $('permSave');
+  btn.disabled = true;
+  $('permMsg').textContent = 'กำลังบันทึก…';
+  try {
+    for (const m of MODS){
+      const roles = PERM_ROLES.filter(r => r === 'admin' ||
+        $('permBody').querySelector(`input[data-m="${m.module}"][data-r="${r}"]`)?.checked);
+      const act = !!$('permBody').querySelector(`input[data-m="${m.module}"][data-act]`)?.checked;
+      const { error } = await sb.rpc('set_module_roles',
+        { p_module:m.module, p_roles:roles, p_active:act, p_by:who() });
+      if (error) throw error;
+    }
+    await loadPerm();
+    /* วาดตารางใหม่ก่อน แล้วค่อยเขียนข้อความ ไม่งั้นข้อความโดนวาดทับหายไปเลย */
+    const el = $('permMsg');
+    if (el) el.textContent = '✅ บันทึกแล้ว — คนที่เปิดหน้าค้างไว้ต้องรีเฟรช 1 ครั้ง';
+  } catch(e){
+    const el = $('permMsg');
+    if (el) el.textContent = '❌ ' + (e.message || e);
+  } finally { const b = $('permSave'); if (b) b.disabled = false; }
 }
 
 /* ---------- ค่าตั้งระบบ ---------- */
