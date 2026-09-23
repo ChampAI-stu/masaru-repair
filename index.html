@@ -2227,11 +2227,15 @@ async function openTrash(){
           <td style="max-width:230px;white-space:normal">${esc(r.reason || '')}</td>
           <td>${esc(r.deleted_by || '—')}</td>
           <td class="mono" style="font-size:12px">${dtth(r.deleted_at)}</td>
-          <td><button class="btn sm g" onclick="restoreJob('${r.id}')"
-                title="เอาใบงานกลับเข้าระบบ พร้อมอะไหล่และรูป">↩️ กู้คืน</button></td>
+          <td style="white-space:nowrap">
+            <button class="btn sm g" onclick="restoreJob('${r.id}')"
+              title="เอาใบงานกลับเข้าระบบ พร้อมอะไหล่และรูป">↩️ กู้คืน</button>
+            <button class="btn sm dn" onclick="purgeJob('${r.id}')"
+              title="ล้างทิ้งถาวร — กู้คืนไม่ได้อีก">🔥 ล้างถาวร</button></td>
         </tr>`).join('')}</tbody></table></div>
        <div class="box-info" style="margin-top:11px;font-size:13px">
-         กู้คืนแล้ว อะไหล่ในใบจะถูก<b>ตัดออกจากสต๊อกอีกครั้ง</b> เหมือนตอนก่อนลบ</div>`
+         กู้คืนแล้ว อะไหล่ในใบจะถูก<b>ตัดออกจากสต๊อกอีกครั้ง</b> เหมือนตอนก่อนลบ<br>
+         <b>ล้างถาวร</b> = เอาออกจากถังนี้ไปเลย กู้คืนไม่ได้อีก · ใช้กับใบทดสอบหรือใบที่แน่ใจว่าไม่ต้องการแล้ว</div>`
     : '<div class="empty">ยังไม่มีใบงานที่ถูกลบ</div>';
 
   infoModal('🗑️ ถังลบใบงาน', `${rows.length} ใบ`, html);
@@ -2253,6 +2257,22 @@ async function restoreJob(id){
     toast('✅ ' + ((data && data.msg) || 'กู้ใบงานคืนแล้ว'));
     await reloadAll();
     try { await openJob(id); } catch(e){}
+  } catch(e){ fail(e); }
+}
+
+/** ล้างใบงานในถังลบให้หายถาวร — ใช้กับใบทดสอบ หรือใบที่แน่ใจว่าไม่ต้องการแล้ว */
+async function purgeJob(id){
+  /* ปิดถังลบก่อน เหมือน restoreJob ไม่งั้น infoModal จะล้างกล่องยืนยันทิ้ง */
+  closeForm(null);
+  await new Promise(r => setTimeout(r, 80));
+  if (!await confirmModal('ล้างใบงานนี้ทิ้งถาวร?',
+      'ใบงานจะหายออกจากถังลบไปเลย — กู้คืนไม่ได้อีก\n'
+    + 'รูปที่อยู่ใน Google Drive ต้องไปลบเองต่างหาก', { ok:'ล้างถาวร' })) return;
+  try {
+    const { data, error } = await sb.rpc('purge_deleted_job', { p_job_id: id });
+    if (error) throw error;
+    toast('🔥 ล้าง ' + (data || 'ใบงาน') + ' ทิ้งถาวรแล้ว');
+    await openTrash();
   } catch(e){ fail(e); }
 }
 
@@ -7259,15 +7279,24 @@ async function deleteTech(id){
     if (!i) throw new Error('ไม่พบช่างคนนี้ในระบบ');
     const who2 = i.code + ' · ' + i.name;
 
-    if (!i.can_delete)
+    /* ติดแค่ใบในถังลบ — ไม่มีใบงานจริง ไม่มีบัญชี → เสนอล้างถังพร้อมลบให้จบในทีเดียว */
+    if (i.only_trash){
+      if (!await confirmModal('ลบ ' + who2 + ' พร้อมล้างใบในถังลบ?',
+          'ช่างคนนี้ไม่มีใบงานในระบบและไม่มีบัญชีเข้าระบบแล้ว\n'
+        + 'เหลือแต่ใบงานในถังลบ ' + i.jobs_trashed + ' ใบ ที่ยังกู้คืนได้: '
+        + (i.trashed_refs || '—') + '\n\n'
+        + 'กดยืนยัน = ล้างใบพวกนั้นทิ้งถาวร แล้วลบช่างออกจากระบบ — กู้คืนไม่ได้อีก\n'
+        + 'ถ้ายังอยากเก็บใบไว้ ให้กดยกเลิก แล้วใช้ปุ่ม 🚫 ปิดใช้งาน แทน',
+          { ok:'ล้างถังแล้วลบช่าง' })) return;
+    } else if (!i.can_delete){
       return toast('ลบ ' + who2 + ' ไม่ได้ — ' + i.reason
         + ' · ถ้าแค่ไม่อยากให้รับงานใหม่ ให้กดปุ่ม 🚫 ปิดใช้งาน แทน', true);
-
-    if (!await confirmModal('ลบช่าง ' + who2 + ' ออกจากระบบ?',
+    } else if (!await confirmModal('ลบช่าง ' + who2 + ' ออกจากระบบ?',
         'ช่างคนนี้ยังไม่มีใบงานและไม่มีบัญชีเข้าระบบ — ลบแล้วหายถาวร กู้คืนไม่ได้\n'
       + 'ถ้าแค่ไม่อยากให้รับงานใหม่ ให้กดปุ่ม 🚫 ปิดใช้งาน แทน', { ok:'ลบถาวร' })) return;
 
-    const { data: nm, error: e2 } = await sb.rpc('delete_technician', { p_id: id });
+    const { data: nm, error: e2 } = await sb.rpc('delete_technician',
+      { p_id: id, p_purge_trash: !!i.only_trash });
     if (e2) throw e2;
     toast('🗑️ ลบ ' + (nm || who2) + ' ออกจากระบบแล้ว');
     await loadSettings(); refreshTechSelects();
