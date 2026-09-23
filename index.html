@@ -1896,7 +1896,19 @@ async function driveCall(payload){
     method: 'POST',
     body: JSON.stringify({ token: UPLOAD_TOKEN, ...payload })
   });
-  const j = await r.json();
+
+  /* Apps Script ที่ตั้งสิทธิ์ผิดจะตอบกลับเป็นหน้าเว็บล็อกอินของ Google
+     ไม่ใช่ JSON — ดักไว้ตรงนี้ จะได้ไม่เจอ "Unexpected token '<'" ที่อ่านไม่รู้เรื่อง */
+  const txt = await r.text();
+  let j;
+  try { j = JSON.parse(txt); }
+  catch(e){
+    if (/<!DOCTYPE|<html/i.test(txt)) {
+      throw new Error('Google ตอบกลับเป็นหน้าเว็บ ไม่ใช่ข้อมูล — ไปที่ Apps Script → '
+        + 'Deploy → Manage deployments → ✏️ → ตั้ง "Who has access" เป็น Anyone → Deploy');
+    }
+    throw new Error('Google ตอบกลับอ่านไม่ออก: ' + txt.slice(0, 120));
+  }
   if (!j.ok) throw new Error(j.error || 'Google ตอบกลับผิดพลาด');
   return j;
 }
