@@ -1539,7 +1539,7 @@ body.mob .mobtoggle,body.canmob .mobtoggle{display:inline-flex}
             </div>
           </div>
 
-          <div class="card">
+          <div class="card" id="dpSumCard">
             <h3>📅 ย้อนหลัง 30 วัน <span class="sp"></span>
               <span class="muted" style="font-weight:400;font-size:13px">กดที่แถวเพื่อดูวันนั้น</span></h3>
             <div class="cb"><div class="tw"><table id="tblDailySum">
@@ -3632,10 +3632,45 @@ async function startApp(session){
   // ผูกที่นี่ไม่ได้ เพราะ startApp ถูกเรียกซ้ำได้ → listener ซ้อนกันหลายตัว
 }
 
+/* =====================================================================
+   ขอบเขตการมองเห็นของช่าง
+     ช่างเห็นได้เฉพาะใบงานที่มอบหมายให้ตัวเองเท่านั้น
+     กรองตั้งแต่ "ตอนดึงข้อมูล" ไม่ใช่ตอนวาดหน้าจอ
+     → ใบงานของคนอื่นไม่เคยเข้ามาอยู่ในเครื่องเลย ทุกจุดที่อ่าน S.jobs
+       (ชิปกรอง · ตัวเลขนับ · กระดิ่งแจ้งเตือน · ค้นหา · Export) จึงสะอาดตามไปเอง
+   ===================================================================== */
+function soloTech(){ return ME.role === 'tech'; }
+/** ใส่เงื่อนไข technician_id ให้คำสั่ง select ถ้าคนที่ล็อกอินอยู่เป็นช่าง */
+function techOnly(q){ return (soloTech() && ME.techId) ? q.eq('technician_id', ME.techId) : q; }
+/** ชื่อเล่นของช่างที่ล็อกอินอยู่ — ใช้เทียบแถวรายงานที่ยังไม่มีคอลัมน์ technician_id */
+function myTechName(){
+  const t = (S.techs || []).find(x => x.id === ME.techId);
+  return ((t && (t.nickname || t.full_name)) || '').trim();
+}
+/** ตัดแถวของช่างคนอื่นออกจากรายงานรายวัน
+    ใช้ technician_id ถ้ามี (ต้องรัน 38_tech_scope.sql) ไม่มีก็ถอยไปเทียบชื่อช่าง */
+function myRowsOnly(rows){
+  if (!soloTech()) return rows || [];
+  const nick = myTechName();
+  return (rows || []).filter(r => r.technician_id
+    ? r.technician_id === ME.techId
+    : (r.tech_name || '').trim() === nick);
+}
+
 async function reloadAll(){
   try {
+    /* ช่างที่ยังไม่ได้ผูกกับตาราง technicians — ระบบไม่รู้ว่าเป็นใคร
+       จึงไม่ให้เห็นใบงานสักใบ ปลอดภัยกว่าเผลอเปิดให้เห็นทั้งหมด */
+    if (soloTech() && !ME.techId){
+      S.jobs = []; S.custs = []; S.adjust = []; S.shortage = []; S.queue = [];
+      S.stock = [];
+      $('connSt').textContent = '● บัญชีนี้ยังไม่ได้ผูกกับช่าง';
+      $('connSt').style.color = '#f0928c';
+      renderDash(); renderChips(); renderJobs(); renderCust(); renderBell();
+      return;
+    }
     const [jobs, custs, stock, adj, sho, dq] = await Promise.all([
-      window.__pageAll(() => sb.from('v_jobs').select('*').order('received_at', { ascending:false })),
+      window.__pageAll(() => techOnly(sb.from('v_jobs').select('*')).order('received_at', { ascending:false })),
       window.__pageAll(() => sb.from('repair_customers').select('*').order('name')),
       window.__pageAll(() => sb.from('v_parts_stock').select('*')),
       sb.from('v_adjust_requests').select('*').eq('status','pending'),
@@ -3648,7 +3683,17 @@ async function reloadAll(){
     S.shortage = sho.error ? [] : (sho.data || []);
     S.queue    = dq.error  ? [] : (dq.data  || []);
     if (adj.error) console.warn('v_adjust_requests', adj.error.message);
-    $('connSt').textContent = `● เชื่อมต่อแล้ว · ${jobs.length} ใบงาน`;
+    /* ตารางลูกที่อ้างถึงใบงาน — ตัดให้เหลือเฉพาะที่ผูกกับใบงานของช่างคนนี้
+       (คิวจ่ายงานไม่ตัด เพราะหน้าจ่ายงานของช่างแสดงแค่ "จำนวนคิว" อยู่แล้ว) */
+    if (soloTech()){
+      const mine = new Set(S.jobs.map(j => j.id));
+      const cids = new Set(S.jobs.map(j => j.customer_id).filter(Boolean));
+      S.custs    = S.custs.filter(c => cids.has(c.id));
+      S.adjust   = S.adjust.filter(a => mine.has(a.job_id));
+      S.shortage = S.shortage.filter(s => mine.has(s.job_id));
+    }
+    $('connSt').textContent = `● เชื่อมต่อแล้ว · ${jobs.length} ใบงาน`
+      + (soloTech() ? ' (งานของฉัน)' : '');
     renderDash(); renderChips(); renderJobs(); renderCust(); renderBell();
   } catch(e){
     const m = (e?.message || '') + '';
@@ -4215,6 +4260,10 @@ async function openJob(id){
       sb.from('repair_status_log').select('*').eq('job_id', id).order('created_at')
     ]);
     if (j.error) throw j.error;
+    /* กันเปิดใบงานของช่างคนอื่นด้วยวิธีอื่นที่ไม่ใช่กดจากรายการ
+       (ลิงก์ในแจ้งเตือน · ปุ่มค้นหา · เรียกจากคอนโซล) */
+    if (soloTech() && j.data.technician_id !== ME.techId)
+      return toast('ใบงานนี้ไม่ได้มอบหมายให้คุณ — เปิดดูได้เฉพาะงานของตัวเอง', true);
     S.job = j.data; S.lines = lines.data || []; S.photos = photos.data || [];
     S.slog = slog.data || []; S.seen = id; S.peek = null;
     goPage('job');
@@ -6620,8 +6669,10 @@ async function renderDaily(){
       window.__pageAll(() => sb.from('v_parts_used_daily').select('*').eq('used_date', day)),
       sb.from('v_parts_daily').select('*').limit(30)
     ]);
-    rows = a || [];
-    sum  = b.error ? [] : (b.data || []);
+    /* ช่างเห็นเฉพาะอะไหล่ที่ตัวเองเบิก และไม่เห็นสรุปรวมของทั้งศูนย์ */
+    rows = myRowsOnly(a || []);
+    sum  = (b.error || soloTech()) ? [] : (b.data || []);
+    if ($('dpSumCard')) $('dpSumCard').hidden = soloTech();
   } catch(e){
     if (/does not exist|schema cache/i.test(e?.message || '')){
       box.innerHTML = `<div class="box-warn">ยังใช้แท็บนี้ไม่ได้ — ให้รัน
@@ -6744,6 +6795,7 @@ async function renderClosed(){
     }
     return fail(e);
   }
+  rows = myRowsOnly(rows);   // ช่างเห็นเฉพาะใบงานที่ตัวเองเป็นคนซ่อม
   S.closed = rows;
 
   const n = st => rows.filter(r => r.status === st).length;
