@@ -1227,9 +1227,13 @@ svg .gl{stroke:#e3eaf0}svg .ax{fill:#8090a3}svg .vl{fill:#465c75}svg .nm{fill:#2
                 <div class="phs" id="stagedBox"></div>
               </div>
               <input type="hidden" id="nCustId">
+              <div class="box-info" id="intakeLock" hidden style="margin-top:14px">
+                🔒 <b>การเปิดใบงานเป็นงานของขั้น 1 รับเครื่อง</b>
+                <div class="sub2" id="intakeLockWho" style="margin-top:3px"></div>
+              </div>
               <div class="row" style="justify-content:flex-end;margin-top:16px">
                 <button class="btn" onclick="clearIntake()">ยกเลิก</button>
-                <button class="btn g" onclick="saveJob()">สร้างใบงาน</button>
+                <button class="btn g" id="btnSaveJob" onclick="saveJob()">สร้างใบงาน</button>
               </div>
             </div>
           </div>
@@ -3020,6 +3024,13 @@ function goPage(p){
   $('pgTitle').textContent = PGT[p][0]; $('pgSub').textContent = PGT[p][1];
   $('side').classList.remove('open');
   window.scrollTo(0,0);
+  if (p === 'intake'){
+    const ok = canStep(1);
+    if ($('btnSaveJob'))  $('btnSaveJob').hidden  = !ok;
+    if ($('intakeLock'))  $('intakeLock').hidden  = ok;
+    if ($('intakeLockWho')) $('intakeLockWho').textContent =
+      (ROLE_LABEL[ME.role] || ME.role) + ' ดูฟอร์มได้ แต่เปิดใบงานไม่ได้ · คุณทำได้: ขั้น ' + myStepsText();
+  }
   if (p === 'cust')   { closeCust(); renderCust(); }
   if (p === 'dispatch') loadDispatch();
   if (p === 'report') loadReport();
@@ -3851,6 +3862,7 @@ async function previewJobNo(){
 }
 
 async function saveJob(){
+  if (!guardStep(1, 'เปิดใบงานใหม่')) return;
   /* กล่องมาถึงแต่ยังไม่ได้แกะ = ยังไม่รู้เจ้าของ ไม่รู้เครื่อง ไม่รู้อาการ
      จึงไม่บังคับช่องพวกนี้ — ขอแค่มีอะไรสักอย่างที่ใช้ตามเรื่องกลับมาได้ */
   const hasCust = val('nCustName') || val('nPhone');
@@ -4734,6 +4746,7 @@ function refundBox(j){
 }
 
 async function editRefund(){
+  if (!isBoss()) return toast('แก้ยอดคืนค่าส่ง ทำได้เฉพาะหัวหน้าช่างหรือแอดมิน', true);
   if (!S.job) return;
   const f = await formModal({
     title:'✏️ แก้ยอดที่ต้องคืนลูกค้า',
@@ -5195,6 +5208,7 @@ async function requestAdjust(usedId, kind){
 }
 
 async function decideAdjust(id, ok){
+  if (!isBoss()) return toast('อนุมัติคำขอแก้อะไหล่ ทำได้เฉพาะหัวหน้าช่างหรือแอดมิน', true);
   const a = (S.adjust || []).find(x => x.id === id);
   const f = await formModal({
     title: ok ? 'อนุมัติคำขอ' : 'ไม่อนุมัติคำขอ',
@@ -5845,6 +5859,7 @@ async function rfSubmit(){
 
 /* ---------- บัญชีจ่ายคืนแล้ว ---------- */
 async function rfPaid(){
+  if (!isBoss()) return toast('ยืนยันจ่ายคืนลูกค้า ทำได้เฉพาะหัวหน้าช่างหรือแอดมิน', true);
   const ids = rfPicked();
   if (!ids.length) return toast('เลือกรายการที่จ่ายคืนแล้วก่อน', true);
   const picked = (S.refund || []).filter(r => ids.includes(r.id));
