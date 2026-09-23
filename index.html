@@ -2022,6 +2022,7 @@ async function deleteJob(){
   const warn = CLOSED.includes(j.status)
     ? '⚠️ ใบนี้ปิดงานไปแล้ว — ลบแล้วจะหายจากรายงานยอดและรายงานปิดจ๊อบรายวันด้วย'
     : '';
+  const nPhoto = Number(info.photo_qty) || 0;
 
   const r = await formModal({
     title: `ลบใบงาน ${jobRef(j)}?`,
@@ -2034,18 +2035,41 @@ async function deleteJob(){
       k:'reason', label:'เหตุผลที่ลบ', type:'textarea', required:true,
       placeholder:'เช่น เปิดใบซ้ำ · คีย์ผิดเครื่อง · ลูกค้ายกเลิกก่อนส่งเข้าศูนย์',
       hint:'อย่างน้อย 5 ตัวอักษร — ใบที่ถูกลบต้องตอบได้ว่าทำไม'
-    }]
+    }].concat(nPhoto ? [{
+      k:'dropfiles', label:`ไฟล์รูป ${nPhoto} รูปใน Google Drive`, type:'select', value:'keep',
+      options: [
+        { v:'keep', t:'เก็บไฟล์ไว้ — กู้ใบงานคืนแล้วรูปยังอยู่ครบ' },
+        { v:'trash', t:`ย้ายไปถังขยะ Drive ด้วย (${nPhoto} ไฟล์)` }
+      ],
+      hint:'ที่อยู่รูปในฐานข้อมูลถูกลบทุกกรณีอยู่แล้ว · เลือกแค่ว่าตัวไฟล์ใน Drive จะเอาไงต่อ'
+    }] : [])
   });
   if (!r) return;
   if ((r.reason || '').trim().length < 5) return toast('เหตุผลสั้นเกินไป', true);
+
+  /* เก็บรหัสไฟล์ไว้ก่อนลบ — พอใบงานหายแล้วตามหาไม่ได้อีก */
+  const keys = (S.photos || []).map(x => x.storage_key).filter(Boolean);
 
   try {
     const { data, error } = await sb.rpc('delete_job', {
       p_job_id: j.id, p_reason: r.reason, p_by: who()
     });
     if (error) throw error;
-    toast('✅ ' + ((data && data.msg) || 'ลบใบงานแล้ว'));
-    S.job = null; S.seen = null;
+
+    let fileMsg = '';
+    if (r.dropfiles === 'trash' && uploadOn() && keys.length){
+      let gone = 0;
+      for (const k of keys){
+        try { await driveCall({ action:'delete', fileId: k }); gone++; }
+        catch(e){ console.warn('ลบไฟล์ Drive ไม่สำเร็จ', k, e); }
+      }
+      fileMsg = ` · ย้ายไฟล์ไปถังขยะ Drive ${gone}/${keys.length} ไฟล์`;
+    } else if (keys.length){
+      fileMsg = ` · ไฟล์รูป ${keys.length} ไฟล์ยังอยู่ใน Drive`;
+    }
+
+    toast('✅ ' + ((data && data.msg) || 'ลบใบงานแล้ว') + fileMsg);
+    S.job = null; S.seen = null; S.photos = [];
     closeJob();
     await reloadAll();
   } catch(e){
@@ -2097,8 +2121,10 @@ async function restoreJob(id){
   closeForm(null);
   await new Promise(r => setTimeout(r, 80));
   if (!await confirmModal('กู้ใบงานนี้คืน?',
-      'ใบงาน อะไหล่ รูป และประวัติสถานะจะกลับเข้าระบบทั้งหมด\n'
-    + 'อะไหล่ในใบจะถูกตัดออกจากสต๊อกอีกครั้ง', { ok:'กู้คืน', danger:false })) return;
+      'ใบงาน อะไหล่ รูป และประวัติสถานะจะกลับเข้าระบบทั้งหมด · '
+    + 'อะไหล่ในใบจะถูกตัดออกจากสต๊อกอีกครั้ง · '
+    + 'ถ้าตอนลบเลือก "ย้ายไฟล์ไปถังขยะ Drive" ต้องไปกู้ไฟล์ใน Drive เองด้วย',
+      { ok:'กู้คืน', danger:false })) return;
   try {
     const { data, error } = await sb.rpc('restore_job', { p_job_id: id, p_by: who() });
     if (error) throw error;
