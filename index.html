@@ -1038,7 +1038,7 @@ svg .gl{stroke:#e3eaf0}svg .ax{fill:#8090a3}svg .vl{fill:#465c75}svg .nm{fill:#2
             <select id="fTech" class="mini" style="width:auto"><option value="">ช่างทั้งหมด</option></select>
             <select id="fAdmin" class="mini" style="width:auto"><option value="">แอดมิน</option></select>
             <button class="btn sm" onclick="reloadAll()">🔄 รีเฟรช</button>
-            <button class="btn sm" onclick="unknownParcel()" title="SOP A9.2 — พัสดุถึงศูนย์แต่หาเจ้าของไม่เจอ">📦 พัสดุไม่ทราบที่มา</button>
+            <button class="btn sm" id="btnUnknown" onclick="unknownParcel()" title="SOP A9.2 — พัสดุถึงศูนย์แต่หาเจ้าของไม่เจอ">📦 พัสดุไม่ทราบที่มา</button>
             <button class="btn sm g" onclick="goPage('intake')">+ รับเครื่องใหม่</button>
           </h3>
           <div class="cb">
@@ -2984,6 +2984,18 @@ function myStepsText(){
   return allow ? allow.map(n => n + ' ' + STEPS[n-1].label).join(' · ') : 'ทุกขั้นตอน';
 }
 
+/** กันปุ่มที่ลอยอยู่ในเนื้อหา ไม่ได้อยู่ในแถบล่างของขั้นตอน
+    (แกะกล่อง · ได้คลิปแล้ว · เพิ่ม/ลบอะไหล่ ฯลฯ)
+    ส่ง n = ขั้นที่งานนั้นสังกัด หรือหลายขั้นก็ส่งเป็น array */
+function guardStep(n, what){
+  const list = Array.isArray(n) ? n : [n];
+  if (list.some(canStep)) return true;
+  toast((what ? what + ' — ' : '')
+    + 'เป็นงานของขั้น ' + list.map(x => x + ' ' + STEPS[x-1].label).join(' หรือ ')
+    + ' ไม่ใช่หน้าที่ของคุณ · คุณทำได้: ขั้น ' + myStepsText(), true);
+  return false;
+}
+
 
 /* =====================================================================
    nav
@@ -3674,7 +3686,8 @@ function renderJobs(){
   });
   $('jobCount').textContent = rows.length + ' รายการ';
   $('jobsEmpty').style.display = rows.length ? 'none' : 'block';
-  if ($('btnTrash')) $('btnTrash').hidden = !isBoss();
+  if ($('btnTrash'))   $('btnTrash').hidden   = !isBoss();
+  if ($('btnUnknown')) $('btnUnknown').hidden = !canStep(1);
   const m = paginate(rows, 'jobs');
   $('pgJobs').innerHTML = pagerHTML(m, 'jobs');
   $('tblJobs').querySelector('tbody').innerHTML = m.slice.map(j => {
@@ -4009,7 +4022,7 @@ function renderJobPage(){
     ${j.clip_waiting
       ? `<span class="pill tag-warn" title="${esc(j.clip_note || '')}">
            📹 รอคลิป ${j.clip_days_waiting > 0 ? j.clip_days_waiting + ' วัน' : 'วันนี้'}</span>
-         <button class="btn sm g noprint" onclick="clipReceived()">✅ ได้คลิปแล้ว</button>` : ''}
+         ${canStep(1) ? `<button class="btn sm g noprint" onclick="clipReceived()">✅ ได้คลิปแล้ว</button>` : ''}` : ''}
     <span class="sp" style="flex:1"></span>
     ${CLOSED.includes(j.status) && isBoss() && (j.photo_count > 0)
       ? `<button class="btn sm dn noprint" onclick="clearPhotos()"
@@ -4226,6 +4239,7 @@ async function assignNow(){
 
 /** ข้ามคิว — เฉพาะหัวหน้า และต้องมีเหตุผล */
 async function overrideTech(){
+  if (!guardStep(3, 'เลือกช่างเอง')) return;
   const j = S.job;
   const f = await formModal({
     title:'เปลี่ยนช่างเอง', subtitle:'ข้ามคิวที่ระบบจัดไว้ — ต้องบันทึกเหตุผลทุกครั้ง',
@@ -4320,7 +4334,7 @@ function stepForm(nStep, j, pc){
       · รอมา <b>${j.clip_days_waiting > 0 ? j.clip_days_waiting + ' วัน' : 'วันนี้'}</b>
       <div class="sub2" style="margin-top:4px">ขอไว้ว่า: ${esc(j.clip_note || '—')}</div>
       <div style="margin-top:9px">
-        <button class="btn g" onclick="clipReceived()">✅ ได้คลิปแล้ว เปิดเรื่องต่อ</button>
+        ${canStep(1) ? `<button class="btn g" onclick="clipReceived()">✅ ได้คลิปแล้ว เปิดเรื่องต่อ</button>` : ''}
       </div></div>` : '';
     return hint + head + (unknown ? `
     <div class="grid g2">
@@ -4782,12 +4796,15 @@ function unboxBox(j){
     <div class="sub2" style="margin-top:3px">
       ของถึงศูนย์ ${dth(j.arrived_at)} · ครบกำหนด ${dth(j.unbox_due)}</div>
     <div style="margin-top:9px">
-      <button class="btn ${d < 0 ? 'dn' : 'g'}" onclick="markUnboxed()">📦 แกะกล่องแล้ว</button>
+      ${canStep(1)
+        ? `<button class="btn ${d < 0 ? 'dn' : 'g'}" onclick="markUnboxed()">📦 แกะกล่องแล้ว</button>`
+        : '<span class="sub2">🔒 การแกะกล่องเป็นงานของขั้น 1 รับเครื่อง</span>'}
     </div></div>`;
 }
 
 /** บันทึกว่าแกะกล่องแล้ว — เวลาจับจากเครื่องเซิร์ฟเวอร์ แก้ย้อนหลังไม่ได้ */
 async function markUnboxed(){
+  if (!guardStep(1, 'แกะกล่อง')) return;
   if (!S.job) return;
   /* ถ้าเพิ่งพิมพ์วันที่ลงช่องแต่ยังไม่กดบันทึก ต้องเซฟก่อน ไม่งั้นฝั่งเซิร์ฟเวอร์ยังไม่มีวัน */
   const typed = val('sArrived');
@@ -4811,6 +4828,7 @@ async function markUnboxed(){
 
 /** A9 — พัสดุมาถึงศูนย์ */
 async function receiveParcel(){
+  if (!guardStep(1, 'รับพัสดุเข้าศูนย์')) return;
   if (!val('sTrackIn') && !await confirmModal('ยังไม่มีเลขพัสดุขาเข้า',
       'SOP ข้อ A9.1 ให้ตรวจสอบเลขอ้างอิงก่อนรับเข้า\nยืนยันรับเข้าโดยไม่มีเลขพัสดุ?', { ok:'รับเข้าเลย' })) return;
   S.peek = null;
@@ -4823,6 +4841,7 @@ async function receiveParcel(){
 
 /** A6 — แจ้งลูกค้าให้จัดส่งสินค้ามาที่ศูนย์ */
 async function notifyCustomer(){
+  if (!guardStep(1, 'แจ้งลูกค้าแล้ว')) return;
   if (!await confirmModal('บันทึกว่าแจ้งลูกค้าแล้ว',
       `${S.job.customer_name || 'ลูกค้า'} · ${S.job.customer_phone || 'ไม่มีเบอร์'}\n\n` +
       'ยืนยันว่าแจ้งให้จัดส่งสินค้ามาที่ศูนย์เรียบร้อยแล้ว\nระบบจะเริ่มนับวันรอพัสดุจากตอนนี้',
@@ -4832,6 +4851,7 @@ async function notifyCustomer(){
 
 /** A9.2 — เปิดรายการพัสดุที่หาเจ้าของไม่เจอ */
 async function unknownParcel(){
+  if (!guardStep(1, 'เปิดใบพัสดุไม่ทราบที่มา')) return;
   const f = await formModal({
     title:'รับพัสดุไม่ทราบที่มา',
     subtitle:'SOP A9.2 — พัสดุถึงศูนย์แต่ไม่พบข้อมูลอ้างอิงในระบบ',
@@ -4861,6 +4881,7 @@ async function unknownParcel(){
 
 /** A9.2 (ต่อ) — ประสานเจอเจ้าของแล้ว ผูกเข้าลูกค้า */
 async function claimOwner(){
+  if (!guardStep(1, 'พบเจ้าของแล้ว')) return;
   const f = await formModal({
     title:'พบเจ้าของพัสดุแล้ว', subtitle:'ผูกพัสดุนี้เข้ากับลูกค้า แล้วเดินเรื่องซ่อมตามปกติ',
     ok:'ผูกและรับเข้าศูนย์',
@@ -4917,6 +4938,7 @@ function repairableChanged(){
 
 /** A12b — ซ่อมไม่ได้ / ใช้เวลานาน → ส่งสินค้าใหม่ให้ลูกค้าทันที */
 async function replaceUnit(){
+  if (!guardStep([4,5], 'เปลี่ยนสินค้า')) return;
   const f = await formModal({
     title:'เปลี่ยนสินค้า', subtitle:'SOP A12b — ซ่อมไม่ได้ หรือใช้เวลานานเกินไป จึงส่งสินค้าใหม่ให้ลูกค้า',
     ok:'ยืนยันเปลี่ยนสินค้า', danger:true,
@@ -4950,6 +4972,7 @@ const CLIP_ASK = [
 ];
 
 async function requestClip(){
+  if (!guardStep(1, 'ขอคลิป')) return;
   if (!S.job) return;
   const f = await formModal({
     title:'📹 ไม่รับเคลม — ขอคลิปจากลูกค้า',
@@ -4978,6 +5001,7 @@ async function requestClip(){
 
 /** ลูกค้าส่งคลิปมาแล้ว — เปิดเรื่องกลับมาเดินตามขั้นตอนปกติ */
 async function clipReceived(){
+  if (!guardStep(1, 'ได้คลิปแล้ว')) return;
   if (!S.job) return;
   const f = await formModal({
     title:'✅ ได้คลิปจากลูกค้าแล้ว',
@@ -5001,6 +5025,7 @@ async function clipReceived(){
 
 /** A3.1 — ไม่รับเคลม ปิดเรื่อง */
 async function rejectClaim(){
+  if (!guardStep(1, 'ไม่รับเคลม')) return;
   const f = await formModal({
     title:'ไม่รับเคลม — ปิดเรื่อง', subtitle:'ตาม SOP ข้อ A3.1 ต้องบันทึกเหตุผลทุกครั้ง',
     ok:'ยืนยันไม่รับเคลม', danger:true,
@@ -5053,6 +5078,7 @@ async function moveStep(to){
 function showHistory(cid){ goPage('cust'); openCust(cid); }
 
 async function addLineInline(){
+  if (!guardStep(4, 'เพิ่มอะไหล่')) return;
   const pn = val('aPart').toUpperCase();
   const p = S.parts.find(x => x.part_no.toUpperCase() === pn);
   if (!p) return toast('ไม่พบอะไหล่รหัสนี้ในทะเบียน', true);
@@ -5076,6 +5102,7 @@ async function addLineInline(){
 
 
 async function removeLine(id){
+  if (!guardStep(4, 'ลบอะไหล่')) return;
   if (!await confirmModal('ลบรายการอะไหล่นี้?', 'ระบบจะคืนของเข้าสต็อกอัตโนมัติ และบันทึกลง log การเคลื่อนไหว', { ok:'ลบและคืนของ' })) return;
   try {
     const { error } = await sb.from('repair_parts_used').delete().eq('id', id);
@@ -5129,6 +5156,7 @@ function shortageBox(jobId){
 }
 
 async function requestAdjust(usedId, kind){
+  if (!guardStep(4, 'ขอแก้/คืนอะไหล่')) return;
   const l = S.lines.find(x => x.id === usedId);
   if (!l) return toast('ไม่พบรายการนี้', true);
   const pn = l.parts_master?.part_no || '';
@@ -5190,6 +5218,7 @@ async function decideAdjust(id, ok){
    อะไหล่ขาด → ใบขอจัดซื้อรายวัน (SOP A11b.1)
    ===================================================================== */
 async function reportShortage(){
+  if (!guardStep(4, 'แจ้งอะไหล่ขาด')) return;
   const f = await formModal({
     title:'แจ้งอะไหล่ขาด', subtitle:'เข้าสรุปรายวัน แล้วหัวหน้าออกใบขอจัดซื้อได้ทันที',
     ok:'บันทึกอะไหล่ขาด', danger:true,
