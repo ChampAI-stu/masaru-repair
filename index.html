@@ -3685,10 +3685,6 @@ async function startApp(session){
   /* ด่านตรวจสิทธิ์ — ต้องผ่านก่อนถึงจะเห็นอะไรในหน้านี้ */
   if (!await canModule(sb, 'repair')) return blockModule('ระบบรับซ่อมเครื่องมือ');
 
-  /* ช่างเห็นเฉพาะงานของตัวเอง */
-  if (ME.role === 'tech' && !ME.techId)
-    toast('บัญชีนี้ยังไม่ได้ผูกกับช่างคนไหน — ให้แอดมินผูกให้ก่อน จะได้เห็นงานของตัวเอง', true);
-
   $('gate').hidden = true; $('app').hidden = false;
   $('bootErrBox').hidden = true;
   try { applyMob(); } catch(e){ console.warn('applyMob', e); }
@@ -3696,6 +3692,9 @@ async function startApp(session){
   try { clearIntake(); } catch(e){ console.warn('clearIntake', e); }
   try { goPage(allow[0]); } catch(e){ console.warn('goPage', e); }
   try { await reloadAll(); } catch(e){ fail(e); }
+
+  /* ช่างที่ยังไม่ได้ผูกตัวตน — ถามเลยว่าเป็นช่างคนไหน ไม่ต้องไปรอแอดมิน */
+  if (ME.role === 'tech' && !ME.techId) setTimeout(() => { bindMyTech(); }, 500);
 
   // การจัดการ session ย้ายไปที่ bindAuthEvents() ตอน boot แล้ว
   // ผูกที่นี่ไม่ได้ เพราะ startApp ถูกเรียกซ้ำได้ → listener ซ้อนกันหลายตัว
@@ -3724,6 +3723,36 @@ function myRowsOnly(rows){
   return (rows || []).filter(r => r.technician_id
     ? r.technician_id === ME.techId
     : (r.tech_name || '').trim() === nick);
+}
+
+/** ช่างเลือกเองว่าตัวเองคือช่างคนไหน แล้วระบบผูกบัญชีให้ทันที
+    ทำได้ครั้งเดียว — เลือกผิดต้องให้ผู้ดูแลระบบแก้ให้ (กันสลับตัวกันเอง) */
+async function bindMyTech(){
+  if (ME.role !== 'tech' || ME.techId) return;
+  try {
+    const { data, error } = await sb.rpc('my_tech_options');
+    if (error) throw error;
+    const list = data || [];
+    if (!list.length)
+      return toast('ยังไม่มีชื่อช่างว่างในระบบ — ให้ผู้ดูแลเพิ่มชื่อที่ ตั้งค่า → 🔧 ช่างซ่อม ก่อน', true);
+
+    const r = await formModal({
+      title: 'คุณคือช่างคนไหน',
+      subtitle: 'เลือกชื่อตัวเองแล้วกดยืนยัน ระบบจะผูกบัญชีให้ทันที ไม่ต้องรอผู้ดูแล',
+      ok: '✅ ยืนยัน — นี่คือฉัน',
+      fields: [{ k:'tech', label:'ชื่อช่างในระบบ', type:'select', required:true, value:'',
+        options: [{ v:'', t:'— เลือกชื่อของคุณ —' }]
+          .concat(list.map(t => ({ v:t.id, t:t.code + ' · ' + t.name }))),
+        hint:'มีแต่ชื่อที่อยู่ในระบบและยังไม่มีใครใช้ · เลือกได้ครั้งเดียว ถ้าเลือกผิดต้องให้ผู้ดูแลแก้ให้' }]
+    });
+    if (!r) return;
+
+    const { data: nm, error: e2 } = await sb.rpc('bind_my_tech', { p_tech_id: r.tech });
+    if (e2) throw e2;
+    ME.techId = r.tech;
+    toast('✅ ผูกบัญชีกับช่าง ' + (nm || '') + ' แล้ว — กำลังโหลดงานของคุณ');
+    await reloadAll();
+  } catch(e){ fail(e); }
 }
 
 async function reloadAll(){
@@ -4065,6 +4094,13 @@ function renderJobs(){
       || String(a.due_date||'9999').localeCompare(String(b.due_date||'9999')));
   }
   $('jobCount').textContent = rows.length + ' รายการ';
+  /* ช่างที่ยังไม่ได้ผูกตัวตน — บอกสาเหตุพร้อมปุ่มแก้ตรงนั้นเลย ไม่ใช่ปล่อยให้งง */
+  const unbound = ME.role === 'tech' && !ME.techId;
+  const emptyMsg = unbound
+    ? `บัญชีนี้ยังไม่ได้ผูกกับช่างคนไหน — ระบบเลยไม่รู้ว่างานไหนเป็นของคุณ
+       <div style="margin-top:11px"><button class="btn g" onclick="bindMyTech()">👤 เลือกว่าฉันคือช่างคนไหน</button></div>`
+    : 'ไม่มีใบงานที่ตรงเงื่อนไข';
+  $('jobsEmpty').innerHTML = emptyMsg;
   $('jobsEmpty').style.display = rows.length ? 'none' : 'block';
   if ($('btnTrash'))   $('btnTrash').hidden   = !isBoss();
   if ($('btnUnknown')) $('btnUnknown').hidden = !canStep(1);
@@ -4079,7 +4115,7 @@ function renderJobs(){
   $('pgJobs').innerHTML = pagerHTML(m, 'jobs');
   $('jobsCards').innerHTML = m.slice.length
     ? m.slice.map(jobCardHTML).join('')
-    : '<div class="empty">ไม่มีใบงานที่ตรงเงื่อนไข</div>';
+    : `<div class="empty">${emptyMsg}</div>`;
 
   $('tblJobs').querySelector('tbody').innerHTML = m.slice.map(j => {
     const s = stepOf(j.status), sd = STEPS[s-1];
