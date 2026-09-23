@@ -1005,6 +1005,12 @@ body.mob .mobtoggle,body.canmob .mobtoggle{display:inline-flex}
         <input type="text" id="suCode" required placeholder="MASARU-XXXX-XXXX"
                style="text-transform:uppercase" autocomplete="off"></div>
       <div id="suCodeMsg" class="gok" hidden></div>
+      <!-- โผล่มาเองเมื่อใส่โค้ดเชิญของช่าง — มีแต่ชื่อช่างที่อยู่ในระบบและยังไม่มีใครสมัคร -->
+      <div class="f" id="suTechWrap" hidden>
+        <label for="suTech">คุณคือช่างคนไหน <span class="req">*</span></label>
+        <select id="suTech"></select>
+        <div class="sub2" id="suTechHint" style="margin-top:5px;line-height:1.45"></div>
+      </div>
       <div class="f"><label for="suName">ชื่อ-สกุล / ชื่อเล่น <span class="req">*</span></label>
         <input type="text" id="suName" required placeholder="เช่น แชมป์"></div>
       <div class="f"><label for="suEmail">อีเมล <span class="req">*</span></label>
@@ -3309,6 +3315,7 @@ function gateTab(t){
   $('gtLogin').classList.toggle('on', login);
   $('gtSign').classList.toggle('on', !login);
   if ($('liErr')) $('liErr').hidden = true;
+  if (login) hideTechPicker();
 }
 
 async function checkCode(){
@@ -3325,13 +3332,54 @@ async function checkCode(){
       codeOk = true;
       box.className = 'gok';
       box.textContent = '✅ โค้ดถูกต้อง — สิทธิ์: ' + (r.label || ROLE_LABEL[r.role] || r.role);
+      await fillSignupTechs(code, r.role);
     } else {
       box.className = 'gok bad';
       box.textContent = '❌ โค้ดไม่ถูกต้อง หมดอายุ หรือถูกใช้ครบแล้ว';
+      hideTechPicker();
     }
   } catch(e){
     box.hidden = false; box.className = 'gok bad';
     box.textContent = 'ตรวจโค้ดไม่สำเร็จ: ' + (e.message || e);
+    hideTechPicker();
+  }
+}
+
+/* ---------------------------------------------------------------------
+   ช่างสมัครเอง แล้วเข้าใช้งานได้เลย
+     โค้ดเชิญของช่าง → ขึ้นช่อง "คุณคือช่างคนไหน"
+     ในช่องนั้นมีแต่ชื่อที่อยู่ในตาราง technicians และยังไม่มีใครสมัครไปใช้
+     เลือกชื่อ = ระบบผูกบัญชีกับช่างคนนั้นให้ทันที ไม่ต้องรอแอดมินมาผูกทีหลัง
+   --------------------------------------------------------------------- */
+function hideTechPicker(){
+  const w = $('suTechWrap'); if (!w) return;
+  w.hidden = true;
+  $('suTech').innerHTML = '';
+  $('suTech').required = false;
+}
+
+async function fillSignupTechs(code, role){
+  const w = $('suTechWrap'); if (!w) return;
+  if (role !== 'tech') return hideTechPicker();
+  const sel = $('suTech'), hint = $('suTechHint');
+  try {
+    const { data, error } = await sb.rpc('techs_for_signup', { p_code: code });
+    if (error) throw error;
+    const list = data || [];
+    w.hidden = false;
+    sel.required = list.length > 0;
+    sel.innerHTML = list.length
+      ? '<option value="">— เลือกชื่อของคุณ —</option>'
+        + list.map(t => `<option value="${esc(t.id)}" data-name="${esc(t.name)}">${esc(t.code)} · ${esc(t.name)}</option>`).join('')
+      : '<option value="">— ไม่มีชื่อให้เลือก —</option>';
+    hint.textContent = list.length
+      ? `มี ${list.length} ชื่อที่ยังว่าง — เลือกแล้วเห็นงานของตัวเองทันที`
+      : 'ช่างในระบบสมัครครบทุกคนแล้ว — ให้ผู้ดูแลเพิ่มชื่อช่างที่ ตั้งค่า → ช่างซ่อม ก่อน';
+    hint.style.color = list.length ? '' : 'var(--crit)';
+  } catch(e){
+    /* ยังไม่ได้รัน 39_tech_signup.sql — ให้สมัครแบบเดิมไปก่อน อย่าให้ฟอร์มค้าง */
+    console.warn('techs_for_signup', e?.message || e);
+    hideTechPicker();
   }
 }
 
@@ -3340,6 +3388,13 @@ document.addEventListener('DOMContentLoaded', () => {
   c.addEventListener('blur', checkCode);
   c.addEventListener('change', checkCode);
   $('signForm').addEventListener('submit', doSignUp);
+  /* เลือกชื่อช่างแล้วเติมช่องชื่อให้เอง — จะได้ไม่พิมพ์คนละแบบกับที่อยู่ในระบบ */
+  const st = $('suTech'), nm = $('suName');
+  if (st && nm) st.addEventListener('change', () => {
+    const n = st.selectedOptions[0]?.dataset.name || '';
+    if (n && (!nm.value.trim() || nm.dataset.auto === '1')){ nm.value = n; nm.dataset.auto = '1'; }
+  });
+  if (nm) nm.addEventListener('input', () => { nm.dataset.auto = ''; });
 });
 
 async function doSignUp(e){
@@ -3347,6 +3402,16 @@ async function doSignUp(e){
   const btn = $('suBtn'), err = $('liErr');
   err.hidden = true;
   if (!codeOk){ await checkCode(); if (!codeOk){ $('suCode').focus(); return; } }
+
+  /* โค้ดของช่าง — ต้องบอกก่อนว่าเป็นช่างคนไหน ไม่งั้นสมัครไปก็เห็นงานว่างเปล่า */
+  const picking = $('suTechWrap') && !$('suTechWrap').hidden;
+  const techId  = picking ? $('suTech').value : '';
+  if (picking && !techId){
+    err.textContent = $('suTech').required
+      ? 'เลือกก่อนว่าคุณคือช่างคนไหน'
+      : 'ยังไม่มีชื่อช่างว่างให้เลือก — ให้ผู้ดูแลเพิ่มชื่อช่างในระบบก่อน';
+    err.hidden = false; $('suTech').focus(); return;
+  }
 
   btn.disabled = true; btn.textContent = 'กำลังสมัคร…';
   try {
@@ -3365,8 +3430,12 @@ async function doSignUp(e){
       sess = r.data.session;
     }
 
-    const { error: rErr } = await sb.rpc('redeem_invite',
-      { p_code: $('suCode').value.trim(), p_name: name });
+    const code = $('suCode').value.trim();
+    let { error: rErr } = await sb.rpc('redeem_invite',
+      { p_code: code, p_name: name, p_tech_id: techId || null });
+    /* ยังไม่ได้รัน 39_tech_signup.sql — ถอยไปใช้แบบ 2 ช่องของเดิม */
+    if (rErr && /could not find|schema cache|does not exist/i.test(rErr.message || ''))
+      ({ error: rErr } = await sb.rpc('redeem_invite', { p_code: code, p_name: name }));
     if (rErr){ await sb.auth.signOut(); throw rErr; }
 
     const { data: fresh } = await sb.auth.refreshSession();   // ดึง role เข้า token
