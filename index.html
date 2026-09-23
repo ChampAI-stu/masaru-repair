@@ -1931,14 +1931,31 @@ async function uploadPhotos(files, jobId, jobNo, phase){
   return n;
 }
 
+/** ลบรูป — ต้องหายทั้ง 2 ที่ ฐานข้อมูลก่อน แล้วค่อยไฟล์ใน Drive
+    ลบฐานข้อมูลก่อนเสมอ เพราะถ้าลบไฟล์สำเร็จแต่แถวยังอยู่
+    ใบงานจะโชว์กรอบรูปเสีย ๆ ที่กดยังไงก็ไม่หาย */
 async function deletePhoto(id, key){
-  if (!await confirmModal('ลบรูปนี้?', 'ไฟล์จะถูกย้ายไปถังขยะใน Google Drive กู้คืนได้ภายใน 30 วัน', { ok:'ลบรูป' })) return;
+  if (!await confirmModal('ลบรูปนี้?',
+      'รูปจะหายจากใบงานทันที และไฟล์จะถูกย้ายไปถังขยะใน Google Drive (กู้คืนได้ 30 วัน)',
+      { ok:'ลบรูป' })) return;
   try {
-    const { error } = await sb.from('repair_photos').delete().eq('id', id);
+    /* .select() เพื่อรู้ว่าลบไปกี่แถวจริง ๆ — ถ้าไม่ใส่ RLS กันไว้ก็จะเงียบ
+       ลบไม่ได้สักแถวแล้วระบบบอกว่าสำเร็จ กลายเป็นรูปค้างในฐานข้อมูล */
+    const { data, error } = await sb.from('repair_photos').delete().eq('id', id).select('id');
     if (error) throw error;
-    if (uploadOn()) { try { await driveCall({ action:'delete', fileId:key }); } catch(e){ console.warn(e); } }
-    toast('ลบรูปแล้ว');
+    if (!data || !data.length) throw new Error('ลบออกจากฐานข้อมูลไม่ได้ — ไม่มีสิทธิ์ หรือรูปนี้ถูกลบไปแล้ว');
+
+    let driveMsg = '';
+    if (uploadOn()){
+      try { await driveCall({ action:'delete', fileId: key }); }
+      catch(e){
+        console.warn('ลบไฟล์ใน Drive ไม่สำเร็จ', key, e);
+        driveMsg = ' · ⚠️ ไฟล์ใน Drive ลบไม่สำเร็จ ต้องไปลบเอง';
+      }
+    }
+    toast('🗑️ ลบรูปออกจากใบงานแล้ว' + driveMsg, !!driveMsg);
     await openJob(S.job.id);
+    reloadAll();
   } catch(e){ fail(e); }
 }
 
