@@ -558,14 +558,334 @@ table.ptab td.n{text-align:right;font-variant-numeric:tabular-nums}
   box-shadow:0 1px 4px rgba(0,0,0,.07)}
 .obtn.on b{color:var(--navy)}
 @media(max-width:640px){ .oswitch{grid-template-columns:1fr} }
+
+/* =====================================================================
+   MASARU PRECISION WORKSHOP · Visual System 2026
+   Industrial Japanese engineering aesthetic — visual layer only.
+   ===================================================================== */
+:root{
+  --navy:#142f52;--navy-d:#0b1d35;--blue:#2f78b9;--blue-l:#e9f2fb;
+  --gold:#d3ad45;--gold-2:#f1c75b;--gold-l:#fff7df;--gold-line:#ead89b;
+  --good:#16845c;--good-l:#e6f4ee;--warn:#d1840b;--warn-l:#fff3da;
+  --crit:#c33e36;--crit-l:#fdefed;--ink:#17253a;--ink2:#53647b;--ink3:#8795a9;
+  --bg:#edf2f7;--card:#fff;--side:#102744;--line:#d8e1eb;--line2:#eaf0f5;
+  --steel:#c9d4df;--steel-d:#7890a7;--r:14px;
+  --sh:0 8px 24px rgba(18,42,72,.07),0 1px 2px rgba(18,42,72,.06);
+  --sh-hi:0 18px 45px rgba(11,29,53,.13),0 2px 8px rgba(11,29,53,.08);
+}
+html{scroll-behavior:smooth}
+body{
+  background-color:var(--bg);
+  background-image:linear-gradient(rgba(20,47,82,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(20,47,82,.025) 1px,transparent 1px);
+  background-size:32px 32px;
+  letter-spacing:.005em;
+}
+*{scrollbar-width:thin;scrollbar-color:#a8b8c8 transparent}
+*::-webkit-scrollbar{width:8px;height:8px}
+*::-webkit-scrollbar-thumb{background:#a8b8c8;border-radius:999px}
+*::-webkit-scrollbar-track{background:transparent}
+::selection{background:#dceafa;color:var(--navy-d)}
+
+/* Brand mark */
+.brand-ic svg{width:27px;height:27px;fill:none;stroke:currentColor;stroke-width:2.7;stroke-linecap:round;stroke-linejoin:round}
+.logo .brand-ic,.glogo .brand-ic{
+  color:var(--navy-d);background:linear-gradient(145deg,var(--gold-2),#bd8e26);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.55),0 8px 20px rgba(0,0,0,.18);
+}
+.logo:hover .brand-ic svg{animation:wrenchNudge .55s ease}
+
+/* Login · technical blueprint composition */
+.gate{
+  background:
+    radial-gradient(circle at 17% 12%,rgba(55,128,190,.2),transparent 30%),
+    radial-gradient(circle at 88% 85%,rgba(211,173,69,.14),transparent 28%),
+    repeating-linear-gradient(0deg,rgba(255,255,255,.018) 0 1px,transparent 1px 32px),
+    repeating-linear-gradient(90deg,rgba(255,255,255,.018) 0 1px,transparent 1px 32px),
+    linear-gradient(145deg,#102846 0%,#08192e 70%,#071425 100%);
+  padding:32px;overflow:auto;
+}
+.gate::before,.gate::after{content:"";position:fixed;pointer-events:none}
+.gate::before{width:260px;height:260px;border:1px solid rgba(211,173,69,.16);border-radius:50%;left:-90px;top:-100px;box-shadow:0 0 0 34px rgba(211,173,69,.025),0 0 0 68px rgba(211,173,69,.02)}
+.gate::after{width:130px;height:1px;background:var(--gold);right:0;bottom:52px;opacity:.45}
+.gate-shell{
+  width:min(1120px,100%);margin:auto;display:grid;grid-template-columns:minmax(0,1.45fr) 420px;
+  position:relative;overflow:hidden;border:1px solid rgba(255,255,255,.12);border-radius:26px;
+  background:#fff;box-shadow:0 32px 90px rgba(0,0,0,.48),0 0 0 1px rgba(211,173,69,.08);
+}
+.gate-shell::before{content:"";position:absolute;z-index:5;left:0;right:0;top:0;height:3px;background:linear-gradient(90deg,var(--gold),var(--gold-2) 28%,transparent 62%)}
+.gate-art{position:relative;min-height:650px;padding:33px 38px 28px;overflow:hidden;color:#b7d7f1;background:linear-gradient(150deg,#16385f 0%,#0d2847 52%,#0a203a 100%)}
+.gate-art::before{content:"";position:absolute;inset:0;background:linear-gradient(120deg,transparent 44%,rgba(255,255,255,.025) 44.2% 45%,transparent 45.2%),radial-gradient(circle at 78% 33%,rgba(69,155,221,.13),transparent 30%);pointer-events:none}
+.ga-topline{position:relative;z-index:2;display:flex;justify-content:space-between;gap:18px;padding-bottom:14px;border-bottom:1px solid rgba(190,220,244,.16);font-size:9.5px;letter-spacing:.16em;color:#7199ba}
+.ga-topline b{color:var(--gold);font-weight:700}
+.ga-copy{position:relative;z-index:2;width:86%;padding:48px 0 0}
+.ga-kicker{display:flex;align-items:center;gap:9px;font-size:11px;font-weight:800;letter-spacing:.2em;color:var(--gold-2)}
+.ga-kicker span{width:34px;height:2px;background:var(--gold)}
+.ga-copy h2{margin:14px 0 13px;color:#fff;font-size:38px;line-height:1.26;letter-spacing:-.025em}
+.ga-copy h2 em{color:#a9d3f1;font-style:normal;font-weight:500}
+.ga-copy p{max-width:510px;margin:0;color:#8fb0ca;font-size:14px;line-height:1.8}
+.ga-drawing{position:absolute;z-index:1;left:11px;right:4px;bottom:88px;height:350px;color:#83c2ed;opacity:.92}
+.ga-drawing svg{width:100%;height:100%;overflow:visible}
+.ga-drawing .measure{opacity:.34}.ga-drawing .tool-outline{stroke-width:2.2;filter:url(#softGlow)}
+.ga-drawing .exploded{color:var(--gold-2);opacity:.9}.ga-drawing .hotspots{color:var(--gold-2)}
+.ga-drawing .labels{font-size:8.5px;letter-spacing:.12em;opacity:.72;font-family:ui-monospace,monospace}
+.ga-stats{position:absolute;z-index:3;left:38px;right:38px;bottom:28px;display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid rgba(190,220,244,.18);padding-top:17px}
+.ga-stats>div{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:10px;padding:0 17px;border-right:1px solid rgba(190,220,244,.15)}
+.ga-stats>div:first-child{padding-left:0}.ga-stats>div:last-child{border:0}
+.ga-stats b{font-size:20px;color:var(--gold-2);font-variant-numeric:tabular-nums}.ga-stats span{font-size:10px;line-height:1.4;color:#87a9c4}
+.ga-corner{position:absolute;right:24px;top:58px;color:#4f7898;font:9px/1 ui-monospace,monospace;letter-spacing:.13em;writing-mode:vertical-rl}
+.ga-corner b{color:var(--gold)}
+.gate .gbox{max-width:none;width:auto;border-radius:0;box-shadow:none;padding:46px 38px 30px;align-self:stretch;display:flex;flex-direction:column;justify-content:center;position:relative}
+.gate .gbox::before{content:"SECURE ACCESS · MR-01";position:absolute;top:19px;right:26px;color:#9aabbc;font:9px/1 ui-monospace,monospace;letter-spacing:.13em}
+.gate .glogo{margin-bottom:27px}.gate .glogo b{font-size:19px;letter-spacing:.07em}.gate .glogo small{display:block;margin-top:2px}
+.gate .gtabs{padding:5px;background:#eaf0f6;border:1px solid #dfe8f0;border-radius:12px}
+.gate .gtab{transition:.2s}.gate .gtab.on{box-shadow:0 4px 12px rgba(17,45,76,.1);color:var(--navy)}
+.gate input{padding:12px 14px;border-radius:9px;background:#fbfdff}.gate input:focus{background:#fff}
+.gate form .btn{background:linear-gradient(135deg,var(--navy),#245a8b);border:0;box-shadow:0 9px 20px rgba(20,47,82,.22);transition:.2s}
+.gate form .btn:hover{transform:translateY(-1px);box-shadow:0 12px 24px rgba(20,47,82,.28)}
+.gate .gfoot{margin-top:22px}.gate .gerr,.gate .gok{border-left-width:4px}
+
+/* Application shell */
+aside{
+  width:258px;flex-basis:258px;background:
+    linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px),
+    linear-gradient(180deg,#112d4f,#0b2039 64%,#091b31);
+  background-size:28px 28px,28px 28px,auto;
+  border-right:1px solid rgba(211,173,69,.18);box-shadow:8px 0 28px rgba(16,39,68,.07);
+}
+aside::after{content:"";position:absolute;top:0;right:0;width:2px;height:132px;background:linear-gradient(var(--gold),transparent)}
+.logo{padding:22px 18px 20px;position:relative;border-bottom:1px solid rgba(255,255,255,.08)}
+.logo::after{content:"SERVICE OPERATIONS";position:absolute;left:69px;bottom:7px;color:#557695;font:8px/1 ui-monospace,monospace;letter-spacing:.16em}
+.logo b{letter-spacing:.08em}.logo small{color:#87a1ba}.logo .ic{border-radius:12px}
+.navlbl{padding:20px 20px 9px;color:#6684a1;font-size:9.5px;letter-spacing:.2em}
+aside nav{gap:5px;padding:0 12px}
+aside nav button{position:relative;min-height:45px;padding:9px 12px;border-radius:10px;color:#b6c7d8;transition:transform .18s,background .18s,color .18s;overflow:hidden}
+aside nav button::after{content:"";position:absolute;right:0;top:50%;width:3px;height:0;background:var(--gold-2);border-radius:3px 0 0 3px;transition:.2s}
+aside nav button:hover{background:rgba(117,174,219,.1);transform:translateX(2px)}
+aside nav button:hover::after{height:20px;top:calc(50% - 10px)}
+aside nav button.on{background:linear-gradient(100deg,var(--gold-2),#d2a538);color:#2a240f;box-shadow:0 7px 18px rgba(0,0,0,.16),inset 0 1px rgba(255,255,255,.45)}
+aside nav button.on::before{content:"";position:absolute;inset:0;background:linear-gradient(115deg,transparent 35%,rgba(255,255,255,.2) 36% 41%,transparent 42%);transform:translateX(-110%);animation:navSheen .55s ease forwards}
+aside nav button .e{width:27px;height:27px;border-radius:8px;background:rgba(255,255,255,.08);display:grid;place-items:center;font-size:14px;filter:saturate(.72);transition:transform .22s}
+aside nav button .e svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+aside nav button.on .e{background:rgba(20,47,82,.13);filter:none}
+aside nav button:hover .e{transform:rotate(-5deg) scale(1.08)}
+.sidefoot{background:rgba(2,12,24,.18);border-top-color:rgba(255,255,255,.08);position:relative}
+.sidefoot::before{content:"SYSTEM STATUS";display:block;color:#567792;font:8px/1 ui-monospace,monospace;letter-spacing:.15em;margin-bottom:9px}
+.sidefoot .st{color:#75d4a6}.sidefoot .st::first-letter{filter:drop-shadow(0 0 5px #75d4a6)}
+
+.phead{min-height:74px;padding:12px 24px;background:rgba(255,255,255,.93);backdrop-filter:blur(15px);border-bottom:1px solid #d6e0ea;box-shadow:0 2px 14px rgba(18,42,72,.045)}
+.phead::after{content:"MR / OPS";position:absolute;right:22px;bottom:3px;color:#a6b1be;font:7px/1 ui-monospace,monospace;letter-spacing:.14em}
+.phead h1{font-size:21px;letter-spacing:-.02em;display:flex;align-items:center;gap:10px}
+.phead h1::before{content:"";width:4px;height:24px;border-radius:4px;background:linear-gradient(var(--gold-2),var(--gold));box-shadow:0 0 0 4px var(--gold-l)}
+.phead .sub{padding-left:14px;color:#8190a4}
+.phead .search input{background:#f3f7fb;border-color:#dce5ee;padding:10px 15px 10px 38px;transition:.22s}
+.phead .search input:focus{background:#fff;max-width:none;box-shadow:0 0 0 3px rgba(47,120,185,.11),0 8px 22px rgba(20,47,82,.07)}
+.bell{width:39px;height:39px;padding:0;border-radius:11px;transition:.2s}.bell:hover{transform:translateY(-2px);box-shadow:var(--sh)}
+.avatar{width:39px;height:39px;border:2px solid #fff;outline:1px solid var(--line);background:linear-gradient(145deg,var(--navy),var(--blue));box-shadow:0 5px 12px rgba(20,47,82,.18)}
+.content{padding:24px 26px 70px;max-width:1560px}
+.page{animation:pageIn .28s ease}
+
+/* Cards and visual hierarchy */
+.card{position:relative;border-color:#d9e3ec;border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;transition:box-shadow .22s,border-color .22s}
+.card:hover{border-color:#cad7e3;box-shadow:0 11px 30px rgba(18,42,72,.085),0 1px 2px rgba(18,42,72,.06)}
+.card::before{content:"";position:absolute;z-index:2;left:0;top:0;width:46px;height:3px;background:linear-gradient(90deg,var(--gold),transparent)}
+.card>h3{min-height:52px;padding:14px 18px;background:linear-gradient(180deg,#fff,#fbfdff);border-bottom-color:#e5ecf2;color:#18375d;font-weight:800}
+.card>h3::after{content:"";width:18px;height:1px;background:#ced9e4;margin-left:auto;order:98}
+.card>h3 .sp{order:97}.card>h3 .sp~*{order:99}
+.cb{padding:19px}
+.split{gap:20px}
+
+.kpis{gap:14px;margin-bottom:20px}
+.kpi{position:relative;min-height:116px;padding:18px 18px 16px;border-color:#d8e2ec;border-radius:14px;box-shadow:var(--sh);overflow:hidden;transition:.22s}
+.kpi::before{content:"";position:absolute;inset:0 auto 0 0;width:4px;background:var(--blue)}
+.kpi::after{position:absolute;right:12px;bottom:8px;color:#dce5ee;font:800 28px/1 ui-monospace,monospace;letter-spacing:-.08em}
+.kpi:nth-child(1)::after{content:"01"}.kpi:nth-child(2)::after{content:"02"}.kpi:nth-child(3)::after{content:"03"}.kpi:nth-child(4)::after{content:"04"}.kpi:nth-child(5)::after{content:"05"}.kpi:nth-child(6)::after{content:"06"}
+.kpi:hover{transform:translateY(-3px);box-shadow:var(--sh-hi)}
+.kpi .e{width:31px;height:31px;margin-top:-4px;border-radius:9px;display:grid;place-items:center;background:#edf4fa;filter:saturate(.72)}
+.kpi .n{font-size:31px;letter-spacing:-.035em}.kpi .l{font-size:12px;letter-spacing:.02em}
+.kpi.na::before{background:var(--navy)}.kpi.nb::before{background:var(--warn)}.kpi.nc::before{background:var(--good)}.kpi.nd::before{background:var(--crit)}.kpi.ne::before{background:var(--blue)}
+
+/* Six-stage repair pipeline */
+.dashtop{position:relative;padding:4px 1px}.dashtop::before{content:"REPAIR PIPELINE";position:absolute;top:-14px;left:0;color:#91a0b2;font:8px/1 ui-monospace,monospace;letter-spacing:.14em}
+.steps{padding-top:9px}
+.stp{position:relative;padding-right:11px}
+.stp .b{width:31px;height:31px;border:3px solid rgba(255,255,255,.75);box-shadow:0 0 0 1px rgba(20,47,82,.15),0 5px 12px rgba(20,47,82,.12);transition:.22s}
+.stp:hover .b{transform:rotate(-7deg) scale(1.08)}
+.stp .n{font-size:12.5px;color:#496079}.stp .q{background:#eff4f8;padding:1px 6px;border-radius:999px;font-size:11px}
+.stpline{height:3px;position:relative;border-radius:999px;background:#dae3eb;overflow:hidden}
+.stpline::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,var(--blue),transparent);transform:translateX(-100%);animation:pipeline 3.4s ease-in-out infinite}
+.stepcards{gap:13px}
+.stepcard{position:relative;min-height:126px;padding:16px 16px 14px 18px;border-color:#dbe5ee;border-radius:12px;background:linear-gradient(145deg,#fff,#f7fafc);overflow:hidden;transition:.22s}
+.stepcard::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--s3)}
+.stepcard::after{position:absolute;right:10px;top:4px;color:#e3eaf1;font:800 36px/1 ui-monospace,monospace}
+.stepcard:nth-child(1)::after{content:"01"}.stepcard:nth-child(2)::after{content:"02"}.stepcard:nth-child(3)::after{content:"03"}.stepcard:nth-child(4)::after{content:"04"}.stepcard:nth-child(5)::after{content:"05"}.stepcard:nth-child(6)::after{content:"06"}
+.stepcard:nth-child(1)::before{background:var(--s1)}.stepcard:nth-child(2)::before{background:var(--s2)}.stepcard:nth-child(3)::before{background:var(--s3)}.stepcard:nth-child(4)::before{background:var(--s4)}.stepcard:nth-child(5)::before{background:var(--s5)}.stepcard:nth-child(6)::before{background:var(--s6)}
+.stepcard:hover{transform:translateY(-3px);border-color:#bfcfdd;box-shadow:0 12px 28px rgba(18,42,72,.1)}
+.stepcard .h{position:relative;z-index:1}.stepcard .n{position:relative;z-index:1;font-size:29px;color:var(--navy)}.stepcard .d{position:relative;z-index:1}
+
+/* Controls */
+input[type=text],input[type=email],input[type=password],input[type=date],input[type=number],input[type=tel],input[type=search],select,textarea{
+  border-color:#d3dee9;border-radius:9px;background:#fcfdff;transition:border-color .18s,box-shadow .18s,background .18s;
+}
+input:hover,select:hover,textarea:hover{border-color:#b9c9d8;background:#fff}
+input:focus,select:focus,textarea:focus{border-color:var(--blue);background:#fff;box-shadow:0 0 0 3px rgba(47,120,185,.12)}
+label{color:#4c6078;letter-spacing:.01em}
+.btn{border-color:#d2dde8;border-radius:9px;transition:transform .16s,box-shadow .16s,background .16s,border-color .16s}
+.btn:hover{transform:translateY(-1px);border-color:#bdccda;box-shadow:0 6px 14px rgba(20,47,82,.08)}
+.btn:active{transform:translateY(0);box-shadow:none}
+.btn.p{background:linear-gradient(135deg,#367fbc,#24669f);box-shadow:0 5px 13px rgba(47,120,185,.2)}
+.btn.g{background:linear-gradient(135deg,#183c65,#102b4c);box-shadow:0 5px 13px rgba(20,47,82,.2)}
+.chip{border-color:#d8e2eb;background:#fbfdff;transition:.17s}.chip:hover{transform:translateY(-1px);border-color:#b7c9da}.chip.on{background:linear-gradient(135deg,var(--navy),#245b8e);box-shadow:0 5px 12px rgba(20,47,82,.16)}
+.pill{border:1px solid rgba(0,0,0,.04);box-shadow:inset 0 1px rgba(255,255,255,.5)}
+.pill .d{box-shadow:0 0 0 3px rgba(255,255,255,.45)}
+
+/* Operational tables */
+.tw{border:1px solid #e1e8ef;border-radius:11px;background:#fff}
+table{background:#fff}
+th{background:#f3f7fa;color:#6f8094;border-bottom-color:#dbe4ec;font-size:10.5px;letter-spacing:.1em}
+td{border-bottom-color:#e9eff4}
+tbody tr{transition:.14s}
+tbody tr:hover>td{background:#f5f9fc}
+tbody tr.click:hover>td{background:#edf5fb}
+tbody tr.click>td:first-child{position:relative}
+tbody tr.click>td:first-child::after{content:"";position:absolute;left:0;top:25%;bottom:25%;width:3px;border-radius:0 3px 3px 0;background:transparent;transition:.15s}
+tbody tr.click:hover>td:first-child::after{top:12%;bottom:12%;background:var(--blue)}
+.mono{color:#204d78;background:#eff5fa;border-radius:5px;padding:2px 5px}
+.pager{border-top-color:#e1e8ef}.pgbtn.on{background:linear-gradient(135deg,var(--navy),#245a8c)}
+
+/* Dispatch board */
+#p-dispatch>.card:first-child{border-top:3px solid var(--gold)}
+#p-dispatch>.card:first-child::after{content:"WORKSHOP BAY";position:absolute;right:16px;top:17px;color:#b0bcc8;font:8px/1 ui-monospace,monospace;letter-spacing:.15em}
+.slotcell{background:linear-gradient(180deg,#fbfdff,#f5f8fb)}
+.slotjob{position:relative;border-radius:9px;border-color:#d7e1eb;border-left-width:4px;box-shadow:0 3px 9px rgba(20,47,82,.06);transition:.18s}
+.slotjob::after{content:"";position:absolute;right:7px;top:7px;width:5px;height:5px;border:1px solid #b8c5d2;border-radius:50%}
+.slotjob:hover{transform:translateY(-2px);box-shadow:0 8px 16px rgba(20,47,82,.11)}
+.slotfree{border-color:#a9cfbd;border-radius:9px;background:repeating-linear-gradient(135deg,#f5fbf8,#f5fbf8 8px,#eff8f3 8px,#eff8f3 16px)}
+
+/* Intake · service ticket */
+#p-intake .card{border-top:3px solid var(--gold)}
+#p-intake .card::after{content:"SERVICE INTAKE · MR-F01";position:absolute;right:18px;top:18px;color:#a3b0be;font:8px/1 ui-monospace,monospace;letter-spacing:.13em}
+#p-intake .card>h3{background:linear-gradient(90deg,var(--gold-l),#fff 48%)}
+#p-intake .cb{background-image:linear-gradient(rgba(20,47,82,.018) 1px,transparent 1px);background-size:100% 40px}
+.obtn{position:relative;border-color:#d5e0e9;border-radius:12px;overflow:hidden;transition:.2s}
+.obtn::after{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:transparent;transition:.2s}
+.obtn:hover{transform:translateY(-2px);box-shadow:var(--sh)}.obtn.on{border-color:var(--gold);background:linear-gradient(135deg,var(--gold-l),#fff)}.obtn.on::after{background:var(--gold)}
+.ph{border-radius:11px}.ph.add{background:repeating-linear-gradient(135deg,#fbfdff,#fbfdff 8px,#f5f8fb 8px,#f5f8fb 16px)}
+
+/* Job detail timeline */
+.jgrid>.card:first-child{position:sticky;top:94px}
+.jnum{background:linear-gradient(145deg,var(--navy),var(--blue));box-shadow:0 3px 8px rgba(20,47,82,.2)}
+.tl::before{background:linear-gradient(var(--blue),#d7e2eb)}
+.tl .e::before{box-shadow:0 0 0 3px var(--blue-l)}
+.robox,.recap{border-color:#dde7ef;background:#f6f9fc}
+.jhint{border-left:4px solid var(--blue)}
+
+/* Charts and reports */
+svg .gl{stroke:#e3eaf0}svg .ax{fill:#8090a3}svg .vl{fill:#465c75}svg .nm{fill:#233a56}
+#p-report>.kpis:first-child{position:relative}
+#p-report .card>h3{background:linear-gradient(180deg,#fff,#f8fbfd)}
+#p-report .rside{background:#f8fafc;border:1px solid #e3eaf0;border-radius:10px;padding:14px;margin-left:2px}
+.lgi .sw{box-shadow:inset 0 0 0 1px rgba(0,0,0,.06)}
+
+/* Notifications, modals and system feedback */
+.npanel{border-color:#cfdae5;border-top:3px solid var(--gold);border-radius:14px;box-shadow:0 24px 60px rgba(11,29,53,.25)}
+.nphead{background:#f8fafc}.nitem:hover{background:#f2f7fb}
+.fmask{background:rgba(8,25,46,.66);backdrop-filter:blur(4px)}
+.fmodal{border:1px solid rgba(255,255,255,.7);border-radius:16px;box-shadow:0 28px 85px rgba(0,0,0,.38)}
+.fhead{position:relative;background:linear-gradient(180deg,#fff,#f7fafc)}
+.fhead::before{content:"";position:absolute;left:0;top:0;width:72px;height:3px;background:linear-gradient(90deg,var(--gold),transparent)}
+.ffoot{background:#f3f7fa}
+.toast{border:1px solid rgba(255,255,255,.16);border-left:4px solid var(--gold);background:linear-gradient(135deg,var(--navy),#0f2948);box-shadow:0 14px 34px rgba(0,0,0,.28);animation:toastIn .24s ease}
+.empty{position:relative;background:radial-gradient(circle at 50% 45%,rgba(47,120,185,.055),transparent 40%);border-radius:10px}
+.box-ok,.box-warn,.box-crit,.box-info,.awarn{border-left-width:4px}
+
+/* Motion */
+@keyframes wrenchNudge{0%,100%{transform:none}35%{transform:rotate(-12deg)}70%{transform:rotate(7deg)}}
+@keyframes navSheen{to{transform:translateX(110%)}}
+@keyframes pipeline{0%,15%{transform:translateX(-110%)}55%,100%{transform:translateX(110%)}}
+@keyframes pageIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+@keyframes toastIn{from{opacity:0;transform:translate(-50%,8px)}to{opacity:1;transform:translate(-50%,0)}}
+@keyframes blueprintFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+.ga-drawing .tool-outline{animation:blueprintFloat 5s ease-in-out infinite}
+
+/* Responsive refinement */
+@media(max-width:980px){
+  .gate-shell{grid-template-columns:minmax(0,1.15fr) 390px}.ga-copy h2{font-size:32px}.ga-stats span{display:none}.ga-stats>div{grid-template-columns:1fr;text-align:center}
+}
+@media(max-width:820px){
+  aside{left:-258px}.gate{padding:18px}.gate-shell{display:block;max-width:440px;border-radius:20px}.gate-art{display:none}.gate .gbox{min-height:610px;padding:48px 30px 30px}.gate .gbox::before{right:20px}
+  .phead{min-height:66px}.phead::after{display:none}.content{padding:18px 14px 65px}.jgrid>.card:first-child{position:relative;top:auto}
+}
+@media(max-width:640px){
+  body{background-size:24px 24px}.gate{padding:10px}.gate-shell{border-radius:16px}.gate .gbox{min-height:calc(100vh - 20px);padding:45px 22px 24px}
+  .phead h1::before{height:20px}.phead .sub{padding-left:14px}.card{border-radius:12px}.card>h3::after{display:none}
+  .kpi{min-height:104px}.kpi::after{font-size:22px}.stepcard{min-height:112px}.stpline::after{animation:none}
+  #p-intake .card::after,#p-dispatch>.card:first-child::after{display:none}
+}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
 </style>
 </head>
 <body>
 
 <!-- ============ หน้าล็อกอิน ============ -->
 <div class="gate" id="gate">
+  <div class="gate-shell">
+  <section class="gate-art" aria-hidden="true">
+    <div class="ga-topline"><span>MASARU SERVICE OPERATIONS</span><b>PRECISION / RELIABILITY / CARE</b></div>
+    <div class="ga-copy">
+      <div class="ga-kicker"><span></span> PRECISION WORKSHOP</div>
+      <h2>ทุกงานซ่อม<br><em>ตรวจสอบได้ทุกขั้นตอน</em></h2>
+      <p>ศูนย์ควบคุมงานรับซ่อม ติดตามสถานะ ช่าง อะไหล่ และคุณภาพหลังการซ่อมในระบบเดียว</p>
+    </div>
+    <div class="ga-drawing">
+      <svg viewBox="0 0 620 365" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <pattern id="bpGrid" width="24" height="24" patternUnits="userSpaceOnUse">
+            <path d="M24 0H0V24" fill="none" stroke="currentColor" stroke-opacity=".11" stroke-width="1"/>
+          </pattern>
+          <filter id="softGlow"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        </defs>
+        <rect width="620" height="365" fill="url(#bpGrid)"/>
+        <g class="measure" fill="none" stroke="currentColor" stroke-width="1">
+          <path d="M48 66H572M48 60v12m524-12v12M72 315H538M72 309v12m466-12v12"/>
+          <path d="M76 49v282M70 49h12m-12 282h12M550 80v228m-6-228h12m-12 228h12"/>
+          <circle cx="480" cy="114" r="55" stroke-dasharray="4 8"/><circle cx="480" cy="114" r="36"/>
+          <path d="M480 46v136M412 114h136" stroke-dasharray="3 7"/>
+        </g>
+        <g class="tool-outline" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-linecap="round">
+          <path d="M150 128l41-34h165l48 30 11 45-37 34H245l-31-20-63-5z"/>
+          <path d="M220 180l15 45-20 78h86l13-79-16-22"/>
+          <path d="M231 226h78M226 252h78M220 279h80"/>
+          <path d="M404 134h48v52h-51M452 145h46v29h-46M498 151h61v16h-61"/>
+          <path d="M169 123h77l18 18-12 39M195 99l23 27M286 118h80M286 139h96"/>
+          <circle cx="364" cy="165" r="17"/><circle cx="364" cy="165" r="5"/>
+          <path d="M279 204v98M247 204l-22 98M213 303h100"/>
+        </g>
+        <g class="exploded" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M434 244h35l10 12-10 12h-35zM489 243h18v27h-18M520 241h32v31h-32"/>
+          <path d="M401 256h25M477 256h9M509 256h8M555 256h27" stroke-dasharray="3 6"/>
+        </g>
+        <g class="hotspots" fill="currentColor">
+          <circle cx="194" cy="99" r="4"/><circle cx="364" cy="165" r="4"/><circle cx="452" cy="145" r="4"/><circle cx="279" cy="302" r="4"/>
+        </g>
+        <g class="labels" fill="currentColor">
+          <text x="55" y="55">620 mm / TECHNICAL SERVICE UNIT</text>
+          <text x="92" y="104">MOTOR HOUSING</text><text x="430" y="207">TORQUE CONTROL</text>
+          <text x="424" y="295">PARTS INSPECTION</text><text x="444" y="344">DWG · MR-REPAIR-01</text>
+        </g>
+      </svg>
+    </div>
+    <div class="ga-stats">
+      <div><b>01</b><span>รับเครื่องและตรวจสอบ</span></div>
+      <div><b>06</b><span>สถานะติดตามงาน</span></div>
+      <div><b>360°</b><span>ข้อมูลครบทุกฝ่าย</span></div>
+    </div>
+    <div class="ga-corner">OPS CONTROL <b>01</b></div>
+  </section>
   <div class="gbox">
-    <div class="glogo"><div class="ic">🔧</div>
+    <div class="glogo"><div class="ic brand-ic"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M29.8 8.2a10.5 10.5 0 0 0-12.5 13.9L7 32.4a4.8 4.8 0 0 0 6.8 6.8l10.3-10.3A10.5 10.5 0 0 0 38 16.4l-6.1 6.1-6.4-1.7-1.7-6.4z"/><path d="M11.1 35.2l1.7 1.7"/></svg></div>
       <div><b>TOOL REPAIR</b><small>ระบบรับซ่อมเครื่องมือ · MASARU</small></div></div>
     <div class="gtabs">
       <button type="button" class="gtab on" id="gtLogin" onclick="gateTab('login')">เข้าสู่ระบบ</button>
@@ -596,23 +916,24 @@ table.ptab td.n{text-align:right;font-variant-numeric:tabular-nums}
     <div id="liErr" class="gerr" hidden></div>
     <div class="gfoot" id="gFoot">ยังไม่มีบัญชี — ขอโค้ดเชิญจากผู้ดูแลระบบ แล้วกดแท็บ "สมัครสมาชิก"</div>
   </div>
+  </div>
 </div>
 
 <div class="app" id="app" hidden>
   <aside id="side">
     <div class="logo">
-      <div class="ic">🔧</div>
+      <div class="ic brand-ic"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M29.8 8.2a10.5 10.5 0 0 0-12.5 13.9L7 32.4a4.8 4.8 0 0 0 6.8 6.8l10.3-10.3A10.5 10.5 0 0 0 38 16.4l-6.1 6.1-6.4-1.7-1.7-6.4z"/><path d="M11.1 35.2l1.7 1.7"/></svg></div>
       <div><b>TOOL REPAIR</b><small>ระบบรับซ่อมเครื่องมือ · MASARU</small></div>
     </div>
     <div class="navlbl">เมนูหลัก</div>
     <nav>
-      <button data-p="dash"   class="on"><span class="e">📊</span>แดชบอร์ด</button>
-      <button data-p="jobs"><span class="e">📋</span>ใบงานซ่อม</button>
-      <button data-p="dispatch"><span class="e">🎯</span>จ่ายงานช่าง</button>
-      <button data-p="intake"><span class="e">➕</span>รับเครื่อง / บันทึกงาน</button>
-      <button data-p="cust"><span class="e">👥</span>ลูกค้า</button>
-      <button data-p="report"><span class="e">📈</span>รายงาน</button>
-      <button data-p="setting"><span class="e">⚙️</span>ตั้งค่า</button>
+      <button data-p="dash" class="on"><span class="e"><svg viewBox="0 0 24 24"><path d="M4 13h6v7H4zM14 4h6v16h-6zM4 4h6v5H4zM14 4h6v5h-6z"/></svg></span>แดชบอร์ด</button>
+      <button data-p="jobs"><span class="e"><svg viewBox="0 0 24 24"><path d="M7 4h10M8 3v3m8-3v3M6 5h12a2 2 0 0 1 2 2v13H4V7a2 2 0 0 1 2-2Zm2 6h8m-8 4h6"/></svg></span>ใบงานซ่อม</button>
+      <button data-p="dispatch"><span class="e"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="m14.3 9.7 5-5M18 4h2v2"/></svg></span>จ่ายงานช่าง</button>
+      <button data-p="intake"><span class="e"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/><circle cx="12" cy="12" r="9"/></svg></span>รับเครื่อง / บันทึกงาน</button>
+      <button data-p="cust"><span class="e"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3.5 19c.5-4 2.3-6 5.5-6s5 2 5.5 6M16 8.5a2.5 2.5 0 1 1 0 5M16 14c2.7 0 4.2 1.7 4.5 5"/></svg></span>ลูกค้า</button>
+      <button data-p="report"><span class="e"><svg viewBox="0 0 24 24"><path d="M5 19V9m7 10V5m7 14v-7M3 20h18"/></svg></span>รายงาน</button>
+      <button data-p="setting"><span class="e"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.4 1A7 7 0 0 0 14.8 6L14.5 3h-5L9.2 6a7 7 0 0 0-1.7 1.1l-2.4-1-2 3.4 2 1.5a7 7 0 0 0 0 2l-2 1.5 2 3.4 2.4-1A7 7 0 0 0 9.2 18l.3 3h5l.3-3a7 7 0 0 0 1.7-1.1l2.4 1 2-3.4-2-1.5c.1-.3.1-.7.1-1Z"/></svg></span>ตั้งค่า</button>
     </nav>
     <div class="sidefoot">
       <div class="k" id="roleLbl">ผู้ใช้งาน</div>
