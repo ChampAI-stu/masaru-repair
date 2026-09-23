@@ -7040,6 +7040,10 @@ function renderSettings(){
   /* ---- ช่าง ---- */
   $('tblTech').querySelector('tbody').innerHTML = (SET.techsAll || []).map(t => {
     const load = S.jobs.filter(j => j.technician_id === t.id && !CLOSED.includes(j.status)).length;
+    /* ลบได้เฉพาะช่างที่ยังไม่มีประวัติ — ช่างที่เคยทำงานแล้วลบทิ้งจะทำให้
+       ใบงานเก่าและรายงานย้อนหลังขาดชื่อคนซ่อม (ฐานข้อมูลเช็คซ้ำอีกชั้นอยู่แล้ว) */
+    const had = S.jobs.some(j => j.technician_id === t.id)
+             || (SET.users || []).some(u => u.technician_id === t.id);
     return `<tr>
       <td class="mono"><b>${esc(t.code)}</b></td>
       <td>${esc(t.full_name)}</td><td>${esc(t.nickname || '—')}</td>
@@ -7049,7 +7053,10 @@ function renderSettings(){
       <td class="num">
         <button class="btn ic" onclick="editTech('${t.id}')" title="แก้ไข">✏️</button>
         <button class="btn ic ${t.is_active ? 'dn' : ''}" onclick="toggleTech('${t.id}',${!t.is_active})"
-          title="${t.is_active ? 'ปิดใช้งาน' : 'เปิดใช้งาน'}">${t.is_active ? '🚫' : '✓'}</button></td>
+          title="${t.is_active ? 'ปิดใช้งาน' : 'เปิดใช้งาน'}">${t.is_active ? '🚫' : '✓'}</button>
+        <button class="btn ic" onclick="deleteTech('${t.id}')" style="${had ? 'opacity:.4' : ''}"
+          title="${had ? 'ลบไม่ได้ — ช่างคนนี้มีประวัติในระบบแล้ว ใช้ปิดใช้งานแทน'
+                       : 'ลบออกจากระบบถาวร'}">🗑️</button></td>
     </tr>`;
   }).join('') || '<tr><td colspan="8" class="empty">ยังไม่มีช่าง</td></tr>';
 
@@ -7238,6 +7245,31 @@ async function editTech(id){
     const { error } = await sb.from('technicians').update(f).eq('id', id);
     if (error) throw error;
     toast('✅ บันทึกแล้ว');
+    await loadSettings(); refreshTechSelects();
+  } catch(e){ fail(e); }
+}
+
+/** ลบช่างออกจากระบบ — ได้เฉพาะคนที่ยังไม่มีใบงานและไม่มีบัญชีเข้าระบบ
+    (ไว้ลบช่างที่สร้างผิด/สร้างเกิน) คนที่เคยทำงานแล้วให้ "ปิดใช้งาน" แทน */
+async function deleteTech(id){
+  try {
+    const { data, error } = await sb.rpc('tech_delete_info', { p_id: id });
+    if (error) throw error;
+    const i = Array.isArray(data) ? data[0] : data;
+    if (!i) throw new Error('ไม่พบช่างคนนี้ในระบบ');
+    const who2 = i.code + ' · ' + i.name;
+
+    if (!i.can_delete)
+      return toast('ลบ ' + who2 + ' ไม่ได้ — ' + i.reason
+        + ' · ถ้าแค่ไม่อยากให้รับงานใหม่ ให้กดปุ่ม 🚫 ปิดใช้งาน แทน', true);
+
+    if (!await confirmModal('ลบช่าง ' + who2 + ' ออกจากระบบ?',
+        'ช่างคนนี้ยังไม่มีใบงานและไม่มีบัญชีเข้าระบบ — ลบแล้วหายถาวร กู้คืนไม่ได้\n'
+      + 'ถ้าแค่ไม่อยากให้รับงานใหม่ ให้กดปุ่ม 🚫 ปิดใช้งาน แทน', { ok:'ลบถาวร' })) return;
+
+    const { data: nm, error: e2 } = await sb.rpc('delete_technician', { p_id: id });
+    if (e2) throw e2;
+    toast('🗑️ ลบ ' + (nm || who2) + ' ออกจากระบบแล้ว');
     await loadSettings(); refreshTechSelects();
   } catch(e){ fail(e); }
 }
