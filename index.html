@@ -928,8 +928,8 @@ svg .gl{stroke:#e3eaf0}svg .ax{fill:#8090a3}svg .vl{fill:#465c75}svg .nm{fill:#2
     <div class="navlbl">เมนูหลัก</div>
     <nav>
       <button data-p="jobs" class="on"><span class="e"><svg viewBox="0 0 24 24"><path d="M7 4h10M8 3v3m8-3v3M6 5h12a2 2 0 0 1 2 2v13H4V7a2 2 0 0 1 2-2Zm2 6h8m-8 4h6"/></svg></span>ใบงานซ่อม</button>
-      <button data-p="dispatch"><span class="e"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="m14.3 9.7 5-5M18 4h2v2"/></svg></span>จ่ายงานช่าง</button>
       <button data-p="intake"><span class="e"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/><circle cx="12" cy="12" r="9"/></svg></span>รับเครื่อง / บันทึกงาน</button>
+      <button data-p="dispatch"><span class="e"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="m14.3 9.7 5-5M18 4h2v2"/></svg></span>จ่ายงานช่าง</button>
       <button data-p="cust"><span class="e"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3.5 19c.5-4 2.3-6 5.5-6s5 2 5.5 6M16 8.5a2.5 2.5 0 1 1 0 5M16 14c2.7 0 4.2 1.7 4.5 5"/></svg></span>ลูกค้า</button>
       <button data-p="dash"><span class="e"><svg viewBox="0 0 24 24"><path d="M4 13h6v7H4zM14 4h6v16h-6zM4 4h6v5H4zM14 4h6v5h-6z"/></svg></span>แดชบอร์ด</button>
       <button data-p="report"><span class="e"><svg viewBox="0 0 24 24"><path d="M5 19V9m7 10V5m7 14v-7M3 20h18"/></svg></span>รายงาน</button>
@@ -1067,6 +1067,10 @@ svg .gl{stroke:#e3eaf0}svg .ax{fill:#8090a3}svg .vl{fill:#465c75}svg .nm{fill:#2
       <!-- ============ จ่ายงานช่าง ============ -->
       <div class="page" id="p-dispatch">
         <div class="kpis" id="dspKpi"></div>
+        <div class="box-info" id="dspTechNote" hidden style="margin-bottom:14px">
+          👷 <b>มุมมองช่าง</b> — ดูช่องรับงานของทุกคนและจำนวนคิวที่รออยู่
+          <div class="sub2" style="margin-top:3px">รายละเอียดใบงานในคิวและการจ่ายงานเป็นหน้าที่ของแอดมินช่าง</div>
+        </div>
 
         <div class="card">
           <h3>🎯 กระดานช่องรับงาน <span class="sp"></span>
@@ -1091,7 +1095,7 @@ svg .gl{stroke:#e3eaf0}svg .ax{fill:#8090a3}svg .vl{fill:#465c75}svg .nm{fill:#2
         <div class="card">
           <h3>⏳ คิวรอจ่าย <span class="sp"></span>
             <span class="pill tag-warn" id="dspQCount">0</span></h3>
-          <div class="cb">
+          <div class="cb" id="dspQBody">
             <div class="tw"><table id="tblQueue">
               <thead><tr><th class="num">คิว</th><th>ใบงาน</th><th>ระดับ</th><th>ลูกค้า</th>
                 <th>เครื่องมือ</th><th>อาการ</th><th class="num">รอมาแล้ว</th>
@@ -1099,6 +1103,9 @@ svg .gl{stroke:#e3eaf0}svg .ax{fill:#8090a3}svg .vl{fill:#465c75}svg .nm{fill:#2
               <tbody></tbody></table></div>
             <div id="dspQEmpty" class="empty" style="display:none">
               ไม่มีงานรอคิว — ช่างรับงานได้ครบทุกใบแล้ว 👍</div>
+          </div>
+          <div class="cb" id="dspQCountOnly" hidden>
+            <div class="empty" id="dspQCountTxt" style="font-size:15px"></div>
           </div>
         </div>
 
@@ -2956,16 +2963,17 @@ const ROLE_LABEL = { staff:'พนักงานรับเครื่อง'
 /* ลำดับในนี้ = ลำดับเมนู และตัวแรกคือหน้าที่เปิดให้ทันทีตอนเข้าระบบ */
 const ROLE_PAGES = {
   staff:     ['jobs','intake','cust','dash','job'],
-  tech:      ['jobs','dispatch','dash','report','job'],
-  head:      ['jobs','dispatch','intake','cust','dash','report','job'],
-  admin:     ['jobs','dispatch','intake','cust','dash','report','setting','job'],
+  /* ช่าง — เห็น 3 หน้า งานของตัวเอง · จ่ายงานช่าง · รายงาน (ไม่มีแดชบอร์ด) */
+  tech:      ['jobs','dispatch','report','job'],
+  head:      ['jobs','intake','dispatch','cust','dash','report','job'],
+  admin:     ['jobs','intake','dispatch','cust','dash','report','setting','job'],
   /* ผู้ทดลองใช้ — เหมือนหัวหน้าทุกหน้า ยกเว้น "ตั้งค่า"
      และ is_boss() ไม่รวม test จึงลบใบงาน/อนุมัติ/แก้ค่าตั้งระบบไม่ได้ */
-  test:      ['jobs','dispatch','intake','cust','dash','report','job'],
+  test:      ['jobs','intake','dispatch','cust','dash','report','job'],
   /* แอดมิน CS — รับเครื่องแล้วส่งต่อให้ช่าง ไม่แตะงานช่าง ไม่เห็นหน้าจ่ายงาน */
   cs:        ['jobs','intake','cust','dash','report','job'],
   /* แอดมินช่าง — เหมือน CS แต่เพิ่มหน้าจ่ายงานช่าง */
-  techadmin: ['jobs','dispatch','intake','cust','dash','report','job']
+  techadmin: ['jobs','intake','dispatch','cust','dash','report','job']
 };
 
 /* =====================================================================
@@ -2976,8 +2984,13 @@ const ROLE_PAGES = {
    ===================================================================== */
 const STEP_ROLE = {
   cs:        [1],
-  techadmin: [2, 3, 6]
+  techadmin: [2, 3, 6],
+  /* ช่าง — ซ่อมและตรวจสอบ · ส่งขั้น 5 เสร็จก็หมดหน้าที่ ที่เหลือเป็นงานแอดมิน */
+  tech:      [4, 5]
 };
+
+/** ใครกดผ่านขั้น 5 (ตรวจสอบ) ได้ — ช่างเจ้าของงาน หรือหัวหน้า/แอดมิน */
+function canPassTesting(){ return isBoss() || ME.role === 'tech'; }
 /** role นี้ลงมือทำขั้นนี้ได้ไหม */
 function canStep(n){
   const allow = STEP_ROLE[ME.role];
@@ -3435,8 +3448,16 @@ async function startApp(session){
   /* ด่านตรวจสิทธิ์ — ต้องผ่านก่อนถึงจะเห็นอะไรในหน้านี้ */
   if (!await canModule(sb, 'repair')) return blockModule('ระบบรับซ่อมเครื่องมือ');
 
-  // ช่างเปิดมาที่รายการงานของตัวเองเลย
-  if (ME.role === 'tech' && ME.techId) $('fTech').value = ME.techId;
+  /* ช่างเห็นเฉพาะงานของตัวเอง — ล็อกตัวกรองไว้ เปลี่ยนไปดูของคนอื่นไม่ได้ */
+  if (ME.role === 'tech'){
+    if (ME.techId){
+      $('fTech').value = ME.techId;
+      $('fTech').hidden = true;
+      $('fTech').disabled = true;
+    } else {
+      toast('บัญชีนี้ยังไม่ได้ผูกกับช่างคนไหน — ให้แอดมินผูกให้ก่อน จะได้เห็นงานของตัวเอง', true);
+    }
+  }
 
   $('gate').hidden = true; $('app').hidden = false;
   $('bootErrBox').hidden = true;
@@ -3686,7 +3707,9 @@ function matchFilter(j){
 }
 
 function renderJobs(){
-  const q = val('gSearch').toLowerCase(), tc = val('fTech'), ad = val('fAdmin');
+  const q = val('gSearch').toLowerCase(), ad = val('fAdmin');
+  /* ช่างถูกบังคับให้เห็นเฉพาะของตัวเองเสมอ ไม่ว่าค่าในช่องกรองจะเป็นอะไร */
+  const tc = (ME.role === 'tech' && ME.techId) ? ME.techId : val('fTech');
   const rows = S.jobs.filter(j => {
     if (!matchFilter(j)) return false;
     if (tc && j.technician_id !== tc) return false;
@@ -4554,12 +4577,12 @@ function stepForm(nStep, j, pc){
     const body = recap('วิธีซ่อม: ' + esc(j.repair_method || '—') + '\nอะไหล่: ' + esc(partTxt))
       + `<div style="margin-top:16px">${photoBox('after','รูปหลังซ่อม',4)}</div>`;
 
-    /* ช่างเห็นทุกอย่าง แต่กดผ่านไม่ได้ */
-    if (!isBoss()) return hint + `
-      <div class="box-warn">🔒 <b>ขั้นตรวจสอบเป็นหน้าที่ของหัวหน้างาน</b>
+    /* คนที่ไม่ใช่ช่าง/หัวหน้า เห็นทุกอย่าง แต่กดผ่านไม่ได้ */
+    if (!canPassTesting()) return hint + `
+      <div class="box-warn">🔒 <b>ขั้นตรวจสอบเป็นหน้าที่ของช่างและหัวหน้างาน</b>
         <div class="muted" style="font-size:13px;margin-top:4px">
-          ช่างซ่อมเสร็จแล้วให้แจ้งหัวหน้ามาตรวจ · ช่างดูข้อมูลและอัปโหลดรูปหลังซ่อมได้ แต่กดผ่านขั้นนี้ไม่ได้</div></div>
-      <div style="margin-top:14px"><label>สรุปผลการทดสอบ (หัวหน้ากรอก)</label>
+          ดูข้อมูลและอัปโหลดรูปหลังซ่อมได้ แต่กดผ่านขั้นนี้ไม่ได้</div></div>
+      <div style="margin-top:14px"><label>สรุปผลการทดสอบ (ช่าง/หัวหน้ากรอก)</label>
         <textarea disabled>${esc(j.note||'')}</textarea></div>
       ${body}
       ${locked ? lockFoot : `<div class="jfoot">${back}${past ? toCur : ''}</div>`}`;
@@ -5082,7 +5105,8 @@ async function moveStep(to){
     if (from === 3 && !S.job.technician_id)
       return toast('ยังไม่มีช่างรับงานใบนี้ — กด "จ่ายงานเดี๋ยวนี้" หรือรอคิว', true);
     if (from === 4 && !val('sMethod'))  return toast('กรอกวิธีการซ่อมก่อน', true);
-    if (from === 5 && !isBoss())        return toast('ขั้นตรวจสอบต้องให้หัวหน้างานกดผ่าน', true);
+    if (from === 5 && !canPassTesting())
+      return toast('ขั้นตรวจสอบต้องให้ช่างหรือหัวหน้างานกดผ่าน', true);
     if (from === 5 && !val('sNote'))    return toast('กรอกสรุปผลการทดสอบก่อน', true);
   }
   S.peek = null;
@@ -5325,6 +5349,19 @@ function renderDispatch(){
     LEVELS.map(l => l.t + ' ' + (Number(SLOTS[l.k])||1)).join(' · ') + ' (แก้ได้ที่ตั้งค่า)';
   $('dspRun').hidden = !isBoss() || !queue.length || !freeAll;
 
+  /* ช่างดูได้แค่กระดานกับ "จำนวน" คิว — ไม่เห็นรายละเอียดใบงานของคนอื่น */
+  const techView = ME.role === 'tech';
+  $('dspKpi').hidden        = techView;
+  $('dspTechNote').hidden   = !techView;
+  $('dspQBody').hidden      = techView;
+  $('dspQCountOnly').hidden = !techView;
+  if (techView){
+    $('dspQCountTxt').textContent = queue.length
+      ? `⏳ มีงานรอจ่ายอยู่ ${queue.length} ใบ · ช่องว่างทั้งระบบ ${freeAll} ช่อง`
+      : 'ไม่มีงานรอคิว — ช่างรับงานได้ครบทุกใบแล้ว 👍';
+    $('dspRun').hidden = true;
+  }
+
   /* ---- กระดาน ---- */
   $('tblBoard').querySelector('tbody').innerHTML = techs.length ? techs.map(t => {
     const mine = t.technician_id === ME.techId;
@@ -5356,7 +5393,7 @@ function renderDispatch(){
 
   /* ---- ใบที่ยังไม่ระบุระดับ = ไม่เข้าคิว ---- */
   const noLv = S.jobs.filter(j => !j.severity && !j.technician_id && !CLOSED.includes(j.status));
-  $('cardNoLevel').hidden = !noLv.length;
+  $('cardNoLevel').hidden = !noLv.length || ME.role === 'tech';
   $('noLvCount').textContent = noLv.length + ' ใบ';
   if (noLv.length) $('tblNoLevel').querySelector('tbody').innerHTML = noLv.map(j => `<tr>
     <td class="mono"><b>${esc(jobRef(j))}</b></td>
@@ -5927,6 +5964,8 @@ const REP_TABS = [
 const DIFF_COLOR = { light:'#9cbbdf', medium:'#4f83bb', heavy:'#1F3864', none:'#d8e0ec' };
 
 function setRepTab(k){
+  const allow = repTabsFor().map(t => t.k);
+  if (allow.length && !allow.includes(k)) k = allow[0];
   S.repTab = k;
   REP_TABS.forEach(t => { const el = $('rt-' + t.k); if (el) el.hidden = (t.k !== k); });
   renderRepTabs();
@@ -5942,15 +5981,26 @@ function redrawRepTab(){
   if (S.repTab === 'daily')   renderDaily();
   if (S.repTab === 'closed')  renderClosed();
 }
+/* ช่างเห็น 3 แท็บ — ผลงานช่าง · อะไหล่ประจำวัน · ปิดจ๊อบรายวัน */
+const TECH_REP_TABS = ['work','daily','closed'];
+function repTabsFor(){
+  return REP_TABS.filter(t => (!t.boss || isBoss())
+    && (ME.role !== 'tech' || TECH_REP_TABS.includes(t.k)));
+}
 function renderRepTabs(){
-  const show = REP_TABS.filter(t => !t.boss || isBoss());
+  const show = repTabsFor();
   $('repTabs').innerHTML = show.map(t =>
     `<button class="chip ${S.repTab === t.k ? 'on' : ''}" onclick="setRepTab('${t.k}')">${t.t}</button>`).join('');
 }
 
 async function loadReport(){
-  if (!S.repTab || (!isBoss() && S.repTab === 'money')) S.repTab = 'work';
+  const allow = repTabsFor().map(t => t.k);
+  if (!S.repTab || !allow.includes(S.repTab)) S.repTab = allow[0] || 'work';
   setRepTab(S.repTab);
+  /* แท็บที่ช่างไม่มีสิทธิ์ ถอดเนื้อหาออกจาก DOM ไปเลย */
+  if (ME.role === 'tech')
+    REP_TABS.filter(t => !TECH_REP_TABS.includes(t.k))
+            .forEach(t => { const el = $('rt-' + t.k); if (el){ el.innerHTML = ''; el.hidden = true; } });
 
   /* ช่างไม่ต้องมีตัวเลขเงินอยู่ในหน้าเลย — ถอดออกจาก DOM ทิ้ง */
   if (!isBoss()){ const m = $('rt-money'); if (m) m.innerHTML = ''; }
