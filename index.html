@@ -3131,6 +3131,11 @@ function authMsg(e){
   if (m.includes('email not confirmed')) return 'อีเมลนี้ยังไม่ได้ยืนยัน — ให้ผู้ดูแลติ๊ก Auto Confirm ให้';
   if (m.includes('rate limit') || m.includes('too many')) return 'ลองบ่อยเกินไป รอสักครู่แล้วลองใหม่';
   if (m.includes('failed to fetch'))     return 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ — ตรวจอินเทอร์เน็ตหรือค่า SUPABASE_URL';
+  /* ย้ายโปรเจกต์ Supabase แล้ว token เก่าในเครื่องใช้กับโปรเจกต์ใหม่ไม่ได้ */
+  if (m.includes('no suitable key') || m.includes('wrong key type')
+      || m.includes('invalid jwt') || m.includes('jwt expired')
+      || m.includes('invalid claim') || m.includes('bad_jwt'))
+    return 'ข้อมูลล็อกอินเก่าค้างอยู่ในเครื่อง ใช้กับฐานข้อมูลใหม่ไม่ได้ — กด "ล้างแล้วเข้าใหม่" ข้างล่าง';
   if (m.includes('permission denied'))   return 'ฐานข้อมูลไม่ให้สิทธิ์อ่าน — น่าจะลืม grant หลัง drop view · รัน diagnose2.sql';
   if (m.includes('does not exist') || m.includes('not exist'))
     return 'ตาราง/view บางตัวหายไป — รัน SQL ไม่ครบตามลำดับ · รัน diagnose2.sql';
@@ -3174,7 +3179,19 @@ $('logoutBtn').addEventListener('click', async () => {
 async function forceLogout(){
   _userLogout = true;
   try { await sb.auth.signOut(); } catch(e){}
+  clearLocalSession();
   location.reload();
+}
+
+/** ล้าง token ที่ supabase-js เก็บไว้ในเครื่อง
+    ใช้ตอนเปลี่ยนโปรเจกต์ Supabase แล้ว token เก่าค้างจนล็อกอินไม่ได้ */
+function clearLocalSession(){
+  try {
+    Object.keys(localStorage)
+      .filter(k => k.startsWith('sb-') || k.startsWith('supabase.'))
+      .forEach(k => localStorage.removeItem(k));
+  } catch(e){ console.warn('ล้าง localStorage ไม่ได้', e); }
+  try { sessionStorage.removeItem('repair_role_refreshed'); } catch(e){}
 }
 
 /* ---------- เริ่มระบบหลังล็อกอินผ่าน ---------- */
@@ -3242,6 +3259,19 @@ async function startApp(session){
     /* โหลดข้อมูลตั้งต้นไม่สำเร็จ ไม่ได้แปลว่าล็อกอินไม่ผ่าน
        เดิม signOut() ทิ้งทั้งเซสชัน → เน็ตกระตุกครั้งเดียวก็ต้องล็อกอินใหม่
        ใหม่ = เก็บเซสชันไว้ ให้กด "ลองใหม่" หรือออกเองถ้าต้องการ */
+    /* token เก่าจากโปรเจกต์เดิมค้างอยู่ → ล้างให้เองรอบเดียว แล้วรีโหลด
+       ทำครั้งเดียวพอ ไม่งั้นถ้าฐานข้อมูลพังจริงจะรีโหลดวนไม่จบ */
+    if (/no suitable key|wrong key type|invalid jwt|jwt expired|invalid claim|bad_jwt/i
+          .test(e?.message || '')) {
+      let tried = false;
+      try { tried = sessionStorage.getItem('repair_key_reset') === '1'; } catch(x){}
+      if (!tried) {
+        try { sessionStorage.setItem('repair_key_reset', '1'); } catch(x){}
+        console.warn('[repair] token เก่าใช้กับโปรเจกต์ใหม่ไม่ได้ — ล้างแล้วเข้าใหม่');
+        clearLocalSession();
+        return location.reload();
+      }
+    }
     const netErr = /failed to fetch|networkerror|load failed|timeout/i.test(e?.message || '');
     $('bootErrBox').innerHTML =
       `<div class="card"><div class="cb">
@@ -3255,6 +3285,8 @@ async function startApp(session){
         </div>
         <div style="display:flex;gap:9px;margin-top:13px;flex-wrap:wrap">
           <button class="btn p" onclick="location.reload()">🔄 ลองใหม่</button>
+          <button class="btn g" onclick="clearLocalSession();location.reload()"
+                  title="ลบข้อมูลล็อกอินที่ค้างในเครื่อง แล้วเข้าใหม่">🧹 ล้างแล้วเข้าใหม่</button>
           <button class="btn dn" onclick="forceLogout()">ออกจากระบบ</button>
         </div>
       </div></div>`;
