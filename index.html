@@ -2920,16 +2920,43 @@ let ME = { id:null, email:'', name:'', role:'staff', techId:null };
 const who = () => ME.name || ME.email || 'ไม่ระบุ';
 const isBoss = () => ME.role === 'head' || ME.role === 'admin';
 const ROLE_LABEL = { staff:'พนักงานรับเครื่อง', tech:'ช่างซ่อม', head:'หัวหน้าช่าง',
-                     admin:'ผู้ดูแลระบบ', test:'ผู้ทดลองใช้' };
+                     admin:'ผู้ดูแลระบบ', test:'ผู้ทดลองใช้',
+                     cs:'แอดมิน CS', techadmin:'แอดมินช่าง' };
+/* หน้าไหนเข้าได้บ้าง — "ตั้งค่า" เปิดให้ผู้ดูแลระบบคนเดียว */
 const ROLE_PAGES = {
-  staff: ['dash','jobs','intake','cust','job'],
-  tech:  ['dash','jobs','dispatch','report','job'],
-  head:  ['dash','jobs','dispatch','intake','cust','report','setting','job'],
-  admin: ['dash','jobs','dispatch','intake','cust','report','setting','job'],
+  staff:     ['dash','jobs','intake','cust','job'],
+  tech:      ['dash','jobs','dispatch','report','job'],
+  head:      ['dash','jobs','dispatch','intake','cust','report','job'],
+  admin:     ['dash','jobs','dispatch','intake','cust','report','setting','job'],
   /* ผู้ทดลองใช้ — เหมือนหัวหน้าทุกหน้า ยกเว้น "ตั้งค่า"
      และ is_boss() ไม่รวม test จึงลบใบงาน/อนุมัติ/แก้ค่าตั้งระบบไม่ได้ */
-  test:  ['dash','jobs','dispatch','intake','cust','report','job']
+  test:      ['dash','jobs','dispatch','intake','cust','report','job'],
+  /* แอดมิน CS — รับเครื่องแล้วส่งต่อให้ช่าง ไม่แตะงานช่าง ไม่เห็นหน้าจ่ายงาน */
+  cs:        ['dash','jobs','intake','cust','report','job'],
+  /* แอดมินช่าง — เหมือน CS แต่เพิ่มหน้าจ่ายงานช่าง */
+  techadmin: ['dash','jobs','dispatch','intake','cust','report','job']
 };
+
+/* =====================================================================
+   ขั้นตอนไหนแก้ได้บ้าง — ใส่เฉพาะ role ที่จำกัด
+   role ที่ไม่อยู่ในตารางนี้ = ทำได้ทุกขั้นเหมือนเดิม
+     แอดมิน CS   ขั้น 1 อย่างเดียว · ปิดท้ายด้วยการกดส่งไปขั้น 2
+     แอดมินช่าง  ขั้น 2 ตรวจเช็ค · 3 มอบหมายงาน · 6 ส่งมอบ
+   ===================================================================== */
+const STEP_ROLE = {
+  cs:        [1],
+  techadmin: [2, 3, 6]
+};
+/** role นี้ลงมือทำขั้นนี้ได้ไหม */
+function canStep(n){
+  const allow = STEP_ROLE[ME.role];
+  return !allow || allow.includes(Number(n));
+}
+/** ข้อความบอกว่าตัวเองทำขั้นไหนได้บ้าง */
+function myStepsText(){
+  const allow = STEP_ROLE[ME.role];
+  return allow ? allow.map(n => n + ' ' + STEPS[n-1].label).join(' · ') : 'ทุกขั้นตอน';
+}
 
 
 /* =====================================================================
@@ -4235,8 +4262,17 @@ function stepForm(nStep, j, pc){
   const toCur = `<button class="btn g" onclick="peekStep(${cur})">ไปขั้นปัจจุบัน (${cur}) →</button>`;
   const deliver = `<button class="btn" style="background:#1c1c1c;border-color:#1c1c1c;color:#fff"
      onclick="setStatus('delivered')">ยืนยันส่งมอบลูกค้า</button>`;
-  const foot = extras => `<div class="jfoot">${past ? save + toCur + (cur === 6 ? deliver : '')
-                                                   : back + save + extras}</div>`;
+  /* ขั้นที่ไม่ใช่หน้าที่ของ role นี้ — ดูได้ แต่ไม่มีปุ่มให้กด */
+  const locked = !canStep(nStep);
+  const lockFoot = `<div class="jfoot">
+      <div class="box-info" style="flex:1;margin:0;font-size:13px">
+        🔒 ขั้นนี้ไม่ใช่หน้าที่ของ<b>${esc(ROLE_LABEL[ME.role] || ME.role)}</b> — ดูได้อย่างเดียว<br>
+        <span class="sub2">คุณทำได้: ขั้น ${esc(myStepsText())}</span>
+      </div>${cur !== nStep ? toCur : ''}</div>`;
+  const foot = extras => locked
+    ? lockFoot
+    : `<div class="jfoot">${past ? save + toCur + (cur === 6 ? deliver : '')
+                                 : back + save + extras}</div>`;
 
   /* ---- 1 รับเครื่อง ---- */
   if (nStep === 1){
@@ -4473,7 +4509,7 @@ function stepForm(nStep, j, pc){
       <div style="margin-top:14px"><label>สรุปผลการทดสอบ (หัวหน้ากรอก)</label>
         <textarea disabled>${esc(j.note||'')}</textarea></div>
       ${body}
-      <div class="jfoot">${back}${past ? toCur : ''}</div>`;
+      ${locked ? lockFoot : `<div class="jfoot">${back}${past ? toCur : ''}</div>`}`;
 
     return hint + `
     <div class="box-info">👤 ผู้ตรวจสอบ: <b>${esc(who())}</b> · ${esc(ROLE_LABEL[ME.role]||ME.role)}</div>
@@ -4526,8 +4562,8 @@ function stepForm(nStep, j, pc){
     <p style="margin:16px 0 0;color:var(--ink2)">
       ${done ? '✅ ปิดงานเรียบร้อยแล้ว' : 'เมื่อลูกค้ารับเครื่องแล้ว กดยืนยันส่งมอบเพื่อปิดงาน'}</p>
     <div style="margin-top:16px">${photoBox('document','เอกสาร / ใบเสร็จ',4)}</div>
-    <div class="jfoot">${back}${save}
-      ${done ? `<button class="btn" onclick="setStatus('ready')">↩ เปิดงานใหม่</button>` : deliver}</div>`;
+    ${locked ? lockFoot : `<div class="jfoot">${back}${save}
+      ${done ? `<button class="btn" onclick="setStatus('ready')">↩ เปิดงานใหม่</button>` : deliver}</div>`}`;
 }
 
 function bindStepForm(cur, pc){
@@ -4597,6 +4633,10 @@ function collectStep(){
 
 async function saveStep(extra){
   const keep = S.peek;
+  /* กันกดผ่านทางอื่น — ปุ่มซ่อนไปแล้วแต่ยังเรียกฟังก์ชันตรง ๆ ได้ */
+  const at = S.peek || stepOf(S.job.status) || 1;
+  if (!canStep(at))
+    return toast('ขั้น ' + at + ' ' + STEPS[at-1].label + ' ไม่ใช่หน้าที่ของคุณ — ทำได้: ขั้น ' + myStepsText(), true);
   try {
     const { error } = await sb.from('repair_jobs').update({ ...collectStep(), ...(extra||{}) }).eq('id', S.job.id);
     if (error) throw error;
@@ -4956,12 +4996,17 @@ async function rejectClaim(){
 }
 
 async function setStatus(st){
+  const at = S.peek || stepOf(S.job.status) || 1;
+  if (!canStep(at))
+    return toast('ขั้น ' + at + ' ' + STEPS[at-1].label + ' ไม่ใช่หน้าที่ของคุณ — ทำได้: ขั้น ' + myStepsText(), true);
   S.peek = null;
   await saveStep({ status: st });
 }
 
 async function moveStep(to){
   const from = S.peek || stepOf(S.job.status) || 1;
+  if (!canStep(from))
+    return toast('ขั้น ' + from + ' ' + STEPS[from-1].label + ' ไม่ใช่หน้าที่ของคุณ — ทำได้: ขั้น ' + myStepsText(), true);
   if (to > from){
     if (from === 1 && !val('sSymptom')) return toast('กรอกอาการเสียที่ลูกค้าแจ้งก่อน', true);
     if (from === 1 && (!val('sWarranty') || val('sWarranty') === 'unknown'))
@@ -6537,7 +6582,7 @@ function renderSettings(){
    สิทธิ์เข้าระบบแต่ละตัว — ย้ายมาจาก index.html ตอนแยก repo
    --------------------------------------------------------------------- */
 let MODS = [];
-const PERM_ROLES = ['staff','tech','head','admin','test'];
+const PERM_ROLES = ['staff','cs','tech','techadmin','head','admin','test'];
 
 async function loadPerm(){
   const card = $('cardPerm');
