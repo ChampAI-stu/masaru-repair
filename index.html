@@ -5408,14 +5408,15 @@ async function claimOwner(){
   const f = await formModal({
     title:'พบเจ้าของพัสดุแล้ว', subtitle:'ผูกพัสดุนี้เข้ากับลูกค้า แล้วเดินเรื่องซ่อมตามปกติ',
     ok:'ผูกและรับเข้าศูนย์',
+    /* เอาแค่ที่ต้องใช้ "ผูกเจ้าของ" จริง ๆ
+       เงื่อนไขประกัน กับ อาการเสีย ไม่ต้องถามซ้ำตรงนี้ —
+       ในใบงานมีช่องเดียวกันอยู่แล้ว กรอกแล้วกดบันทึกได้เลย */
     fields:[
       { k:'phone', label:'เบอร์โทรลูกค้า', required:true, half:true,
         hint:'ถ้าเคยซ่อมมาก่อน ระบบจะผูกกับประวัติเดิมให้' },
       { k:'name', label:'ชื่อลูกค้า', required:true, half:true },
-      { k:'order_no', label:'เลขคำสั่งซื้อ', half:true },
-      { k:'warranty_case', label:'เงื่อนไขประกัน', type:'select', half:true,
-        value:'unknown', options:Object.entries(WARRANTY).map(([k,v]) => ({v:k, t:v.l})) },
-      { k:'symptom', label:'อาการเสียที่ลูกค้าแจ้ง', type:'textarea', required:true }
+      { k:'order_no', label:'เลขคำสั่งซื้อ', half:true,
+        hint:'เงื่อนไขประกันกับอาการเสีย กรอกต่อในใบงานได้เลย' }
     ]});
   if (!f) return;
   try {
@@ -5429,7 +5430,6 @@ async function claimOwner(){
     S.peek = null;
     await saveStep({
       customer_id: c.id, order_no: f.order_no || null,
-      warranty_case: f.warranty_case, symptom: f.symptom,
       status:'received', received_at: new Date().toISOString()
     });
   } catch(e){ fail(e); }
