@@ -5999,29 +5999,37 @@ async function deleteCust(id){
     const i = Array.isArray(data) ? data[0] : data;
     if (!i) throw new Error('ไม่พบลูกค้ารายนี้');
     const who2 = i.name + (i.phone ? ' · ' + i.phone : '');
-    let moveTo = null;
+    let moveTo = null, detach = false;
 
     if (i.jobs_total > 0){
       const others = S.custs.filter(c => c.id !== id)
         .sort((a,b) => String(a.name).localeCompare(String(b.name), 'th'));
-      if (!others.length) return toast('ยังไม่มีลูกค้ารายอื่นให้ย้ายใบงานไป', true);
       const f = await formModal({
         title: 'ลบ ' + who2,
         subtitle: 'ลูกค้ารายนี้มีใบงานอยู่ ' + i.jobs_total + ' ใบ (ค้างอยู่ ' + i.jobs_open
-                + ' ใบ) — ใบงานจะหายไปด้วยไม่ได้ ต้องบอกก่อนว่าจะย้ายไปรวมกับใคร',
-        ok: 'ย้ายใบงานแล้วลบ', danger: true,
-        fields: [{ k:'to', label:'ย้ายใบงานทั้งหมดไปรวมกับลูกค้า', type:'select', required:true, value:'',
-          options: [{ v:'', t:'— เลือกลูกค้าปลายทาง —' }]
-            .concat(others.map(c => ({ v:c.id, t:c.name + (c.phone ? ' · ' + c.phone : '') }))),
-          hint:'ใช้ตอนลูกค้าคนเดียวกันถูกบันทึกซ้ำหลายรายชื่อ — ประวัติซ่อมจะไปรวมอยู่ที่รายที่เลือก' }]
+                + ' ใบ) — ใบงานจะไม่ถูกลบ เลือกก่อนว่าจะให้ใบงานไปอยู่ตรงไหน',
+        ok: 'ลบลูกค้ารายนี้', danger: true,
+        fields: [{ k:'to', label:'แล้วใบงานล่ะ', type:'select', required:true, value:'',
+          options: [{ v:'', t:'— เลือกก่อนว่าจะทำยังไงกับใบงาน —' },
+                    { v:'__none__', t:'🚫 ไม่ระบุลูกค้า — ใบงานยังอยู่ แต่ไม่มีชื่อลูกค้าติดอยู่' }]
+            .concat(others.map(c => ({ v:c.id,
+              t:'👤 ย้ายไปรวมกับ ' + c.name + (c.phone ? ' · ' + c.phone : '') }))),
+          hint:'"ไม่ระบุลูกค้า" = ใช้ตอนชื่อนี้เป็นข้อมูลขยะ · '
+             + '"ย้ายไปรวมกับ…" = ใช้ตอนลูกค้าคนเดียวกันถูกบันทึกซ้ำหลายชื่อ ประวัติซ่อมจะไปกองที่รายที่เลือก' }]
       });
       if (!f) return;
-      moveTo = f.to;
+      detach = f.to === '__none__';
+      moveTo = detach ? null : f.to;
+      if (detach && !await confirmModal('ปลดใบงานออกจาก ' + who2 + '?',
+          'ใบงาน ' + i.jobs_total + ' ใบ จะยังอยู่ในระบบครบ แต่จะไม่มีชื่อลูกค้าติดอยู่อีก\n'
+        + 'แล้วลบชื่อลูกค้ารายนี้ทิ้ง — ย้อนกลับไม่ได้\n\n'
+        + 'ถ้าอยากลบใบงานทิ้งด้วย ให้ไปลบใบงานจากหน้าใบงานก่อน แล้วค่อยกลับมาลบลูกค้า',
+          { ok:'ปลดใบงานแล้วลบ' })) return;
     } else if (!await confirmModal('ลบลูกค้า ' + who2 + '?',
         'ลูกค้ารายนี้ยังไม่มีใบงานในระบบ — ลบแล้วหายถาวร กู้คืนไม่ได้', { ok:'ลบถาวร' })) return;
 
     const { data: nm, error: e2 } = await sb.rpc('delete_customer',
-      { p_id: id, p_move_to: moveTo });
+      { p_id: id, p_move_to: moveTo, p_detach: detach });
     if (e2) throw e2;
     toast('🗑️ ลบ ' + (nm || who2) + ' แล้ว');
     await reloadAll();
