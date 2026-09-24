@@ -5428,10 +5428,12 @@ async function claimOwner(){
       c = data;
     }
     S.peek = null;
-    await saveStep({
-      customer_id: c.id, order_no: f.order_no || null,
-      status:'received', received_at: new Date().toISOString()
-    });
+    const extra = { customer_id: c.id,
+      status:'received', received_at: new Date().toISOString() };
+    /* ใส่เลขคำสั่งซื้อก็ต่อเมื่อพิมพ์มาในกล่องนี้จริง ๆ
+       ปล่อยว่าง = ใช้ค่าที่กรอกไว้ในใบงานต่อ ไม่เอา null ไปทับให้หาย */
+    if (f.order_no) extra.order_no = f.order_no;
+    await saveStep(extra);
   } catch(e){ fail(e); }
 }
 
