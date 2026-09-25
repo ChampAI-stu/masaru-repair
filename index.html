@@ -4463,6 +4463,11 @@ async function openJob(id){
     S.slog = slog.data || []; S.seen = id; S.peek = null;
     goPage('job');
     renderJobPage();
+    /* ใบที่รอช่างอยู่ — ดึงคิวมาใหม่ให้เลขคิวตรงจริง (ตารางเล็ก ไม่เปลือง) */
+    if (!S.job.technician_id && S.job.severity && !CLOSED.includes(S.job.status)){
+      await refreshQueue();
+      renderJobPage();
+    }
   } catch(e){ fail(e); }
 }
 
@@ -4645,15 +4650,18 @@ function techBox(j){
     </div>`;
   }
 
-  const q = (S.queue || []).find(x => x.id === j.id);
+  const q  = (S.queue || []).find(x => x.id === j.id);
   const lv = LEVELS.find(l => l.k === j.severity);
+  /* คิวระดับเดียวกันทั้งหมด — ให้เห็นว่ารออยู่กี่ใบ ไม่ใช่แค่ "ยังไม่มีช่าง" ลอย ๆ */
+  const same = (S.queue || []).filter(x => x.severity === j.severity).length;
   return `<div class="box-warn">
-    ⏳ <b>ยังไม่มีช่างรับ — รอระบบจ่ายงาน</b>
+    ⏳ <b>${q ? 'อยู่ในคิวรอจ่ายงาน' : 'ยังไม่มีช่างรับ — รอระบบจ่ายงาน'}</b>
     <div style="font-size:13px;margin-top:4px">
       ${j.severity
-        ? `อยู่ในคิวระดับ <b>${esc(lv ? lv.t : j.severity)}</b>` +
-          (q ? ` · คิวที่ <b>${q.queue_no}</b>` : '') +
-          ' — ระบบจะจ่ายให้ช่างที่ช่องว่างมานานที่สุดโดยอัตโนมัติ'
+        ? `คิวระดับ <b>${esc(lv ? lv.t : j.severity)}</b>`
+          + (q ? ` · <b>คิวที่ ${q.queue_no}</b> จาก ${same} ใบที่รออยู่` : '')
+          + (q && q.hours_waiting >= 1 ? ` · รอมาแล้ว ${Math.floor(q.hours_waiting)} ชม.` : '')
+          + '<br>ช่างระดับนี้เต็มอยู่ — ระบบจะจ่ายให้ช่างที่ช่องว่างมานานที่สุดโดยอัตโนมัติทันทีที่มีคนว่าง'
         : '<b style="color:var(--crit)">ยังไม่ได้เลือกระดับความยาก</b> — เลือกข้างล่างก่อน ระบบถึงจะจ่ายงานได้'}
     </div>
     <div style="display:flex;gap:9px;margin-top:10px;flex-wrap:wrap">
@@ -4747,15 +4755,46 @@ async function peekBoard(){
   }
 }
 
-/** จ่ายงานใบนี้ตามคิว — ใครก็กดได้ ระบบเป็นคนเลือกช่างเอง */
+/** ดึงคิวรอจ่ายมาใหม่ — ตารางเล็ก เรียกบ่อยได้ไม่เปลือง */
+async function refreshQueue(){
+  try {
+    const { data, error } = await sb.from('v_dispatch_queue').select('*');
+    if (!error) S.queue = data || [];
+  } catch(e){ console.warn('v_dispatch_queue', e?.message || e); }
+  return S.queue || [];
+}
+
+/** ลองให้ระบบจ่ายงานใบที่เปิดอยู่
+    ได้ช่าง  → คืนชื่อช่าง
+    ไม่ได้   → ใบนี้ "เข้าคิว" ไม่ใช่ทางตัน — บอกคิวที่เท่าไหร่ให้ชัด */
+async function tryDispatch(){
+  try {
+    const { data: tn, error } = await sb.rpc('auto_assign', { p_job_id:S.job.id, p_by:who() });
+    if (error) throw error;
+    if (tn){ toast('🎯 ระบบจ่ายงานให้ ' + tn + ' แล้ว'); return tn; }
+
+    const q = (await refreshQueue()).find(x => x.id === S.job.id);
+    const lv = LEVELS.find(l => l.k === S.job.severity);
+    toast(q
+      ? `⏳ ช่างระดับ${lv ? lv.t : ''}เต็มทุกคน — ใบนี้เข้าคิวแล้ว อยู่คิวที่ ${q.queue_no} · `
+        + 'ระบบจะจ่ายให้เองทันทีที่มีช่างว่าง'
+      : '⏳ ยังไม่มีช่างว่าง — ใบนี้อยู่ในคิวรอจ่าย ระบบจะจ่ายให้เองเมื่อมีช่างว่าง');
+    return null;
+  } catch(e){ console.warn('auto_assign', e?.message || e); return null; }
+}
+
+/** จ่ายงานใบนี้ตามคิว — ใครก็กดได้ ระบบเป็นคนเลือกช่างเอง
+    ระดับความยากที่เพิ่งเลือกแต่ยังไม่ได้กดบันทึก ระบบบันทึกให้ก่อนเอง
+    ไม่งั้นกดแล้วจะขึ้นว่า "เลือกระดับความยากก่อน" ทั้งที่เลือกไปแล้ว */
 async function assignNow(){
   try {
-    if (!S.job.severity) return toast('เลือกระดับความยากก่อน', true);
-    const { data, error } = await sb.rpc('auto_assign', { p_job_id:S.job.id, p_by:who() });
-    if (error) throw error;
-    if (!data) toast('ช่องของระดับนี้เต็มทุกคน — ใบนี้รอคิวต่อ ระบบจะจ่ายให้เองเมื่อมีช่างว่าง', true);
-    else toast('✅ ระบบจ่ายให้ ' + data + ' แล้ว');
-    await openJob(S.job.id); reloadAll();
+    const lv = ($('sDiff') ? val('sDiff') : '') || S.job.severity;
+    if (!lv) return toast('เลือกระดับความยากก่อน', true);
+    if (lv !== S.job.severity){ await saveStep(); }
+    const tn = await tryDispatch();
+    await openJob(S.job.id);
+    reloadAll();
+    return tn;
   } catch(e){ fail(e); }
 }
 
@@ -5590,8 +5629,18 @@ async function moveStep(to){
     if (from === 2 && !val('sInspect')) return toast('กรอกอาการที่พบจากการตรวจเช็คก่อน', true);
     if (from === 3 && !val('sDiff'))
       return toast('เลือกระดับความยากก่อน — ระบบใช้ค่านี้จ่ายงานและคิดกำหนดเสร็จ', true);
-    if (from === 3 && !S.job.technician_id)
-      return toast('ยังไม่มีช่างรับงานใบนี้ — กด "จ่ายงานเดี๋ยวนี้" หรือรอคิว', true);
+    /* ยังไม่มีช่าง — ไม่ใช่ทางตัน
+       บันทึกระดับความยากให้ก่อน (ใบจะได้เข้าคิวจริง) แล้วลองจ่ายงานทันที
+       ได้ช่าง → ไปขั้นต่อไปให้เลย · ไม่ได้ → อยู่ขั้น 3 ต่อ พร้อมบอกว่าอยู่คิวที่เท่าไหร่ */
+    if (from === 3 && !S.job.technician_id){
+      await saveStep();
+      const tn = await tryDispatch();
+      await openJob(S.job.id);
+      reloadAll();
+      if (!tn) return;
+      S.peek = null;
+      return saveStep({ status: STEPS[to-1].main });
+    }
     if (from === 4 && !val('sMethod'))  return toast('กรอกวิธีการซ่อมก่อน', true);
     if (from === 5 && !canPassTesting())
       return toast('ขั้นตรวจสอบต้องให้ช่างหรือหัวหน้างานกดผ่าน', true);
